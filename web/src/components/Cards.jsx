@@ -100,13 +100,10 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
 export function PlaylistCard({ playlist }) {
   if (!playlist) return null;
   const idStr = String(playlist.id);
-  const isLocal = playlist.local || idStr.startsWith('local-playlist:');
   const isSystem = playlist.kind === 'system-playlist' || idStr.startsWith('system:');
-  const to = isLocal
-    ? `/playlist/${playlist.id}`
-    : isSystem
-      ? `/playlist/system:${idStr.replace(/^system:/, '')}`
-      : `/playlist/sc:${playlist.id}`;
+  const to = isSystem
+    ? `/playlist/system:${idStr.replace(/^system:/, '')}`
+    : `/playlist/sc:${playlist.id}`;
   const owner = playlist.user;
   const trackCount = playlist.track_count ?? playlist.tracks?.length ?? 0;
 

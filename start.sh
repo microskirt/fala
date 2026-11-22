@@ -26,13 +26,13 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "error: node not found. Install Node 22+ (node:sqlite is required)." >&2
+  echo "error: node not found. Install Node 18+ and try again." >&2
   exit 1
 fi
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-if [ "$NODE_MAJOR" -lt 22 ]; then
-  echo "error: Node 22+ required (found $(node -v))." >&2
+if [ "$NODE_MAJOR" -lt 18 ]; then
+  echo "error: Node 18+ required (found $(node -v))." >&2
   exit 1
 fi
 
@@ -53,8 +53,6 @@ if [ ! -f dist/index.html ] || [ -n "$(find web/src web/index.html -newer dist/i
 fi
 
 # ------------------------------------------------------------------- run it
-mkdir -p data
-
 echo "==> Wavefront is starting"
 echo "    http://${HOST}:${PORT}"
 echo

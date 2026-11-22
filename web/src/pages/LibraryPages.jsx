@@ -253,19 +253,9 @@ export function FollowingPage() {
         </EmptyState>
       ) : (
         <div className="search-user-grid">
-          {items.map((entry) => {
-            const person = entry.user;
-            if (!person) return null;
-            return (
-              <ArtistRow
-                key={`${entry.target_type}-${entry.target_id}`}
-                user={person}
-                subtitle={
-                  entry.target_type === 'local-user' ? 'On Wavefront' : 'On SoundCloud'
-                }
-              />
-            );
-          })}
+          {items.map((person) => (
+            <ArtistRow key={person.id} user={person} subtitle={person.description} />
+          ))}
         </div>
       )}
     </ListShell>
@@ -486,12 +476,8 @@ export function LibraryPage() {
           </p>
         ) : (
           <div className="search-user-grid">
-            {following.items.slice(0, 6).map((entry) => (
-              <ArtistRow
-                key={`${entry.target_type}-${entry.target_id}`}
-                user={entry.user}
-                subtitle={entry.target_type === 'local-user' ? 'On Wavefront' : 'On SoundCloud'}
-              />
+            {following.items.slice(0, 6).map((person) => (
+              <ArtistRow key={person.id} user={person} subtitle={person.description} />
             ))}
           </div>
         )}

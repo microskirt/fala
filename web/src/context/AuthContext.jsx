@@ -1,21 +1,32 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { api } from '../api.js';
+import { api, getToken, setToken } from '../api.js';
 import { useTheme } from './ThemeContext.jsx';
+
+/*
+ * Auth here is only ever the user's real SoundCloud account. Wavefront never
+ * creates accounts and never stores passwords. The token lives in this browser
+ * and is forwarded by the proxy.
+ */
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const { setTheme } = useTheme();
 
   const refresh = useCallback(async () => {
+    if (!getToken()) {
+      setAccount(null);
+      setLoading(false);
+      return null;
+    }
     try {
-      const me = await api.get('/api/auth/me');
-      setUser(me);
-      return me;
+      const res = await api.get('/api/session');
+      setAccount(res?.account || null);
+      return res?.account || null;
     } catch {
-      setUser(null);
+      setAccount(null);
       return null;
     } finally {
       setLoading(false);
@@ -26,63 +37,53 @@ export function AuthProvider({ children }) {
     refresh();
   }, [refresh]);
 
-  // Follow the account's saved theme once we know who they are.
-  useEffect(() => {
-    if (user?.settings?.theme) setTheme(user.settings.theme);
-  }, [user?.id, user?.settings?.theme, setTheme]);
+  const connect = useCallback(
+    async (token) => {
+      const clean = String(token || '').trim();
+      if (!clean) throw new Error('Paste your SoundCloud oauth_token');
+      setToken(clean);
+      try {
+        const res = await api.get('/api/session');
+        if (!res?.account) {
+          setToken('');
+          throw new Error('SoundCloud did not accept that token. Make sure you copied oauth_token.');
+        }
+        setAccount(res.account);
+        return res.account;
+      } catch (err) {
+        setToken('');
+        setAccount(null);
+        throw err;
+      }
+    },
+    []
+  );
 
-  const login = useCallback(async (email, password, code) => {
-    const res = await api.post('/api/auth/login', { email, password, code });
-    if (res && res.mfa_required) return { mfa_required: true };
-    setUser(res);
-    if (res?.settings?.theme) setTheme(res.settings.theme);
-    return res;
-  }, [setTheme]);
-
-  const register = useCallback(async (payload) => {
-    const res = await api.post('/api/auth/register', payload);
-    setUser(res);
-    if (res?.settings?.theme) setTheme(res.settings.theme);
-    return res;
-  }, [setTheme]);
-
-  const logout = useCallback(async () => {
-    try {
-      await api.post('/api/auth/logout');
-    } catch {}
-    setUser(null);
+  const disconnect = useCallback(async () => {
+    setToken('');
+    setAccount(null);
   }, []);
 
-  const patchSettings = useCallback(
-    async (patch) => {
-      const res = await api.patch('/api/me/settings', patch);
-      setUser(res);
-      if (res?.settings?.theme) setTheme(res.settings.theme);
-      return res;
+  const applyTheme = useCallback(
+    (next) => {
+      setTheme(next);
     },
     [setTheme]
   );
 
-  const updateProfile = useCallback(async (patch) => {
-    const res = await api.patch('/api/me/profile', patch);
-    setUser(res);
-    return res;
-  }, []);
-
   const value = useMemo(
     () => ({
-      user,
+      account,
+      user: account,
       loading,
-      isAuthed: !!user,
-      login,
-      register,
-      logout,
+      isAuthed: !!account,
+      connect,
+      disconnect,
+      logout: disconnect,
       refresh,
-      patchSettings,
-      updateProfile,
-      setUser,
+      setTheme: applyTheme,
     }),
-    [user, loading, login, register, logout, refresh, patchSettings, updateProfile]
+    [account, loading, connect, disconnect, refresh, applyTheme]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

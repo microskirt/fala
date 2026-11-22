@@ -1,10 +1,37 @@
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
+/*
+ * Wavefront has no accounts of its own. The user's SoundCloud OAuth token is
+ * kept in this browser's localStorage and attached to every API call. The
+ * server forwards it to SoundCloud and stores nothing.
+ */
+
+const TOKEN_KEY = 'wf.sc_token';
+
+export function getToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setToken(token) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {}
+}
+
 async function request(path, { method = 'GET', body, headers, signal } = {}) {
+  const token = getToken();
   const res = await fetch(path, {
     method,
-    credentials: 'include',
-    headers: { ...(body !== undefined ? JSON_HEADERS : {}), ...(headers || {}) },
+    headers: {
+      ...(body !== undefined ? JSON_HEADERS : {}),
+      ...(token ? { 'X-SC-Token': token } : {}),
+      ...(headers || {}),
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
     signal,
   });
@@ -23,6 +50,7 @@ async function request(path, { method = 'GET', body, headers, signal } = {}) {
     const err = new Error((data && data.error) || `Request failed (${res.status})`);
     err.status = res.status;
     err.data = data;
+    err.code = data && data.code;
     throw err;
   }
   return data;
@@ -31,6 +59,7 @@ async function request(path, { method = 'GET', body, headers, signal } = {}) {
 export const api = {
   get: (path, opts) => request(path, opts),
   post: (path, body, opts) => request(path, { ...opts, method: 'POST', body: body ?? {} }),
+  put: (path, body, opts) => request(path, { ...opts, method: 'PUT', body: body ?? {} }),
   patch: (path, body, opts) => request(path, { ...opts, method: 'PATCH', body: body ?? {} }),
   del: (path, body, opts) => request(path, { ...opts, method: 'DELETE', body }),
 };
@@ -127,6 +156,5 @@ export function trackPath(track) {
 
 export function userPath(user) {
   if (!user) return '#';
-  if (user.local || String(user.id).startsWith('local:')) return `/u/${user.permalink}`;
   return `/artist/${user.id}`;
 }

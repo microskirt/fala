@@ -6,13 +6,11 @@ import {
   Music2,
   ListMusic,
   Heart,
-  Repeat2,
   Users,
   BadgeCheck,
   Pencil,
   Settings2,
   Loader2,
-  Radio,
   Play,
   UserPlus,
 } from 'lucide-react';
@@ -36,15 +34,7 @@ import {
 } from '../components/Cards.jsx';
 import { FollowButton, PlayButton } from '../components/Controls.jsx';
 
-const LOCAL_TABS = [
-  { id: 'likes', label: 'Likes', icon: Heart },
-  { id: 'reposts', label: 'Reposts', icon: Repeat2 },
-  { id: 'playlists', label: 'Playlists', icon: ListMusic },
-  { id: 'followers', label: 'Followers', icon: Users },
-  { id: 'followings', label: 'Following', icon: UserPlus },
-];
-
-const REMOTE_TABS = [
+const TABS = [
   { id: 'tracks', label: 'Tracks', icon: Music2 },
   { id: 'toptracks', label: 'Popular', icon: Play },
   { id: 'albums', label: 'Albums', icon: ListMusic },
@@ -79,27 +69,17 @@ export function ProfilePage() {
   const [tabLoading, setTabLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const isLocal = !!permalink;
-  const tabs = isLocal ? LOCAL_TABS : REMOTE_TABS;
+  const tabs = TABS;
 
   const loadProfile = async () => {
     setLoading(true);
     setError(null);
     try {
-      let data;
-      if (isLocal) {
-        data = await api.get(`/api/resolve?url=${encodeURIComponent('/u/' + permalink)}`);
-      } else {
-        data = await api.get(`/api/users/${remoteId}`);
-      }
+      const data = permalink
+        ? await api.get(`/api/resolve?url=${encodeURIComponent(permalink)}`)
+        : await api.get(`/api/users/${remoteId}`);
       setProfile(data);
-      const isOwn = me && String(me.id) === String(data.id);
-      const first = isLocal
-        ? isOwn || !data.private_likes
-          ? 'likes'
-          : 'reposts'
-        : 'tracks';
-      setTab(first);
+      setTab('tracks');
     } catch (err) {
       setError(err.message || 'Profile not found');
     } finally {
@@ -267,7 +247,6 @@ export function ProfilePage() {
             <h1>
               {profile.username}
               {profile.verified && <BadgeCheck size={20} color="var(--accent)" />}
-              {profile.local && <span className="badge accent">Wavefront</span>}
             </h1>
             <div className="hero-handle">@{profile.permalink}</div>
 
@@ -306,9 +285,14 @@ export function ProfilePage() {
           <div className="hero-actions">
             {isOwn ? (
               <>
-                <Link className="btn" to="/settings?tab=profile">
-                  <Pencil size={15} /> Edit profile
-                </Link>
+                <a
+                  className="btn"
+                  href="https://soundcloud.com/settings/profile"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Pencil size={15} /> Edit on SoundCloud
+                </a>
                 <Link className="btn ghost" to="/settings">
                   <Settings2 size={15} /> Settings
                 </Link>
@@ -316,7 +300,7 @@ export function ProfilePage() {
             ) : (
               <>
                 <FollowButton target={profile} />
-                {profile.permalink_url && !profile.local && (
+                {profile.permalink_url && (
                   <a
                     className="btn ghost"
                     href={profile.permalink_url}

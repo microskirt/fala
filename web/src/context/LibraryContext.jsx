@@ -3,20 +3,24 @@ import { api } from '../api.js';
 import { useAuth } from './AuthContext.jsx';
 import { useToast } from './ToastContext.jsx';
 
+/*
+ * Everything here talks to the user's real SoundCloud account through the
+ * proxy. Nothing is stored locally beyond the token in api.js.
+ */
+
 const LibraryContext = createContext(null);
 
 export function LibraryProvider({ children }) {
   const { user } = useAuth();
   const toast = useToast();
 
-  // Sets of ids we have toggled in this session, layered over server state.
-  const [liked, setLiked] = useState(() => new Set());
-  const [reposted, setReposted] = useState(() => new Set());
-  const [followed, setFollowed] = useState(() => new Set());
+  // Optimistic overrides for this session, layered over SoundCloud's state.
+  const [liked, setLiked] = useState(() => new Map());
+  const [reposted, setReposted] = useState(() => new Map());
+  const [followed, setFollowed] = useState(() => new Map());
   const [busy, setBusy] = useState(() => new Set());
   const [playlists, setPlaylists] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [counts, setCounts] = useState({ likes: 0, playlists: 0, following: 0, unread: 0 });
+  const [counts, setCounts] = useState({ likes: 0, playlists: 0, following: 0 });
 
   const markBusy = (key, on) =>
     setBusy((prev) => {
@@ -29,15 +33,29 @@ export function LibraryProvider({ children }) {
   const isBusy = useCallback((key) => busy.has(key), [busy]);
 
   const isLiked = useCallback(
-    (track) => (track ? liked.has(String(track.id)) || !!track.liked : false),
+    (track) => {
+      if (!track) return false;
+      const override = liked.get(String(track.id));
+      return override === undefined ? !!track.liked : override;
+    },
     [liked]
   );
+
   const isReposted = useCallback(
-    (track) => (track ? reposted.has(String(track.id)) || !!track.reposted : false),
+    (track) => {
+      if (!track) return false;
+      const override = reposted.get(String(track.id));
+      return override === undefined ? !!track.reposted : override;
+    },
     [reposted]
   );
+
   const isFollowing = useCallback(
-    (u) => (u ? followed.has(String(u.id)) || !!u.is_following : false),
+    (target) => {
+      if (!target) return false;
+      const override = followed.get(String(target.id));
+      return override === undefined ? !!target.is_following : override;
+    },
     [followed]
   );
 
@@ -46,24 +64,20 @@ export function LibraryProvider({ children }) {
   const refreshLibrary = useCallback(async () => {
     if (!user) {
       setPlaylists([]);
-      setCounts({ likes: 0, playlists: 0, following: 0, unread: 0 });
-      setNotifications([]);
+      setCounts({ likes: 0, playlists: 0, following: 0 });
       return;
     }
     try {
-      const [pl, likes, following, notifs] = await Promise.all([
+      const [pl, likes, following] = await Promise.all([
         api.get('/api/me/playlists').catch(() => ({ collection: [] })),
         api.get('/api/me/likes').catch(() => ({ collection: [] })),
         api.get('/api/me/following').catch(() => ({ collection: [] })),
-        api.get('/api/me/notifications').catch(() => ({ collection: [] })),
       ]);
       setPlaylists(pl.collection || []);
-      setNotifications(notifs.collection || []);
       setCounts({
-        likes: (likes.collection || []).length,
+        likes: likes.total_results ?? (likes.collection || []).length,
         playlists: (pl.collection || []).length,
-        following: (following.collection || []).length,
-        unread: (notifs.collection || []).filter((n) => !n.read).length,
+        following: following.total_results ?? (following.collection || []).length,
       });
     } catch {}
   }, [user]);
@@ -78,56 +92,58 @@ export function LibraryProvider({ children }) {
     async (track) => {
       if (!track) return;
       if (!user) {
-        toast.error('Sign in to like tracks');
+        toast.error('Connect your SoundCloud account to like tracks');
         return;
       }
       const key = 'like:' + track.id;
       if (busy.has(key)) return;
+      const next = !isLiked(track);
       markBusy(key, true);
+      setLiked((prev) => new Map(prev).set(String(track.id), next));
       try {
-        const res = await api.post(`/api/tracks/${track.id}/like`, { track });
-        setLiked((prev) => {
-          const next = new Set(prev);
-          if (res.liked) next.add(String(track.id));
-          else next.delete(String(track.id));
-          return next;
-        });
-        setCounts((c) => ({ ...c, likes: Math.max(0, c.likes + (res.liked ? 1 : -1)) }));
+        await api.put(`/api/tracks/${track.id}/like`, { on: next });
+        setCounts((c) => ({ ...c, likes: Math.max(0, c.likes + (next ? 1 : -1)) }));
       } catch (err) {
+        setLiked((prev) => {
+          const copy = new Map(prev);
+          copy.delete(String(track.id));
+          return copy;
+        });
         toast.error(err.message || 'Could not update like');
       } finally {
         markBusy(key, false);
       }
     },
-    [user, busy, toast]
+    [user, busy, toast, isLiked]
   );
 
   const toggleRepost = useCallback(
     async (track) => {
       if (!track) return;
       if (!user) {
-        toast.error('Sign in to repost tracks');
+        toast.error('Connect your SoundCloud account to repost');
         return;
       }
       const key = 'repost:' + track.id;
       if (busy.has(key)) return;
+      const next = !isReposted(track);
       markBusy(key, true);
+      setReposted((prev) => new Map(prev).set(String(track.id), next));
       try {
-        const res = await api.post(`/api/tracks/${track.id}/repost`, { track });
-        setReposted((prev) => {
-          const next = new Set(prev);
-          if (res.reposted) next.add(String(track.id));
-          else next.delete(String(track.id));
-          return next;
-        });
-        toast.success(res.reposted ? 'Reposted to your profile' : 'Repost removed');
+        await api.put(`/api/tracks/${track.id}/repost`, { on: next });
+        toast.success(next ? 'Reposted to your profile' : 'Repost removed');
       } catch (err) {
+        setReposted((prev) => {
+          const copy = new Map(prev);
+          copy.delete(String(track.id));
+          return copy;
+        });
         toast.error(err.message || 'Could not repost');
       } finally {
         markBusy(key, false);
       }
     },
-    [user, busy, toast]
+    [user, busy, toast, isReposted]
   );
 
   /* ------------------------------ follows ------------------------------ */
@@ -136,28 +152,29 @@ export function LibraryProvider({ children }) {
     async (target) => {
       if (!target) return;
       if (!user) {
-        toast.error('Sign in to follow artists');
+        toast.error('Connect your SoundCloud account to follow artists');
         return;
       }
       const key = 'follow:' + target.id;
       if (busy.has(key)) return;
+      const next = !isFollowing(target);
       markBusy(key, true);
+      setFollowed((prev) => new Map(prev).set(String(target.id), next));
       try {
-        const res = await api.post(`/api/users/${encodeURIComponent(target.id)}/follow`);
-        setFollowed((prev) => {
-          const next = new Set(prev);
-          if (res.following) next.add(String(target.id));
-          else next.delete(String(target.id));
-          return next;
-        });
-        setCounts((c) => ({ ...c, following: Math.max(0, c.following + (res.following ? 1 : -1)) }));
+        await api.put(`/api/users/${encodeURIComponent(target.id)}/follow`, { on: next });
+        setCounts((c) => ({ ...c, following: Math.max(0, c.following + (next ? 1 : -1)) }));
       } catch (err) {
+        setFollowed((prev) => {
+          const copy = new Map(prev);
+          copy.delete(String(target.id));
+          return copy;
+        });
         toast.error(err.message || 'Could not update follow');
       } finally {
         markBusy(key, false);
       }
     },
-    [user, busy, toast]
+    [user, busy, toast, isFollowing]
   );
 
   /* ----------------------------- playlists ----------------------------- */
@@ -165,14 +182,14 @@ export function LibraryProvider({ children }) {
   const createPlaylist = useCallback(
     async (payload) => {
       if (!user) {
-        toast.error('Sign in to create playlists');
+        toast.error('Connect your SoundCloud account to create playlists');
         return null;
       }
       try {
         const pl = await api.post('/api/playlists', payload);
         setPlaylists((prev) => [pl, ...prev]);
         setCounts((c) => ({ ...c, playlists: c.playlists + 1 }));
-        toast.success('Playlist created');
+        toast.success('Playlist created on SoundCloud');
         return pl;
       } catch (err) {
         toast.error(err.message || 'Could not create playlist');
@@ -186,7 +203,7 @@ export function LibraryProvider({ children }) {
     async (id, payload) => {
       try {
         const pl = await api.patch(`/api/playlists/${id}`, payload);
-        setPlaylists((prev) => prev.map((p) => (p.id === pl.id ? pl : p)));
+        setPlaylists((prev) => prev.map((p) => (String(p.id) === String(pl.id) ? pl : p)));
         return pl;
       } catch (err) {
         toast.error(err.message || 'Could not update playlist');
@@ -200,7 +217,7 @@ export function LibraryProvider({ children }) {
     async (id) => {
       try {
         await api.del(`/api/playlists/${id}`);
-        setPlaylists((prev) => prev.filter((p) => p.id !== id));
+        setPlaylists((prev) => prev.filter((p) => String(p.id) !== String(id)));
         setCounts((c) => ({ ...c, playlists: Math.max(0, c.playlists - 1) }));
         toast.success('Playlist deleted');
         return true;
@@ -215,8 +232,8 @@ export function LibraryProvider({ children }) {
   const addTrackToPlaylist = useCallback(
     async (playlistId, track) => {
       try {
-        const pl = await api.post(`/api/playlists/${playlistId}/tracks`, { track });
-        setPlaylists((prev) => prev.map((p) => (p.id === pl.id ? pl : p)));
+        const pl = await api.post(`/api/playlists/${playlistId}/tracks`, { track_id: track.id });
+        setPlaylists((prev) => prev.map((p) => (String(p.id) === String(pl.id) ? pl : p)));
         toast.success(`Added to ${pl.title}`);
         return pl;
       } catch (err) {
@@ -231,7 +248,7 @@ export function LibraryProvider({ children }) {
     async (playlistId, trackId) => {
       try {
         const pl = await api.del(`/api/playlists/${playlistId}/tracks/${trackId}`);
-        setPlaylists((prev) => prev.map((p) => (p.id === pl.id ? pl : p)));
+        setPlaylists((prev) => prev.map((p) => (String(p.id) === String(pl.id) ? pl : p)));
         return pl;
       } catch (err) {
         toast.error(err.message || 'Could not remove track');
@@ -241,32 +258,12 @@ export function LibraryProvider({ children }) {
     [toast]
   );
 
-  /* --------------------------- notifications --------------------------- */
-
-  const refreshNotifications = useCallback(async () => {
-    if (!user) return;
-    try {
-      const res = await api.get('/api/me/notifications');
-      setNotifications(res.collection || []);
-      setCounts((c) => ({ ...c, unread: (res.collection || []).filter((n) => !n.read).length }));
-    } catch {}
-  }, [user]);
-
-  const markNotificationsRead = useCallback(async () => {
-    if (!user) return;
-    try {
-      await api.post('/api/me/notifications/read');
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      setCounts((c) => ({ ...c, unread: 0 }));
-    } catch {}
-  }, [user]);
-
   /* ------------------------------ comments ----------------------------- */
 
   const addComment = useCallback(
     async (trackId, body, timestampMs) => {
       if (!user) {
-        toast.error('Sign in to comment');
+        toast.error('Connect your SoundCloud account to comment');
         return null;
       }
       try {
@@ -299,7 +296,6 @@ export function LibraryProvider({ children }) {
   const value = useMemo(
     () => ({
       playlists,
-      notifications,
       counts,
       isLiked,
       isReposted,
@@ -314,16 +310,14 @@ export function LibraryProvider({ children }) {
       addTrackToPlaylist,
       removeTrackFromPlaylist,
       refreshLibrary,
-      refreshNotifications,
-      markNotificationsRead,
       addComment,
       deleteComment,
     }),
     [
-      playlists, notifications, counts, isLiked, isReposted, isFollowing, isBusy,
+      playlists, counts, isLiked, isReposted, isFollowing, isBusy,
       toggleLike, toggleRepost, toggleFollow, createPlaylist, updatePlaylist,
       deletePlaylist, addTrackToPlaylist, removeTrackFromPlaylist, refreshLibrary,
-      refreshNotifications, markNotificationsRead, addComment, deleteComment,
+      addComment, deleteComment,
     ]
   );
 

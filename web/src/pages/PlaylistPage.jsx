@@ -94,15 +94,13 @@ export function PlaylistPage() {
     setLoading(true);
     setError(null);
     try {
-      // ids come as `system:<id>`, `sc:<id>`, `local-playlist:<id>` or `local:<id>`.
+      // ids come as `system:<id>`, `sc:<id>` or a bare playlist id.
       const idStr = String(id);
       let path;
       if (idStr.startsWith('system:')) {
-        path = `/api/system-playlists/${encodeURIComponent(idStr.slice(7))}`;
+        path = `/api/playlists/system:${encodeURIComponent(idStr.slice(7))}`;
       } else if (idStr.startsWith('sc:')) {
         path = `/api/playlists/sc-playlist:${idStr.slice(3)}`;
-      } else if (idStr.startsWith('local-playlist:') || idStr.startsWith('local:')) {
-        path = `/api/playlists/${idStr}`;
       } else {
         path = `/api/playlists/sc-playlist:${idStr}`;
       }
@@ -150,7 +148,7 @@ export function PlaylistPage() {
   const tracks = (playlist.tracks || []).filter((t) => t && t.kind === 'track');
   const owner = playlist.user;
   const isOwner = user && owner && String(user.id) === String(owner.id);
-  const canEdit = isOwner && playlist.local;
+  const canEdit = isOwner;
 
   const save = async () => {
     setBusy(true);

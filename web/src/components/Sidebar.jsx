@@ -11,7 +11,6 @@ import {
   Bell,
   LogIn,
   Radio,
-  Plus,
   History,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -76,7 +75,7 @@ export function Sidebar({ open, onNavigate }) {
 
       <div className="nav-group">
         <div className="nav-heading">Account</div>
-        {isAuthed && link('/notifications', <Bell size={18} />, 'Notifications', counts.unread ? <span className="nav-count">{counts.unread}</span> : null)}
+        {isAuthed && link('/notifications', <Bell size={18} />, 'Activity')}
         {link('/settings', <Settings size={18} />, 'Settings')}
       </div>
 
@@ -96,7 +95,7 @@ export function Sidebar({ open, onNavigate }) {
         </div>
 
         {isAuthed && user ? (
-          <Link to={`/u/${user.permalink}`} className="sidebar-user" onClick={onNavigate}>
+          <Link to={`/artist/${user.id}`} className="sidebar-user" onClick={onNavigate}>
             <Avatar src={user.avatar_url} name={user.username} size={34} />
             <div className="who">
               <strong>{user.username}</strong>

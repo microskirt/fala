@@ -8,20 +8,16 @@ import {
   ArrowLeft,
   ArrowRight,
   LogIn,
-  UserPlus,
-  Command,
   TrendingUp,
 } from 'lucide-react';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useLibrary } from '../context/LibraryContext.jsx';
 import { Avatar } from './Media.jsx';
 
 export function Topbar({ onToggleSidebar, onOpenAuth }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthed } = useAuth();
-  const { counts } = useLibrary();
 
   const [term, setTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -191,26 +187,19 @@ export function Topbar({ onToggleSidebar, onOpenAuth }) {
             <Link
               to="/notifications"
               className="icon-btn"
-              aria-label={`Notifications${counts.unread ? ` (${counts.unread} unread)` : ''}`}
-              title="Notifications"
-              style={{ position: 'relative' }}
+              aria-label="Activity"
+              title="Activity"
             >
               <Bell size={18} />
-              {counts.unread > 0 && <span className="notif-dot" />}
             </Link>
-            <Link to={`/u/${user.permalink}`} className="avatar-btn" aria-label="Your profile">
+            <Link to={`/artist/${user.id}`} className="avatar-btn" aria-label="Your profile">
               <Avatar src={user.avatar_url} name={user.username} size={32} />
             </Link>
           </>
         ) : (
-          <>
-            <button type="button" className="btn ghost sm" onClick={() => onOpenAuth('login')}>
-              <LogIn size={15} /> <span>Sign in</span>
-            </button>
-            <button type="button" className="btn primary sm" onClick={() => onOpenAuth('register')}>
-              <UserPlus size={15} /> <span>Create account</span>
-            </button>
-          </>
+          <button type="button" className="btn primary sm" onClick={() => onOpenAuth('login')}>
+            <LogIn size={15} /> <span>Connect SoundCloud</span>
+          </button>
         )}
       </div>
     </header>

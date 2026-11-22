@@ -35,10 +35,11 @@ function cacheSet(key, data, ttl) {
 }
 
 export class ScError extends Error {
-  constructor(status, message, body) {
+  constructor(status, message, body, code) {
     super(message || `SoundCloud responded ${status}`);
     this.status = status;
     this.body = body;
+    this.code = code;
   }
 }
 
@@ -77,10 +78,12 @@ function withClientId(href) {
   return url.toString();
 }
 
-async function rawGet(href, { refresh = true } = {}) {
+async function rawGet(href, { refresh = true, token = null } = {}) {
   const url = withClientId(href);
-  let res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
-  if ((res.status === 401 || res.status === 403) && refresh) {
+  const headers = { 'User-Agent': UA, Accept: 'application/json' };
+  if (token) headers.Authorization = `OAuth ${token}`;
+  const res = await fetch(url, { headers });
+  if (!token && (res.status === 401 || res.status === 403) && refresh) {
     const next = await refreshClientId();
     if (next && next !== clientId) return rawGet(href, { refresh: false });
   }
@@ -94,7 +97,14 @@ async function rawGet(href, { refresh = true } = {}) {
   return res.json();
 }
 
-export async function apiGet(href, { ttl = 60_000 } = {}) {
+export async function apiGet(href, { ttl = 60_000, token = null } = {}) {
+  // Personalised responses depend on the caller's token, so never share them
+  // through the process-wide cache.
+  if (token) {
+    const data = await rawGet(href, { token });
+    rememberUsers(data);
+    return data;
+  }
   const key = href.replace(/([?&])client_id=[^&]*/g, '$1');
   const hit = cacheGet(key);
   if (hit !== undefined) return hit;
@@ -102,6 +112,49 @@ export async function apiGet(href, { ttl = 60_000 } = {}) {
   cacheSet(key, data, ttl);
   rememberUsers(data);
   return data;
+}
+
+const CAPTCHA_MESSAGE =
+  'SoundCloud is asking this server to solve a captcha before it allows write actions ' +
+  '(likes, reposts, comments, follows and playlists). SoundCloud blocks those actions ' +
+  'from many datacenter and VPN addresses. Reading and streaming still work. ' +
+  'Run Wavefront from your own network to enable write actions.';
+
+export async function apiWrite(method, href, { token, body } = {}) {
+  if (!token) throw new ScError(401, 'Connect your SoundCloud account first');
+  const url = withClientId(href);
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'User-Agent': UA,
+      Authorization: `OAuth ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/plain, */*',
+      Origin: 'https://soundcloud.com',
+      Referer: 'https://soundcloud.com/',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  if (res.status === 403 && text.includes('captcha-delivery')) {
+    throw new ScError(403, CAPTCHA_MESSAGE, null, 'captcha');
+  }
+  if (res.status === 401) {
+    throw new ScError(401, 'SoundCloud rejected this token. It may have expired — paste a fresh one.', null, 'token');
+  }
+  if (!res.ok) {
+    let parsed = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {}
+    throw new ScError(res.status, parsed?.errors?.[0] || parsed?.error || `SoundCloud responded ${res.status}`, parsed);
+  }
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
 }
 
 function rememberUsers(data) {
@@ -129,13 +182,13 @@ const QUALITY_PRESETS = {
 
 export function slimUser(u) {
   if (!u) return null;
-  if (u.local) return u;
+
   return {
     id: u.id,
     kind: 'user',
     username: u.username || u.permalink,
     permalink: u.permalink,
-    permalink_url: u.permalink_url || `/u/${u.permalink}`,
+    permalink_url: u.permalink_url || `https://soundcloud.com/${u.permalink}`,
     avatar_url: u.avatar_url,
     description: u.description || '',
     city: u.city || '',
@@ -147,7 +200,9 @@ export function slimUser(u) {
     likes_count: u.likes_count ?? 0,
     verified: !!u.verified,
     urn: u.urn,
-    local: false,
+    created_at: u.created_at || null,
+    first_name: u.first_name || '',
+    last_name: u.last_name || '',
   };
 }
 
@@ -174,7 +229,6 @@ export function slimTrack(t) {
     monetization_model: t.monetization_model,
     waveform_url: t.waveform_url,
     user: slimUser(t.user),
-    local: false,
   };
 }
 
@@ -222,7 +276,6 @@ export function slimPlaylist(p) {
     set_type: p.set_type || '',
     user: slimUser(p.user),
     tracks: Array.isArray(p.tracks) ? p.tracks.map(slimTrack).filter(Boolean) : undefined,
-    local: false,
   };
 }
 
@@ -303,8 +356,8 @@ export async function systemPlaylist(id, { trackLimit } = {}) {
   return { ...slimPlaylist(data), tracks, track_count: data.track_count ?? total };
 }
 
-export async function playlist(id) {
-  const data = await apiGet(`/playlists/${id}`, { ttl: 120_000 });
+export async function playlist(id, { token = null } = {}) {
+  const data = await apiGet(`/playlists/${id}`, { ttl: 120_000, token });
   return slimPlaylist(data);
 }
 
@@ -322,8 +375,8 @@ export async function tracksByIds(ids) {
   return clean.map((id) => slimTrack(byId.get(id))).filter(Boolean);
 }
 
-export async function track(id) {
-  const data = await apiGet(`/tracks/${id}`, { ttl: 120_000 });
+export async function track(id, { token = null } = {}) {
+  const data = await apiGet(`/tracks/${id}`, { ttl: 120_000, token });
   return fullTrack(data);
 }
 
@@ -344,14 +397,14 @@ export async function resolve(url) {
   return null;
 }
 
-export async function userTab(id, tab, { limit = 24, next } = {}) {
+export async function userTab(id, tab, { limit = 24, next, token = null } = {}) {
   const allowed = ['tracks', 'likes', 'playlists', 'albums', 'followers', 'followings', 'spotlight', 'comments', 'toptracks'];
   if (!allowed.includes(tab)) throw new ScError(400, 'bad tab');
   if (next) {
-    const data = await apiGet(next, { ttl: 120_000 });
+    const data = await apiGet(next, { ttl: 120_000, token });
     return mapCollection(data, (item) => mapUserTabItem(tab, item));
   }
-  const data = await apiGet(`/users/${id}/${tab}?limit=${limit}`, { ttl: 120_000 });
+  const data = await apiGet(`/users/${id}/${tab}?limit=${limit}`, { ttl: 120_000, token });
   return mapCollection(data, (item) => mapUserTabItem(tab, item));
 }
 
@@ -364,9 +417,9 @@ function mapUserTabItem(tab, item) {
   return mapSearchItem(item);
 }
 
-export async function activity(id, { limit = 20, next } = {}) {
+export async function activity(id, { limit = 20, next, token = null } = {}) {
   if (next) {
-    const data = await apiGet(next, { ttl: 60_000 });
+    const data = await apiGet(next, { ttl: 60_000, token });
     return {
       collection: (data.collection || []).map(mapActivityItem).filter(Boolean),
       next_href: stripClientId(data.next_href),
@@ -410,7 +463,7 @@ export async function comments(id, { limit = 30, next } = {}) {
 function slimComment(c) {
   if (!c) return null;
   return {
-    id: 'sc:' + c.id,
+    id: c.id,
     source: 'soundcloud',
     body: c.body,
     timestamp_ms: c.timestamp ?? null,
@@ -576,4 +629,237 @@ export async function genres() {
   } catch {
     return [];
   }
+}
+
+/* --------------------------- authenticated account -------------------------- */
+
+// Short-lived per-token caches. Wavefront stores no account data on disk; these
+// only avoid re-fetching the same thing several times per page render.
+const tokenCache = new Map();
+
+function tokenEntry(token) {
+  const hit = tokenCache.get(token);
+  if (hit && hit.exp > Date.now()) return hit;
+  const entry = { me: null, exp: Date.now() + 60_000 };
+  tokenCache.set(token, entry);
+  if (tokenCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of tokenCache) if (v.exp < now) tokenCache.delete(k);
+  }
+  return entry;
+}
+
+export async function me(token) {
+  if (!token) return null;
+  const entry = tokenEntry(token);
+  if (entry.me) return entry.me;
+  const data = await apiGet('/me', { token });
+  entry.me = data;
+  return data;
+}
+
+export async function meId(token) {
+  const data = await me(token);
+  if (!data) throw new ScError(401, 'Connect your SoundCloud account first');
+  return data.id;
+}
+
+async function idSet(href, token) {
+  const entry = tokenEntry(token);
+  entry.sets = entry.sets || new Map();
+  const hit = entry.sets.get(href);
+  if (hit && hit.exp > Date.now()) return hit.ids;
+  const data = await apiGet(href, { token });
+  const ids = new Set((data.collection || []).map((v) => String(v.id ?? v)));
+  entry.sets.set(href, { ids, exp: Date.now() + 30_000 });
+  return ids;
+}
+
+export async function likeIds(token) {
+  try {
+    return await idSet('/me/track_likes/ids', token);
+  } catch {
+    return new Set();
+  }
+}
+
+export async function repostIds(token) {
+  try {
+    return await idSet('/me/track_reposts/ids', token);
+  } catch {
+    return new Set();
+  }
+}
+
+export async function followIds(token) {
+  try {
+    const id = await meId(token);
+    return await idSet(`/users/${id}/followings/ids`, token);
+  } catch {
+    return new Set();
+  }
+}
+
+export function invalidateToken(token) {
+  if (token) tokenCache.delete(token);
+}
+
+/* ------------------------------- library reads ------------------------------ */
+
+export async function myLikes(token, { limit = 50, next } = {}) {
+  const id = await meId(token);
+  const data = next
+    ? await apiGet(next, { token })
+    : await apiGet(`/users/${id}/track_likes?limit=${limit}`, { token });
+  return mapCollection(data, slimTrack);
+}
+
+export async function myReposts(token, { limit = 50, next } = {}) {
+  const id = await meId(token);
+  const data = next
+    ? await apiGet(next, { token })
+    : await apiGet(`/stream/users/${id}/reposts?limit=${limit}`, { token });
+  return mapCollection(data, (item) => {
+    if (!item) return null;
+    if (item.track) return slimTrack(item.track);
+    if (item.kind === 'track') return slimTrack(item);
+    return null;
+  });
+}
+
+export async function myPlaylists(token, { limit = 50, next } = {}) {
+  const id = await meId(token);
+  const data = next
+    ? await apiGet(next, { token })
+    : await apiGet(`/users/${id}/playlists?limit=${limit}`, { token });
+  return mapCollection(data, slimPlaylist);
+}
+
+export async function myFollowing(token, { limit = 50, next } = {}) {
+  const id = await meId(token);
+  const data = next
+    ? await apiGet(next, { token })
+    : await apiGet(`/users/${id}/followings?limit=${limit}`, { token });
+  return mapCollection(data, slimUser);
+}
+
+export async function myHistory(token, { limit = 50 } = {}) {
+  const data = await apiGet(`/me/play-history/tracks?limit=${limit}`, { token });
+  return {
+    collection: (data.collection || [])
+      .map((entry) => slimTrack(entry.track))
+      .filter(Boolean),
+    next_href: null,
+  };
+}
+
+export async function myStream(token, { limit = 20 } = {}) {
+  const data = await apiGet(`/stream?limit=${limit}`, { token });
+  return {
+    collection: (data.collection || []).map(mapActivityItem).filter(Boolean),
+    next_href: stripClientId(data.next_href),
+  };
+}
+
+/* --------------------------------- writes ---------------------------------- */
+
+export async function like(token, trackId, on) {
+  const id = await meId(token);
+  await apiWrite(on ? 'PUT' : 'DELETE', `/users/${id}/track_likes/${trackId}`, { token });
+  invalidateToken(token);
+  return { liked: !!on };
+}
+
+export async function repost(token, trackId, on) {
+  await apiWrite(on ? 'PUT' : 'DELETE', `/me/track_reposts/${trackId}`, { token });
+  invalidateToken(token);
+  return { reposted: !!on };
+}
+
+export async function follow(token, userId, on) {
+  await apiWrite(on ? 'POST' : 'DELETE', `/me/followings/${userId}`, { token });
+  invalidateToken(token);
+  return { following: !!on };
+}
+
+export async function comment(token, trackId, body, timestampMs) {
+  const payload = { comment: { body } };
+  if (timestampMs != null) payload.comment.timestamp = Math.round(timestampMs);
+  const data = await apiWrite('POST', `/tracks/${trackId}/comments`, { token, body: payload });
+  return slimComment(data) || data;
+}
+
+export async function deleteComment(token, commentId) {
+  await apiWrite('DELETE', `/comments/${commentId}`, { token });
+  return { ok: true };
+}
+
+export async function createPlaylist(token, { title, description, is_private }) {
+  const id = await meId(token);
+  const payload = {
+    playlist: {
+      title,
+      description: description || '',
+      sharing: is_private ? 'private' : 'public',
+      tracks: [],
+    },
+  };
+  const data = await apiWrite('POST', `/playlists?user_id=${id}`, { token, body: payload });
+  return slimPlaylist(data);
+}
+
+export async function updatePlaylist(token, playlistId, patch) {
+  const current = await apiGet(`/playlists/${playlistId}`, { token });
+  const payload = {
+    playlist: {
+      title: patch.title ?? current.title,
+      description: patch.description ?? current.description,
+      sharing: patch.is_private === undefined
+        ? current.sharing
+        : patch.is_private
+          ? 'private'
+          : 'public',
+      tracks: (current.tracks || []).map((t) => ({ id: t.id })),
+    },
+  };
+  const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: payload });
+  return slimPlaylist(data);
+}
+
+export async function deletePlaylist(token, playlistId) {
+  await apiWrite('DELETE', `/playlists/${playlistId}`, { token });
+  return { ok: true };
+}
+
+export async function addTrackToPlaylist(token, playlistId, trackId) {
+  const current = await apiGet(`/playlists/${playlistId}`, { token });
+  const ids = (current.tracks || []).map((t) => t.id);
+  if (!ids.includes(Number(trackId))) ids.push(Number(trackId));
+  const payload = {
+    playlist: {
+      title: current.title,
+      description: current.description || '',
+      sharing: current.sharing || 'public',
+      tracks: ids.map((id) => ({ id })),
+    },
+  };
+  const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: payload });
+  return slimPlaylist(data);
+}
+
+export async function removeTrackFromPlaylist(token, playlistId, trackId) {
+  const current = await apiGet(`/playlists/${playlistId}`, { token });
+  const ids = (current.tracks || [])
+    .map((t) => t.id)
+    .filter((id) => String(id) !== String(trackId));
+  const payload = {
+    playlist: {
+      title: current.title,
+      description: current.description || '',
+      sharing: current.sharing || 'public',
+      tracks: ids.map((id) => ({ id })),
+    },
+  };
+  const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: payload });
+  return slimPlaylist(data);
 }

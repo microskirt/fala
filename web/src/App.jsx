@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar.jsx';
 import { Topbar } from './components/Topbar.jsx';
 import { Player } from './components/Player.jsx';
@@ -49,7 +49,7 @@ function ScrollToTop() {
 export default function App() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  const isAuthPage = location.pathname === '/login';
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -59,7 +59,6 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<AuthPage />} />
-        <Route path="/register" element={<Navigate to="/login?mode=register" replace />} />
       </Routes>
     );
   }
@@ -84,7 +83,6 @@ export default function App() {
             <Route path="/discover" element={<DiscoverPage />} />
             <Route path="/track/:id" element={<TrackPage />} />
             <Route path="/playlist/:id" element={<PlaylistPage />} />
-            <Route path="/u/:permalink" element={<ProfilePage />} />
             <Route path="/artist/:id" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />

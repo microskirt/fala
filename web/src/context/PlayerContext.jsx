@@ -8,7 +8,7 @@ import {
   useMemo,
 } from 'react';
 import { api } from '../api.js';
-import { useAuth } from './AuthContext.jsx';
+import { usePrefs } from '../prefs.js';
 import { useToast } from './ToastContext.jsx';
 
 const PlayerContext = createContext(null);
@@ -31,7 +31,7 @@ export function PlayerProvider({ children }) {
   const hlsRef = useRef(null);
   const playingRef = useRef(false);
   const loadIdRef = useRef(0);
-  const { user } = useAuth();
+  const [prefs] = usePrefs();
   const toast = useToast();
 
   const [queue, setQueue] = useState([]);
@@ -48,7 +48,7 @@ export function PlayerProvider({ children }) {
   const [playbackError, setPlaybackError] = useState(null);
 
   const current = index >= 0 && index < queue.length ? queue[index] : null;
-  const quality = user?.settings?.quality || 'hq';
+  const quality = prefs.quality || 'hq';
 
   useEffect(() => {
     playingRef.current = playing;

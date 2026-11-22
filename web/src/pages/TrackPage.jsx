@@ -138,7 +138,7 @@ function CommentForm({ track, onPosted, timestampMs }) {
 function CommentItem({ comment, onDelete }) {
   const { user } = useAuth();
   const { seek } = usePlayer();
-  const canDelete = user && comment.source === 'local' && comment.user && String(user.id) === String(comment.user.id);
+  const canDelete = user && comment.user && String(user.id) === String(comment.user.id);
 
   return (
     <div className="comment">

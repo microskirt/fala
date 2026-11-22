@@ -4,8 +4,8 @@ node_modules/
 # build output
 dist/
 
-# runtime data: SQLite database, cached SoundCloud client_id.
-# contains password hashes, TOTP secrets and backup codes — never commit.
+# runtime data: cached SoundCloud client_id.
+# Wavefront stores no accounts and no tokens.
 data/
 *.db
 *.db-shm
