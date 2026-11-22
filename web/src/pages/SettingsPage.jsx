@@ -422,8 +422,8 @@ export function SettingsPage() {
                   {[
                     {
                       id: 'hq',
-                      title: 'High (160 kbps)',
-                      desc: 'Best available AAC stream. Recommended.',
+                      title: 'High (up to 256 kbps)',
+                      desc: 'Best stream your account can play. 256 kbps needs SoundCloud Go+.',
                     },
                     {
                       id: 'sq',
