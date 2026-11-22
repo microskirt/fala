@@ -51,15 +51,15 @@ export function TrackCard({ track, context, showStats = true }) {
           </Link>
         ) : null}
         {showStats ? (
-          <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1" title="Plays">
-              <Play size={10} fill="currentColor" /> {formatCount(track.playback_count)}
+              <Play size={14} fill="currentColor" /> {formatCount(track.playback_count)}
             </span>
             <span className="inline-flex items-center gap-1" title="Likes">
-              <Heart size={10} /> {formatCount(track.likes_count)}
+              <Heart size={14} /> {formatCount(track.likes_count)}
             </span>
             <span className="inline-flex items-center gap-1" title="Comments">
-              <MessageSquare size={10} /> {formatCount(track.comment_count)}
+              <MessageSquare size={14} /> {formatCount(track.comment_count)}
             </span>
           </div>
         ) : null}
@@ -108,9 +108,9 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-        <LikeButton track={track} size={15} />
-        <AddToPlaylistButton track={track} size={15} />
-        <QueueMenuButton track={track} size={15} />
+        <LikeButton track={track} size={16} />
+        <AddToPlaylistButton track={track} size={16} />
+        <QueueMenuButton track={track} size={16} />
       </div>
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
         {formatDuration(track.duration)}
@@ -138,8 +138,8 @@ export function PlaylistCard({ playlist }) {
           kind="playlist"
         />
         {trackCount > 0 ? (
-          <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
-            <ListMusic size={10} /> {trackCount}
+          <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
+            <ListMusic size={14} /> {trackCount}
           </span>
         ) : null}
       </Link>
@@ -180,7 +180,7 @@ export function ArtistCard({ user }) {
         {user.username}
       </Link>
       <span className="max-w-full truncate text-xs text-muted-foreground">@{user.permalink}</span>
-      <span className="text-[11px] text-muted-foreground">
+      <span className="text-xs text-muted-foreground">
         {formatCount(user.followers_count)} follower{(user.followers_count || 0) === 1 ? '' : 's'}
       </span>
       <FollowButton target={user} size="sm" className="mt-1" />
@@ -256,7 +256,7 @@ export function SectionScroller({ title, subtitle, children, action }) {
             onClick={() => scrollBy(-1)}
             aria-label="Scroll left"
           >
-            <ChevronLeft size={17} />
+            <ChevronLeft size={16} />
           </button>
         ) : null}
         <div
@@ -273,7 +273,7 @@ export function SectionScroller({ title, subtitle, children, action }) {
             onClick={() => scrollBy(1)}
             aria-label="Scroll right"
           >
-            <ChevronRight size={17} />
+            <ChevronRight size={16} />
           </button>
         ) : null}
       </div>
@@ -286,17 +286,17 @@ export function TrackStatLine({ track }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
       <span className="inline-flex items-center gap-1.5">
-        <PlayCircle size={13} /> {formatCount(track.playback_count)} plays
+        <PlayCircle size={14} /> {formatCount(track.playback_count)} plays
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <Heart size={13} /> {formatCount(track.likes_count)} likes
+        <Heart size={14} /> {formatCount(track.likes_count)} likes
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <MessageSquare size={13} /> {formatCount(track.comment_count)} comments
+        <MessageSquare size={14} /> {formatCount(track.comment_count)} comments
       </span>
       {track.display_date ? (
         <span className="inline-flex items-center gap-1.5">
-          <Clock size={13} /> {timeAgo(track.display_date)}
+          <Clock size={14} /> {timeAgo(track.display_date)}
         </span>
       ) : null}
     </div>

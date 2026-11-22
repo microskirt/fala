@@ -38,7 +38,7 @@ function NavLink({ to, icon: Icon, label, count, onClick }) {
       <Icon size={18} className={cn(active ? 'text-primary' : 'text-muted-foreground')} />
       <span className="truncate">{label}</span>
       {count ? (
-        <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+        <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
           {count}
         </span>
       ) : null}
@@ -48,7 +48,7 @@ function NavLink({ to, icon: Icon, label, count, onClick }) {
 
 function NavHeading({ children }) {
   return (
-    <div className="px-3 pt-5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+    <div className="px-3 pt-5 pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
       {children}
     </div>
   );
@@ -69,11 +69,11 @@ export function Sidebar({ open, onNavigate }) {
     >
       <Link to="/" onClick={onNavigate} className="flex items-center gap-2.5 px-5 py-4">
         <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-          <Radio size={17} strokeWidth={2.4} />
+          <Radio size={16} strokeWidth={2.4} />
         </span>
         <span className="leading-tight">
-          <span className="block text-sm font-semibold tracking-tight">Wavefront</span>
-          <span className="block text-[11px] text-muted-foreground">Sound, reimagined</span>
+          <span className="block text-sm font-semibold tracking-tight">Fala</span>
+          <span className="block text-xs text-muted-foreground">A calmer SoundCloud</span>
         </span>
       </Link>
 
@@ -130,8 +130,8 @@ export function Sidebar({ open, onNavigate }) {
             >
               <Avatar src={user.avatar_url} name={user.username} size={32} />
               <div className="min-w-0 leading-tight">
-                <div className="truncate text-[13px] font-semibold">{user.username}</div>
-                <div className="truncate text-[11px] text-muted-foreground">@{user.permalink}</div>
+                <div className="truncate text-sm font-semibold">{user.username}</div>
+                <div className="truncate text-xs text-muted-foreground">@{user.permalink}</div>
               </div>
             </Link>
             <Button
@@ -144,7 +144,7 @@ export function Sidebar({ open, onNavigate }) {
                 navigate({ to: '/' });
               }}
             >
-              <LogOut size={15} /> Sign out
+              <LogOut size={16} /> Sign out
             </Button>
           </div>
         ) : (
@@ -155,7 +155,7 @@ export function Sidebar({ open, onNavigate }) {
               navigate({ to: '/login' });
             }}
           >
-            <LogIn size={15} /> Connect SoundCloud
+            <LogIn size={16} /> Connect SoundCloud
           </Button>
         )}
       </div>

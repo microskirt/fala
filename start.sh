@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wavefront — launcher
+# Fala — launcher
 # Builds the React app with bun if needed, then serves it on 0.0.0.0:8090.
 set -euo pipefail
 
@@ -72,7 +72,7 @@ if [ ! -f dist/index.html ] || [ -n "$(find web/src web/index.html -newer dist/i
 fi
 
 # ------------------------------------------------------------------- run it
-echo "==> Wavefront is starting"
+echo "==> Fala is starting"
 echo "    http://${HOST}:${PORT}"
 echo
 exec env PORT="$PORT" HOST="$HOST" node server/index.js

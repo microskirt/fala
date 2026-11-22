@@ -1,26 +1,19 @@
+import { KEYS, readKey, writeKey } from '@/lib/storage.js';
+
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 /*
- * Wavefront has no accounts of its own. The user's SoundCloud OAuth token is
- * kept in this browser's localStorage and attached to every API call. The
- * server forwards it to SoundCloud and stores nothing.
+ * Fala has no accounts of its own. The user's SoundCloud OAuth token is kept
+ * in this browser's localStorage and attached to every API call. The server
+ * forwards it to SoundCloud and stores nothing.
  */
 
-const TOKEN_KEY = 'wf.sc_token';
-
 export function getToken() {
-  try {
-    return localStorage.getItem(TOKEN_KEY) || '';
-  } catch {
-    return '';
-  }
+  return readKey(KEYS.token) || '';
 }
 
 export function setToken(token) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch {}
+  writeKey(KEYS.token, token || null);
 }
 
 async function request(path, { method = 'GET', body, headers, signal } = {}) {

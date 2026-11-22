@@ -76,7 +76,7 @@ export function EmptyState({ icon: Icon, title, children, action }) {
           <Icon size={22} strokeWidth={1.6} />
         </div>
       ) : null}
-      <h3 className="text-base font-semibold">{title}</h3>
+      <h3 className="text-base font-semibold tracking-tight">{title}</h3>
       {children ? (
         <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">{children}</p>
       ) : null}
@@ -91,7 +91,7 @@ export function ErrorState({ message, onRetry }) {
       <div className="mb-4 grid size-12 place-items-center rounded-full bg-destructive/10 text-destructive">
         <AlertTriangle size={22} strokeWidth={1.6} />
       </div>
-      <h3 className="text-base font-semibold">Something went wrong</h3>
+      <h3 className="text-base font-semibold tracking-tight">Something went wrong</h3>
       <p className="mt-1.5 max-w-md text-sm text-muted-foreground">{message}</p>
       {onRetry ? (
         <Button variant="outline" className="mt-5" onClick={onRetry}>

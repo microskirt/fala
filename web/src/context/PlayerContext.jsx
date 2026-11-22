@@ -8,21 +8,18 @@ import {
   useMemo,
 } from 'react';
 import { api } from '../api.js';
+import { KEYS, readKey, writeKey } from '../lib/storage.js';
 import { usePrefs } from '../prefs.js';
 import { useToast } from './ToastContext.jsx';
 
 const PlayerContext = createContext(null);
 
-const VOLUME_KEY = 'wf.volume';
-
 function readStoredVolume() {
-  try {
-    const raw = localStorage.getItem(VOLUME_KEY);
-    if (raw !== null) {
-      const v = Number(raw);
-      if (Number.isFinite(v) && v >= 0 && v <= 1) return v;
-    }
-  } catch {}
+  const raw = readKey(KEYS.volume);
+  if (raw !== null) {
+    const v = Number(raw);
+    if (Number.isFinite(v) && v >= 0 && v <= 1) return v;
+  }
   return 0.85;
 }
 
@@ -58,9 +55,7 @@ export function PlayerProvider({ children }) {
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = muted ? 0 : volume;
-    try {
-      localStorage.setItem(VOLUME_KEY, String(volume));
-    } catch {}
+    writeKey(KEYS.volume, String(volume));
   }, [volume, muted]);
 
   useEffect(() => {
@@ -319,18 +314,21 @@ export function PlayerProvider({ children }) {
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
   const addToQueue = useCallback(
-    (track) => {
-      if (!track) return;
+    (input) => {
+      const incoming = (Array.isArray(input) ? input : [input]).filter(Boolean);
+      if (incoming.length === 0) return;
       setQueue((prev) => {
-        if (prev.some((t) => String(t.id) === String(track.id))) return prev;
+        const seen = new Set(prev.map((t) => String(t.id)));
+        const added = incoming.filter((t) => !seen.has(String(t.id)));
+        if (added.length === 0) return prev;
         if (prev.length === 0) {
           setIndex(0);
           setPlaying(true);
           playingRef.current = true;
         }
-        return [...prev, track];
+        return [...prev, ...added];
       });
-      toast.success('Added to queue');
+      toast.success(incoming.length === 1 ? 'Added to queue' : `Added ${incoming.length} tracks to queue`);
     },
     [toast]
   );
@@ -378,7 +376,7 @@ export function PlayerProvider({ children }) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: current.title || 'Unknown track',
         artist: current.user?.username || 'Unknown artist',
-        album: 'Wavefront',
+        album: 'Fala',
         artwork: current.artwork_url
           ? [{ src: current.artwork_url, sizes: '500x500', type: 'image/jpeg' }]
           : [],

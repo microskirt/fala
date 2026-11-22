@@ -127,13 +127,13 @@ export function SearchPage() {
                 type="button"
                 onClick={() => setFilter(f.id)}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
                   filter === f.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <f.icon size={13} /> {f.label}
+                <f.icon size={14} /> {f.label}
               </button>
             ))}
           </div>
@@ -217,7 +217,7 @@ export function SearchPage() {
       {data.next_href ? (
         <div className="mt-8 flex justify-center">
           <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
-            {loadingMore ? <Loader2 size={15} className="animate-spin" /> : null}
+            {loadingMore ? <Loader2 size={16} className="animate-spin" /> : null}
             {loadingMore ? 'Loading…' : 'Load more'}
           </Button>
         </div>

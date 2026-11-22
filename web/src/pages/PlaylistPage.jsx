@@ -21,9 +21,10 @@ import { useToast } from '@/context/ToastContext.jsx';
 import { Artwork, Avatar, Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx';
 import { LikeButton, AddToPlaylistButton, QueueMenuButton, PlayButton } from '@/components/Controls.jsx';
 import { Modal, ConfirmDialog } from '@/components/Modal.jsx';
-import { Page, TrackList } from '@/components/layout/Page.jsx';
+import { Page, TrackList, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
+import { Textarea } from '@/components/ui/textarea.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
 
@@ -88,7 +89,7 @@ export function PlaylistPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { playQueue, playTrack } = usePlayer();
+  const { playQueue, addToQueue } = usePlayer();
   const { updatePlaylist, deletePlaylist, removeTrackFromPlaylist } = useLibrary();
   const toast = useToast();
 
@@ -197,24 +198,24 @@ export function PlaylistPage() {
             size="100%"
             rounded={12}
             kind="playlist"
-            className="aspect-square shadow-lg"
+            className="aspect-square shadow-md"
           />
         </div>
 
         <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-primary uppercase">
+          <Eyebrow>
             {playlist.is_private ? (
               <>
-                <Lock size={12} /> Private playlist
+                <Lock size={14} /> Private playlist
               </>
             ) : playlist.is_album ? (
               'Album'
             ) : (
               'Playlist'
             )}
-          </div>
+          </Eyebrow>
 
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {playlist.title}
           </h1>
 
@@ -262,22 +263,22 @@ export function PlaylistPage() {
               onClick={() => playQueue(tracks, 0)}
               disabled={tracks.length === 0}
             >
-              <Play size={17} fill="currentColor" /> Play
+              <Play size={16} fill="currentColor" /> Play
             </Button>
             <Button
               variant="outline"
-              onClick={() => tracks.forEach((t) => playTrack(t))}
+              onClick={() => addToQueue(tracks)}
               disabled={tracks.length === 0}
             >
-              <ListMusic size={15} /> Add to queue
+              <ListMusic size={16} /> Add to queue
             </Button>
             {canEdit ? (
               <>
                 <Button variant="outline" onClick={() => setEditing(true)}>
-                  <Pencil size={15} /> Edit
+                  <Pencil size={16} /> Edit
                 </Button>
                 <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
-                  <Trash2 size={15} /> Delete
+                  <Trash2 size={16} /> Delete
                 </Button>
               </>
             ) : null}
@@ -333,9 +334,9 @@ export function PlaylistPage() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="pl-desc">Description</Label>
-            <textarea
+            <Textarea
               id="pl-desc"
-              className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
+              className="min-h-24"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               maxLength={2000}

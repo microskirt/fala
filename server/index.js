@@ -11,9 +11,9 @@ const PORT = Number(process.env.PORT || 8090);
 const HOST = process.env.HOST || '0.0.0.0';
 
 /*
- * Wavefront is a stateless SoundCloud front-end.
+ * Fala is a stateless SoundCloud front-end.
  *
- * There are no Wavefront accounts. The browser holds the user's real
+ * There are no Fala accounts. The browser holds the user's real
  * SoundCloud OAuth token and sends it with every request. This server forwards
  * it to SoundCloud and keeps nothing on disk. Nothing here is a user database.
  */
@@ -581,5 +581,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Wavefront listening on http://${HOST}:${PORT}${DEV ? ' (dev)' : ''}`);
+  console.log(`Fala listening on http://${HOST}:${PORT}${DEV ? ' (dev)' : ''}`);
 });

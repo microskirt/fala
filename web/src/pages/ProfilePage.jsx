@@ -194,11 +194,11 @@ export function ProfilePage() {
       <div>
         {tracksOnly.length > 1 ? (
           <div className="mb-4 flex items-center justify-between gap-3">
-            <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold tabular-nums text-muted-foreground">
+            <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground">
               {tracksOnly.length} tracks
             </span>
             <Button size="sm" onClick={() => playQueue(tracksOnly, 0)}>
-              <Play size={13} fill="currentColor" /> Play all
+              <Play size={14} fill="currentColor" /> Play all
             </Button>
           </div>
         ) : null}
@@ -234,9 +234,9 @@ export function ProfilePage() {
               className="ring-4 ring-card"
             />
             <div className="min-w-0 flex-1 pb-1">
-              <h1 className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight">
+              <h1 className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
                 {profile.username}
-                {profile.verified ? <BadgeCheck size={19} className="text-primary" /> : null}
+                {profile.verified ? <BadgeCheck size={18} className="text-primary" /> : null}
               </h1>
               <div className="text-sm text-muted-foreground">@{profile.permalink}</div>
             </div>
@@ -249,12 +249,12 @@ export function ProfilePage() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <Pencil size={15} /> Edit on SoundCloud
+                      <Pencil size={16} /> Edit on SoundCloud
                     </a>
                   </Button>
                   <Button variant="ghost" asChild>
                     <Link to="/settings">
-                      <Settings2 size={15} /> Settings
+                      <Settings2 size={16} /> Settings
                     </Link>
                   </Button>
                 </>
@@ -289,13 +289,13 @@ export function ProfilePage() {
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             {profile.city ? (
               <span className="inline-flex items-center gap-1.5">
-                <MapPin size={12} /> {profile.city}
+                <MapPin size={14} /> {profile.city}
               </span>
             ) : null}
             {profile.country_code ? <span>{profile.country_code}</span> : null}
             {profile.created_at ? (
               <span className="inline-flex items-center gap-1.5">
-                <Calendar size={12} /> Joined {formatDate(profile.created_at)}
+                <Calendar size={14} /> Joined {formatDate(profile.created_at)}
               </span>
             ) : null}
           </div>

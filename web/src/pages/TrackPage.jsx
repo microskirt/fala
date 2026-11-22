@@ -23,7 +23,7 @@ import { useToast } from '@/context/ToastContext.jsx';
 import { Artwork, Avatar, Skeleton, ErrorState } from '@/components/Media.jsx';
 import { LikeButton, FollowButton, AddToPlaylistButton } from '@/components/Controls.jsx';
 import { TrackCard, TrackStatLine } from '@/components/Cards.jsx';
-import { Page, CardGrid } from '@/components/layout/Page.jsx';
+import { Page, CardGrid, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
@@ -95,7 +95,7 @@ function CommentForm({ track, onPosted, timestampMs }) {
   if (!user) {
     return (
       <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-3.5 py-2.5 text-sm text-muted-foreground">
-        <MessageSquare size={15} />
+        <MessageSquare size={16} />
         <span>
           <Link to="/login" className="font-medium text-primary hover:underline">
             Sign in
@@ -160,17 +160,15 @@ function CommentItem({ comment, onDelete }) {
           {comment.timestamp_ms != null ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold text-primary tabular-nums hover:bg-primary/25"
+              className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-1.5 py-0.5 text-xs font-semibold text-primary tabular-nums hover:bg-primary/25"
               onClick={() => seek(comment.timestamp_ms)}
               title="Jump to this moment"
             >
-              <Play size={9} fill="currentColor" /> {formatDuration(comment.timestamp_ms)}
+              <Play size={14} fill="currentColor" /> {formatDuration(comment.timestamp_ms)}
             </button>
           ) : null}
           {comment.source === 'soundcloud' ? (
-            <Badge variant="secondary" className="h-[18px] text-[10px]">
-              SoundCloud
-            </Badge>
+            <Badge variant="secondary">SoundCloud</Badge>
           ) : null}
         </div>
         <p className="mt-1 text-sm leading-relaxed break-words">{comment.body}</p>
@@ -326,19 +324,19 @@ export function TrackPage() {
             alt={track.title}
             size="100%"
             rounded={12}
-            className="aspect-square shadow-lg"
+            className="aspect-square shadow-md"
           />
         </div>
 
         <div className="min-w-0">
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold tracking-wider text-primary uppercase">
-            <span className="inline-flex items-center gap-1.5">
-              <Music2 size={13} /> {track.genre || 'Track'}
-            </span>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <Eyebrow className="mb-0">
+              <Music2 size={14} /> {track.genre || 'Track'}
+            </Eyebrow>
             {track.policy === 'BLOCK' ? <Badge variant="destructive">Unavailable</Badge> : null}
           </div>
 
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {track.title}
           </h1>
 
@@ -353,7 +351,7 @@ export function TrackPage() {
                 className="inline-flex items-center gap-1 text-sm font-semibold hover:underline"
               >
                 {track.user.username}
-                {track.user.verified ? <BadgeCheck size={15} className="text-primary" /> : null}
+                {track.user.verified ? <BadgeCheck size={16} className="text-primary" /> : null}
               </Link>
               <FollowButton target={track.user} size="sm" />
             </div>
@@ -362,7 +360,7 @@ export function TrackPage() {
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
+              className="grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
               onClick={() => (active ? togglePlay() : playTrack(track, contextList))}
               aria-label={active && playing ? 'Pause' : 'Play'}
             >
@@ -373,7 +371,7 @@ export function TrackPage() {
               )}
             </button>
 
-            <LikeButton track={track} showCount size={19} />
+            <LikeButton track={track} showCount size={18} />
 
             <Button variant={reposted ? 'secondary' : 'ghost'} onClick={() => toggleRepost(track)}>
               <Repeat2 size={16} /> {reposted ? 'Reposted' : 'Repost'}
@@ -382,13 +380,13 @@ export function TrackPage() {
             <AddToPlaylistButton track={track} size={18} />
 
             <Button variant="ghost" size="icon" onClick={copyLink} title="Copy link" aria-label="Copy link">
-              <Link2 size={17} />
+              <Link2 size={16} />
             </Button>
 
             {track.permalink_url ? (
               <Button variant="ghost" size="icon" asChild title="Open on SoundCloud">
                 <a href={track.permalink_url} target="_blank" rel="noreferrer" aria-label="Open on SoundCloud">
-                  <Share2 size={17} />
+                  <Share2 size={16} />
                 </a>
               </Button>
             ) : null}
@@ -396,7 +394,7 @@ export function TrackPage() {
 
           {waveform ? (
             <div className="mt-6 flex items-center gap-3">
-              <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+              <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                 {formatDuration(active ? currentTime : 0)}
               </span>
               <Waveform
@@ -407,7 +405,7 @@ export function TrackPage() {
                   seek(ratio * (track.full_duration || track.duration || 0));
                 }}
               />
-              <span className="w-10 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+              <span className="w-10 shrink-0 text-xs tabular-nums text-muted-foreground">
                 {formatDuration(track.duration)}
               </span>
             </div>
@@ -446,9 +444,9 @@ export function TrackPage() {
                   key={tag}
                   to="/search"
                   search={{ q: tag }}
-                  className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                  className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
                 >
-                  <Tag size={10} /> {tag}
+                  <Tag size={14} /> {tag}
                 </Link>
               ))}
             </div>
@@ -457,7 +455,7 @@ export function TrackPage() {
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             {track.display_date ? (
               <span className="inline-flex items-center gap-1.5">
-                <Calendar size={13} /> {formatDate(track.display_date)}
+                <Calendar size={14} /> {formatDate(track.display_date)}
               </span>
             ) : null}
             {track.label_name ? <span>Label: {track.label_name}</span> : null}
@@ -470,7 +468,7 @@ export function TrackPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <MessageSquare size={18} /> Comments
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
               {comments.length}
             </span>
           </h2>

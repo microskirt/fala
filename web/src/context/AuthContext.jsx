@@ -3,7 +3,7 @@ import { api, getToken, setToken } from '../api.js';
 import { useTheme } from './ThemeContext.jsx';
 
 /*
- * Auth here is only ever the user's real SoundCloud account. Wavefront never
+ * Auth here is only ever the user's real SoundCloud account. Fala never
  * creates accounts and never stores passwords. The token lives in this browser
  * and is forwarded by the proxy.
  */

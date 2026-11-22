@@ -12,22 +12,22 @@ export function QueuePanel() {
 
   return (
     <aside
-      className="fixed bottom-[76px] right-0 top-14 z-30 flex w-full max-w-sm flex-col border-l border-border bg-card shadow-2xl sm:top-0 sm:h-dvh"
+      className="fixed bottom-(--player-height) right-0 top-14 z-30 flex w-full max-w-sm flex-col border-l border-border bg-card shadow-lg sm:top-0 sm:h-dvh"
       aria-label="Queue"
     >
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="leading-tight">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <ListMusic size={15} /> Queue
+          <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <ListMusic size={16} /> Queue
           </h3>
-          <span className="text-[11.5px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {queue.length} track{queue.length === 1 ? '' : 's'}
           </span>
         </div>
         <div className="flex items-center gap-1">
           {queue.length > 0 ? (
             <Button variant="ghost" size="icon-sm" onClick={clearQueue} aria-label="Clear queue">
-              <Trash2 size={15} />
+              <Trash2 size={16} />
             </Button>
           ) : null}
           <Button variant="ghost" size="icon-sm" onClick={() => setQueueOpen(false)} aria-label="Close queue">
@@ -58,13 +58,13 @@ export function QueuePanel() {
                   <span className="min-w-0 leading-tight">
                     <span
                       className={cn(
-                        'block truncate text-[12.5px] font-semibold',
+                        'block truncate text-xs font-semibold',
                         i === index && 'text-primary'
                       )}
                     >
                       {t.title}
                     </span>
-                    <span className="block truncate text-[11.5px] text-muted-foreground">
+                    <span className="block truncate text-xs text-muted-foreground">
                       {t.user?.username}
                     </span>
                   </span>
@@ -76,7 +76,7 @@ export function QueuePanel() {
                   onClick={() => removeFromQueue(t.id)}
                   aria-label="Remove from queue"
                 >
-                  <X size={13} />
+                  <X size={14} />
                 </Button>
               </div>
             ))

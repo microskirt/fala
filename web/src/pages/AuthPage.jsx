@@ -65,24 +65,24 @@ export function AuthPage() {
             <Radio size={18} strokeWidth={2.4} />
           </span>
           <span className="leading-tight">
-            <span className="block text-base font-semibold tracking-tight">Wavefront</span>
-            <span className="block text-xs text-muted-foreground">Sound, reimagined</span>
+            <span className="block text-base font-semibold tracking-tight">Fala</span>
+            <span className="block text-xs text-muted-foreground">A calmer SoundCloud</span>
           </span>
         </Link>
 
         <div className="relative max-w-md">
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Your SoundCloud account, with a better face.
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Wavefront is just a front-end. It signs you in with your real SoundCloud account, so
+            Fala is just a front-end. It signs you in with your real SoundCloud account, so
             your likes, reposts, comments, follows and playlists are the real ones.
           </p>
           <ul className="mt-6 flex flex-col gap-3 text-sm text-muted-foreground">
             {[
               [Headphones, 'Lossless-ready streaming with adjustable quality'],
               [ListMusic, 'Your real playlists, likes and reposts'],
-              [ShieldCheck, 'No Wavefront account, no password, no database'],
+              [ShieldCheck, 'No Fala account, no password, no database'],
               [Globe2, 'Three hand-tuned themes, including Catppuccin Mocha'],
             ].map(([Icon, text]) => (
               <li key={text} className="flex items-center gap-2.5">
@@ -94,7 +94,7 @@ export function AuthPage() {
         </div>
 
         <p className="relative text-xs leading-relaxed text-muted-foreground/70">
-          Wavefront is an independent front-end. Music and metadata belong to SoundCloud and their
+          Fala is an independent front-end. Music and metadata belong to SoundCloud and their
           respective creators.
         </p>
       </div>
@@ -105,22 +105,22 @@ export function AuthPage() {
           <div className="mb-6">
             <h1 className="text-2xl font-semibold tracking-tight">Connect SoundCloud</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Paste your SoundCloud <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">oauth_token</code>.
-              Wavefront uses it to talk to SoundCloud as you.
+              Paste your SoundCloud <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-xs">oauth_token</code>.
+              Fala uses it to talk to SoundCloud as you.
             </p>
           </div>
 
           {error ? (
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
-              <AlertCircle size={15} className="mt-0.5 shrink-0" />
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           ) : null}
 
           <div className="mb-5 flex items-start gap-2 rounded-lg border bg-muted/50 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
-            <ShieldCheck size={15} className="mt-0.5 shrink-0 text-success" />
+            <ShieldCheck size={16} className="mt-0.5 shrink-0 text-success" />
             <span>
-              The token stays in this browser and is sent only to your own Wavefront server, which
+              The token stays in this browser and is sent only to your own Fala server, which
               forwards it to SoundCloud. It is never saved to disk or committed.
             </span>
           </div>
@@ -130,14 +130,14 @@ export function AuthPage() {
               <>
                 Open{' '}
                 <a href="https://soundcloud.com" target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
-                  soundcloud.com <ExternalLink size={11} className="inline" />
+                  soundcloud.com <ExternalLink size={14} className="inline" />
                 </a>{' '}
                 and sign in as usual.
               </>,
               <>
                 Open developer tools, go to{' '}
                 <strong className="text-foreground">Application → Cookies → soundcloud.com</strong>{' '}
-                and copy the value of <code className="rounded bg-muted px-1 font-mono text-[11px]">oauth_token</code>.
+                and copy the value of <code className="rounded-sm bg-muted px-1 font-mono text-xs">oauth_token</code>.
               </>,
               <>Paste it below.</>,
             ].map((text, i) => (
@@ -154,7 +154,7 @@ export function AuthPage() {
             <div className="flex flex-col gap-2">
               <Label htmlFor="token">SoundCloud oauth_token</Label>
               <div className="relative">
-                <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <KeyRound size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="token"
                   className="pl-9 pr-10 font-mono text-xs"
@@ -166,14 +166,16 @@ export function AuthPage() {
                   spellCheck={false}
                   required
                 />
-                <button
+                <Button
                   type="button"
-                  className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="absolute right-1.5 top-1/2 size-7 -translate-y-1/2 text-muted-foreground"
                   onClick={() => setReveal((v) => !v)}
                   aria-label={reveal ? 'Hide token' : 'Show token'}
                 >
                   {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
+                </Button>
               </div>
             </div>
 

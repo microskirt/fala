@@ -4,7 +4,7 @@ import { api } from '@/api.js';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { TrackCard } from '@/components/Cards.jsx';
 import { ErrorState } from '@/components/Media.jsx';
-import { Page, Section, CardGrid, CardGridSkeleton } from '@/components/layout/Page.jsx';
+import { Page, Section, CardGrid, CardGridSkeleton, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils.js';
 
@@ -57,8 +57,8 @@ export function DiscoverPage() {
     return (
       <Page>
         <div className="mb-8 flex flex-col gap-2">
-          <div className="h-7 w-52 animate-pulse rounded bg-muted" />
-          <div className="h-4 w-80 animate-pulse rounded bg-muted" />
+          <div className="h-7 w-52 animate-pulse rounded-md bg-muted" />
+          <div className="h-4 w-80 animate-pulse rounded-md bg-muted" />
         </div>
         <CardGridSkeleton count={12} />
       </Page>
@@ -84,9 +84,9 @@ export function DiscoverPage() {
           }}
         />
         <div className="relative max-w-2xl">
-          <div className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-primary uppercase">
-            <Flame size={12} /> Discover
-          </div>
+          <Eyebrow>
+            <Flame size={14} /> Discover
+          </Eyebrow>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Find your next favourite sound.
           </h1>
@@ -96,7 +96,7 @@ export function DiscoverPage() {
           </p>
           {charts.length > 0 ? (
             <Button className="mt-5" onClick={() => playQueue(charts, 0)}>
-              <Play size={15} fill="currentColor" /> Play the charts
+              <Play size={16} fill="currentColor" /> Play the charts
             </Button>
           ) : null}
         </div>
@@ -110,7 +110,7 @@ export function DiscoverPage() {
               type="button"
               onClick={() => openGenre(g)}
               className={cn(
-                'rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors',
+                'rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors',
                 activeGenre?.id === g.id
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
@@ -129,12 +129,12 @@ export function DiscoverPage() {
         {activeGenre ? (
           <div className="mt-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="flex items-center gap-2 text-base font-semibold">
+              <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
                 <TrendingUp size={16} /> Trending in {activeGenre.title}
               </h3>
               {genreTracks.length > 0 ? (
                 <Button size="sm" onClick={() => playQueue(genreTracks, 0)}>
-                  <Play size={13} fill="currentColor" /> Play station
+                  <Play size={14} fill="currentColor" /> Play station
                 </Button>
               ) : null}
             </div>
@@ -158,14 +158,14 @@ export function DiscoverPage() {
       <Section
         title={
           <span className="inline-flex items-center gap-2">
-            <TrendingUp size={19} /> Global charts
+            <TrendingUp size={18} /> Global charts
           </span>
         }
         description="The most played tracks across SoundCloud"
         actions={
           charts.length > 0 ? (
             <Button variant="outline" size="sm" onClick={() => playQueue(charts, 0)}>
-              <Play size={13} fill="currentColor" /> Play all
+              <Play size={14} fill="currentColor" /> Play all
             </Button>
           ) : null
         }

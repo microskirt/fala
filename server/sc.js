@@ -117,7 +117,7 @@ export async function apiGet(href, { ttl = 60_000, token = null } = {}) {
 const CAPTCHA_MESSAGE =
   'SoundCloud is asking for a captcha check before it allows write actions (likes, ' +
   'reposts, comments, follows and playlists). Reading and streaming still work. ' +
-  'Open Settings → Write access in Wavefront to fix this.';
+  'Open Settings → Write access in Fala to fix this.';
 
 const ddCookies = new Map();
 
@@ -692,7 +692,7 @@ export async function genres() {
 
 /* --------------------------- authenticated account -------------------------- */
 
-// Short-lived per-token caches. Wavefront stores no account data on disk; these
+// Short-lived per-token caches. Fala stores no account data on disk; these
 // only avoid re-fetching the same thing several times per page render.
 const tokenCache = new Map();
 

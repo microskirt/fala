@@ -102,22 +102,22 @@ export function Topbar({ onToggleSidebar }) {
         onClick={onToggleSidebar}
         aria-label="Open navigation"
       >
-        <Menu size={19} />
+        <Menu size={18} />
       </Button>
 
       <div className="hidden items-center gap-1 sm:flex">
         <Button variant="ghost" size="icon-sm" onClick={() => window.history.back()} aria-label="Back">
-          <ArrowLeft size={17} />
+          <ArrowLeft size={16} />
         </Button>
         <Button variant="ghost" size="icon-sm" onClick={() => window.history.forward()} aria-label="Forward">
-          <ArrowRight size={17} />
+          <ArrowRight size={16} />
         </Button>
       </div>
 
       <div className="relative mx-auto w-full max-w-md" ref={shellRef}>
         <div className="relative">
           <Search
-            size={15}
+            size={16}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
@@ -136,9 +136,11 @@ export function Topbar({ onToggleSidebar }) {
             aria-label="Search"
           />
           {term ? (
-            <button
+            <Button
               type="button"
-              className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
               onClick={() => {
                 setTerm('');
                 inputRef.current?.focus();
@@ -146,7 +148,7 @@ export function Topbar({ onToggleSidebar }) {
               aria-label="Clear search"
             >
               <X size={14} />
-            </button>
+            </Button>
           ) : null}
         </div>
 
@@ -190,7 +192,7 @@ export function Topbar({ onToggleSidebar }) {
         ) : (
           <Button size="sm" asChild>
             <Link to="/login">
-              <LogIn size={15} /> <span className="hidden sm:inline">Connect SoundCloud</span>
+              <LogIn size={16} /> <span className="hidden sm:inline">Connect SoundCloud</span>
             </Link>
           </Button>
         )}

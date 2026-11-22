@@ -15,7 +15,7 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { TrackCard, PlaylistCard, ArtistRow, TrackRow } from '@/components/Cards.jsx';
-import { Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx';
+import { ErrorState, EmptyState } from '@/components/Media.jsx';
 import { Modal } from '@/components/Modal.jsx';
 import {
   Page,
@@ -25,9 +25,11 @@ import {
   TrackList,
   CardGridSkeleton,
   TrackListSkeleton,
+  PersonGridSkeleton,
 } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
+import { Textarea } from '@/components/ui/textarea.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
 
@@ -230,11 +232,7 @@ export function FollowingPage() {
         description={`${items.length} account${items.length === 1 ? '' : 's'} you follow`}
       />
       {loading ? (
-        <PersonGrid>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-[70px] w-full rounded-lg" />
-          ))}
-        </PersonGrid>
+        <PersonGridSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={reload} />
       ) : items.length === 0 ? (
@@ -292,7 +290,7 @@ export function PlaylistsPage() {
         description={`${playlists.length} playlist${playlists.length === 1 ? '' : 's'}`}
         actions={
           <Button onClick={() => setCreating(true)}>
-            <Plus size={15} /> New playlist
+            <Plus size={16} /> New playlist
           </Button>
         }
       />
@@ -303,7 +301,7 @@ export function PlaylistsPage() {
           title="No playlists yet"
           action={
             <Button onClick={() => setCreating(true)}>
-              <Plus size={15} /> Create your first playlist
+              <Plus size={16} /> Create your first playlist
             </Button>
           }
         >
@@ -347,9 +345,9 @@ export function PlaylistsPage() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="new-pl-desc">Description</Label>
-            <textarea
+            <Textarea
               id="new-pl-desc"
-              className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
+              className="min-h-24"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               placeholder="Optional"

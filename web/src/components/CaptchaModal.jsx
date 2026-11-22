@@ -44,7 +44,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
     >
       <p className="mb-3.5 text-sm leading-relaxed text-muted-foreground">
         SoundCloud asks for a quick verification before it allows likes, reposts, comments,
-        follows and playlist changes. Solve it once and Wavefront remembers the result for this
+        follows and playlist changes. Solve it once and Fala remembers the result for this
         connection.
       </p>
 
@@ -87,7 +87,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
           >
             {saving ? (
               <>
-                <Loader2 size={15} className="animate-spin" /> Checking…
+                <Loader2 size={16} className="animate-spin" /> Checking…
               </>
             ) : (
               'Save and test'
@@ -104,7 +104,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
                 {[
                   'Switch back with "Use the check instead". That check is triggered by a request that cannot change your account: it asks SoundCloud to add a repost for a track id that does not exist.',
                   'Solve the puzzle or audio check in the panel.',
-                  'If Wavefront does not pick the result up by itself, open DevTools (F12) → Application → Cookies → https://soundcloud.com and copy the value of datadome.',
+                  'If Fala does not pick the result up by itself, open DevTools (F12) → Application → Cookies → https://soundcloud.com and copy the value of datadome.',
                   'Paste it above and press "Save and test". A correct value is accepted straight away.',
                 ].map((text, i) => (
                   <li key={i} className="flex gap-3 text-sm leading-relaxed text-muted-foreground">
@@ -125,7 +125,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
 
       {saving && !manual ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          <Loader2 size={13} className="inline animate-spin" /> Saving the verification…
+          <Loader2 size={14} className="inline animate-spin" /> Saving the verification…
         </p>
       ) : null}
 

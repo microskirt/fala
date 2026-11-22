@@ -9,7 +9,10 @@ import { PlayerProvider } from './context/PlayerContext.jsx';
 import { Toaster } from './components/ui/sonner.jsx';
 import { TooltipProvider } from './components/ui/tooltip.jsx';
 import { router } from './router.jsx';
+import { migrateLegacyKeys } from './lib/storage.js';
 import './styles/globals.css';
+
+migrateLegacyKeys();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

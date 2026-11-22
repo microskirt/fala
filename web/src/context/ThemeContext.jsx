@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { KEYS, readKey, writeKey } from '@/lib/storage.js';
 
 const ThemeContext = createContext(null);
 
@@ -12,18 +13,14 @@ function applyTheme(theme) {
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('wf.theme');
-      if (THEMES.includes(saved)) return saved;
-    } catch {}
+    const saved = readKey(KEYS.theme);
+    if (THEMES.includes(saved)) return saved;
     return 'dark';
   });
 
   useEffect(() => {
     applyTheme(theme);
-    try {
-      localStorage.setItem('wf.theme', theme);
-    } catch {}
+    writeKey(KEYS.theme, theme);
   }, [theme]);
 
   const setTheme = useCallback((next) => {

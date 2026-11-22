@@ -20,15 +20,24 @@ export function Page({ children, className, wide = false }) {
   );
 }
 
+export function Eyebrow({ children, className }) {
+  return (
+    <div
+      className={cn(
+        'mb-2 inline-flex items-center gap-1.5 text-xs font-semibold tracking-wider text-primary uppercase',
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function PageHeader({ eyebrow, title, description, actions, className }) {
   return (
     <div className={cn('mb-6 flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="min-w-0">
-        {eyebrow ? (
-          <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-primary uppercase">
-            {eyebrow}
-          </div>
-        ) : null}
+        {eyebrow ? <Eyebrow className="mb-1.5">{eyebrow}</Eyebrow> : null}
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
         {description ? (
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -98,6 +107,22 @@ export function CardGridSkeleton({ count = 12 }) {
         </div>
       ))}
     </CardGrid>
+  );
+}
+
+export function PersonGridSkeleton({ count = 6 }) {
+  return (
+    <PersonGrid>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5">
+          <Skeleton className="size-11 shrink-0 rounded-full" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-3 w-2/5" />
+            <Skeleton className="h-2.5 w-3/5" />
+          </div>
+        </div>
+      ))}
+    </PersonGrid>
   );
 }
 

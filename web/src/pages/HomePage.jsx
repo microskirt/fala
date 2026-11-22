@@ -134,14 +134,14 @@ export function HomePage() {
     <Page>
       <PageHeader
         title={`${greeting()}${isAuthed && user ? `, ${user.username}` : ''}`}
-        description="Here is what is moving on SoundCloud right now — streamed through Wavefront."
+        description="Here is what is moving on SoundCloud right now — streamed through Fala."
       />
 
       {loading ? (
         <div className="flex flex-col gap-10">
           {[0, 1].map((s) => (
             <div key={s}>
-              <div className="mb-4 h-5 w-40 animate-pulse rounded bg-muted" />
+              <div className="mb-4 h-5 w-40 animate-pulse rounded-md bg-muted" />
               <CardGridSkeleton count={6} />
             </div>
           ))}
@@ -154,7 +154,7 @@ export function HomePage() {
           title="Nothing to show yet"
           action={
             <Button variant="outline" onClick={load}>
-              <RefreshCw size={15} /> Refresh
+              <RefreshCw size={16} /> Refresh
             </Button>
           }
         >
@@ -189,7 +189,7 @@ export function HomePage() {
               action={
                 tracks.length > 3 ? (
                   <Button variant="outline" size="sm" onClick={() => playQueue(tracks, 0)}>
-                    <Play size={13} fill="currentColor" /> Play all
+                    <Play size={14} fill="currentColor" /> Play all
                   </Button>
                 ) : null
               }

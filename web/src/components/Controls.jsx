@@ -40,7 +40,7 @@ export function PlayButton({ track, context, size = 'md', className }) {
     <button
       type="button"
       className={cn(
-        'grid place-items-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95',
+        'grid place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95',
         size === 'lg' ? 'size-14' : size === 'sm' ? 'size-9' : 'size-11',
         className
       )}
@@ -202,9 +202,9 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
               setOpen(false);
             }}
           >
-            <ListPlus size={15} />
+            <ListPlus size={16} />
             <span className="truncate">{pl.title}</span>
-            <span className="ml-auto text-[11px] text-muted-foreground">{pl.track_count}</span>
+            <span className="ml-auto text-xs text-muted-foreground">{pl.track_count}</span>
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
@@ -224,7 +224,7 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
           </div>
         ) : (
           <DropdownMenuItem onClick={() => setCreating(true)}>
-            <Plus size={15} /> New playlist
+            <Plus size={16} /> New playlist
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -256,14 +256,14 @@ export function QueueMenuButton({ track, size = 18 }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => playNextInQueue(track)}>
-          <ListEnd size={15} /> Play next
+          <ListEnd size={16} /> Play next
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => addToQueue(track)}>
-          <ListPlus size={15} /> Add to queue
+          <ListPlus size={16} /> Add to queue
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={copy}>
-          <Link2 size={15} /> Copy link
+          <Link2 size={16} /> Copy link
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={async () => {
@@ -276,12 +276,12 @@ export function QueueMenuButton({ track, size = 18 }) {
             copy();
           }}
         >
-          <Share2 size={15} /> Share…
+          <Share2 size={16} /> Share…
         </DropdownMenuItem>
         {track?.permalink_url ? (
           <DropdownMenuItem asChild>
             <a href={track.permalink_url} target="_blank" rel="noreferrer">
-              <Share2 size={15} /> Open on SoundCloud
+              <Share2 size={16} /> Open on SoundCloud
             </a>
           </DropdownMenuItem>
         ) : null}

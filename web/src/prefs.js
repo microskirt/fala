@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { KEYS, readKey, writeKey } from '@/lib/storage.js';
 
 /*
- * Playback preferences live in this browser. There is no Wavefront account to
- * store them on, and SoundCloud has no endpoint for them.
+ * Playback preferences live in this browser. There is no Fala account to store
+ * them on, and SoundCloud has no endpoint for them.
  */
 
-const KEY = 'wf.prefs';
+const KEY = KEYS.prefs;
 
 const DEFAULTS = {
   quality: 'hq',
@@ -14,9 +15,9 @@ const DEFAULTS = {
 };
 
 function read() {
+  const raw = readKey(KEY);
+  if (!raw) return { ...DEFAULTS };
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULTS };
     const parsed = JSON.parse(raw);
     return { ...DEFAULTS, ...parsed };
   } catch {
@@ -37,9 +38,7 @@ export function getPrefs() {
 
 export function setPrefs(patch) {
   current = { ...current, ...patch };
-  try {
-    localStorage.setItem(KEY, JSON.stringify(current));
-  } catch {}
+  writeKey(KEY, JSON.stringify(current));
   emit();
   return current;
 }

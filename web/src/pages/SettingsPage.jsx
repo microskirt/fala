@@ -47,7 +47,7 @@ function Group({ title, description, children }) {
       <header className="border-b px-5 py-4">
         <h2 className="text-base font-semibold tracking-tight">{title}</h2>
         {description ? (
-          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
         ) : null}
       </header>
       <div className="divide-y">{children}</div>
@@ -61,7 +61,7 @@ function Row({ title, description, children }) {
       <div className="min-w-0 leading-tight">
         <div className="text-sm font-medium">{title}</div>
         {description ? (
-          <div className="mt-0.5 text-[12.5px] text-muted-foreground">{description}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
         ) : null}
       </div>
       {children ? <div className="flex shrink-0 items-center gap-2">{children}</div> : null}
@@ -112,20 +112,20 @@ function WriteAccessPanel() {
     >
       <Row title="Verification" description={statusText}>
         <Button variant="outline" size="sm" onClick={check} disabled={checking}>
-          {checking ? <Loader2 size={13} className="animate-spin" /> : <ShieldQuestion size={13} />}
+          {checking ? <Loader2 size={14} className="animate-spin" /> : <ShieldQuestion size={14} />}
           Check
         </Button>
         <Button size="sm" onClick={openVerification}>
-          <ShieldCheck size={13} /> Verify
+          <ShieldCheck size={14} /> Verify
         </Button>
       </Row>
 
       <details className="group px-5 py-3.5">
-        <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-medium text-muted-foreground hover:text-foreground">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ShieldQuestion size={14} /> How to solve this without changing anything
           <ChevronDown size={14} className="ml-auto transition-transform group-open:rotate-180" />
         </summary>
-        <div className="mt-3 flex flex-col gap-3 text-[13px] leading-relaxed text-muted-foreground">
+        <div className="mt-3 flex flex-col gap-3 text-sm leading-relaxed text-muted-foreground">
           <p>
             The check is triggered by a request that <strong className="text-foreground">cannot</strong>{' '}
             change your account: it asks SoundCloud to add a repost for a track id that does not
@@ -135,18 +135,18 @@ function WriteAccessPanel() {
           <ol className="flex flex-col gap-3">
             {[
               <>
-                Press <strong className="text-foreground">Verify</strong> above. Wavefront asks
+                Press <strong className="text-foreground">Verify</strong> above. Fala asks
                 SoundCloud for a fresh check and shows it right here.
               </>,
               <>
-                Solve the visual or audio puzzle in the panel. When it passes, Wavefront receives
+                Solve the visual or audio puzzle in the panel. When it passes, Fala receives
                 the result automatically and retries your action.
               </>,
               <>
                 Prefer to do it by hand? Choose{' '}
                 <strong className="text-foreground">Paste cookie instead</strong> in that panel,
                 open soundcloud.com in another tab, solve the check there, then copy the{' '}
-                <code className="rounded bg-muted px-1 font-mono text-[11px]">datadome</code>{' '}
+                <code className="rounded-sm bg-muted px-1 font-mono text-xs">datadome</code>{' '}
                 cookie from DevTools &rarr;{' '}
                 <strong className="text-foreground">Application &rarr; Cookies &rarr; soundcloud.com</strong>.
               </>,
@@ -181,7 +181,7 @@ function WriteAccessPanel() {
             setForgetting(false);
           }}
         >
-          <Eraser size={13} /> Forget
+          <Eraser size={14} /> Forget
         </Button>
       </Row>
     </Group>
@@ -253,13 +253,13 @@ export function SettingsPage() {
     return (
       <Page>
         <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-16 text-center">
-          <h2 className="text-base font-semibold">Connect your SoundCloud account</h2>
+          <h2 className="text-base font-semibold tracking-tight">Connect your SoundCloud account</h2>
           <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
-            Wavefront has no accounts of its own. Connect SoundCloud to use your real profile.
+            Fala has no accounts of its own. Connect SoundCloud to use your real profile.
           </p>
           <Button className="mt-5" asChild>
             <Link to="/login">
-              <KeyRound size={15} /> Connect SoundCloud
+              <KeyRound size={16} /> Connect SoundCloud
             </Link>
           </Button>
         </div>
@@ -271,7 +271,7 @@ export function SettingsPage() {
     <Page>
       <PageHeader
         title="Settings"
-        description="Your SoundCloud account, plus how Wavefront looks and sounds."
+        description="Your SoundCloud account, plus how Fala looks and sounds."
       />
 
       <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -285,13 +285,13 @@ export function SettingsPage() {
               type="button"
               onClick={() => setSection(s.id)}
               className={cn(
-                'inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition-colors',
+                'inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 section === s.id
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
               )}
             >
-              <s.icon size={15} /> {s.label}
+              <s.icon size={16} /> {s.label}
             </button>
           ))}
         </nav>
@@ -301,16 +301,16 @@ export function SettingsPage() {
             <>
               <Group
                 title="Connected account"
-                description="Wavefront is signed in to your real SoundCloud account. Edits to your name, avatar and bio are made on SoundCloud."
+                description="Fala is signed in to your real SoundCloud account. Edits to your name, avatar and bio are made on SoundCloud."
               >
                 <div className="flex items-center gap-3.5 px-5 py-4">
                   <Avatar src={user.avatar_url} name={user.username} size={64} />
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 text-sm font-semibold">
                       {user.username}
-                      {user.verified ? <BadgeCheck size={15} className="text-primary" /> : null}
+                      {user.verified ? <BadgeCheck size={16} className="text-primary" /> : null}
                     </div>
-                    <div className="text-[12.5px] text-muted-foreground">@{user.permalink}</div>
+                    <div className="text-xs text-muted-foreground">@{user.permalink}</div>
                   </div>
                 </div>
                 <Row
@@ -327,7 +327,7 @@ export function SettingsPage() {
                     title="Location"
                     description={
                       <span className="inline-flex items-center gap-1">
-                        <MapPin size={12} /> {user.city}
+                        <MapPin size={14} /> {user.city}
                         {user.country_code ? `, ${user.country_code}` : ''}
                       </span>
                     }
@@ -338,7 +338,7 @@ export function SettingsPage() {
                     title="On SoundCloud since"
                     description={
                       <span className="inline-flex items-center gap-1">
-                        <Calendar size={12} /> {formatDate(user.created_at)}
+                        <Calendar size={14} /> {formatDate(user.created_at)}
                       </span>
                     }
                   />
@@ -351,7 +351,7 @@ export function SettingsPage() {
                       copyText(`https://soundcloud.com/${user.permalink}`, 'Profile link copied')
                     }
                   >
-                    <Copy size={13} /> Copy
+                    <Copy size={14} /> Copy
                   </Button>
                   <Button variant="outline" size="sm" asChild>
                     <a
@@ -359,7 +359,7 @@ export function SettingsPage() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <ExternalLink size={13} /> Open
+                      <ExternalLink size={14} /> Open
                     </a>
                   </Button>
                 </Row>
@@ -367,7 +367,7 @@ export function SettingsPage() {
 
               <Group
                 title="Connection"
-                description="Wavefront keeps your token in this browser only. It is not stored on the server."
+                description="Fala keeps your token in this browser only. It is not stored on the server."
               >
                 <Row
                   title="Disconnect this browser"
@@ -398,8 +398,8 @@ export function SettingsPage() {
                     )}
                   >
                     <ThemeSwatch swatch={t.swatch} />
-                    <span className="mt-2 flex items-center gap-1.5 text-[13px] font-medium">
-                      <t.icon size={13} /> {t.name}
+                    <span className="mt-2 flex items-center gap-1.5 text-sm font-medium">
+                      <t.icon size={14} /> {t.name}
                       {theme === t.id ? <Check size={14} className="ml-auto text-primary" /> : null}
                     </span>
                   </button>
@@ -465,7 +465,7 @@ export function SettingsPage() {
                         ) : null}
                       </span>
                       <span className="min-w-0 leading-tight">
-                        <span className="block text-[13px] font-medium">{q.title}</span>
+                        <span className="block text-sm font-medium">{q.title}</span>
                         <span className="block text-xs text-muted-foreground">{q.desc}</span>
                       </span>
                     </button>
@@ -523,7 +523,7 @@ export function SettingsPage() {
         }
       >
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Wavefront will forget the token in this browser. You stay signed in on SoundCloud
+          Fala will forget the token in this browser. You stay signed in on SoundCloud
           itself, and can reconnect any time by pasting the token again.
         </p>
       </Modal>
