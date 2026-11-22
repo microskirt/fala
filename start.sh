@@ -58,10 +58,22 @@ if [ "$NODE_MAJOR" -lt 18 ]; then
 fi
 
 # ------------------------------------------------------------- dependencies
-# Check for the build tool as well as a runtime dep: a tree can be half
-# installed and still contain node_modules.
-if [ ! -x node_modules/.bin/vite ] || [ ! -d node_modules/react ]; then
-  echo "==> Installing dependencies with bun"
+# Verify that every dependency declared in package.json actually resolves. A
+# tree left over from an older package.json can still contain vite and react
+# while missing a newer devDependency, which then fails inside vite itself.
+missing_deps() {
+  node -e '
+    const fs = require("node:fs");
+    const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+    const names = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+    const missing = names.filter((n) => !fs.existsSync(`node_modules/${n}/package.json`));
+    if (missing.length) console.log(missing.join(", "));
+  '
+}
+
+MISSING="$(missing_deps)"
+if [ -n "$MISSING" ]; then
+  echo "==> Installing dependencies with bun (missing: $MISSING)"
   bun install
 fi
 
