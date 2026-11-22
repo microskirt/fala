@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Wavefront — temporary launcher
-# Serves the built React app on 10.0.0.50:8090
+# Builds the React app if needed, then serves it on 0.0.0.0:8090 by default.
 set -euo pipefail
 
 cd "$(dirname "$(readlink -f "$0")")"
 
-HOST="${HOST:-10.0.0.50}"
+# Bind to every interface by default so the app works on any machine.
+# Override with HOST=127.0.0.1 (local only) or a specific LAN IP.
+HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-8090}"
-
-export NODE_ENV="${NODE_ENV:-production}"
 
 # ---------------------------------------------------------------- locate node
 if ! command -v node >/dev/null 2>&1; then
@@ -37,9 +37,13 @@ if [ "$NODE_MAJOR" -lt 22 ]; then
 fi
 
 # ------------------------------------------------------------- dependencies
-if [ ! -d node_modules ] || [ ! -d node_modules/react ]; then
+# Check for the build tool as well as a runtime dep: a tree can be half
+# installed (e.g. devDependencies skipped) and still contain node_modules.
+if [ ! -x node_modules/.bin/vite ] || [ ! -d node_modules/react ]; then
   echo "==> Installing dependencies"
-  npm install --no-audit --no-fund
+  # --include=dev: NODE_ENV=production in the caller's environment would
+  # otherwise skip devDependencies, and vite is one of them.
+  npm install --include=dev --no-audit --no-fund
 fi
 
 # --------------------------------------------------------------- build step
