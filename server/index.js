@@ -154,6 +154,47 @@ route('GET', '/api/session', async (ctx) => {
   }
 });
 
+/* -------------------------------- captcha --------------------------------- */
+
+/*
+ * DataDome (SoundCloud's bot check) sits in front of write actions. The browser
+ * can solve the challenge, but it is this server that talks to api-v2, so the
+ * resulting `datadome` cookie has to end up here. These routes move it across.
+ */
+
+route('GET', '/api/captcha', async (ctx) => {
+  const token = requireToken(ctx);
+  const challenge = await sc.captchaChallenge(token);
+  return {
+    blocked: challenge.blocked,
+    url: challenge.url,
+    solved: !!sc.getDdCookie(token),
+    clientId: sc.getClientId(),
+  };
+});
+
+route('POST', '/api/captcha', async (ctx) => {
+  const token = requireToken(ctx);
+  const raw = String(ctx.body.cookie || '').trim();
+  if (!raw) throw new HttpError(400, 'Paste the datadome cookie value first');
+  // Accept a full "datadome=…; Path=…" line as well as the bare value.
+  const value = raw
+    .replace(/^datadome=/i, '')
+    .split(';')[0]
+    .trim();
+  if (!value) throw new HttpError(400, 'That does not look like a datadome cookie');
+  // DataDome ties the verdict to the UA that solved it, so keep the browser's.
+  const ua = String(ctx.body.ua || '').slice(0, 400).trim();
+  sc.setDdCookie(token, value, ua || null);
+  return { solved: true };
+});
+
+route('DELETE', '/api/captcha', async (ctx) => {
+  const token = requireToken(ctx);
+  sc.setDdCookie(token, null, null);
+  return { solved: false };
+});
+
 /* -------------------------------- library --------------------------------- */
 
 route('GET', '/api/me/likes', async (ctx) => {

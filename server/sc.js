@@ -115,29 +115,88 @@ export async function apiGet(href, { ttl = 60_000, token = null } = {}) {
 }
 
 const CAPTCHA_MESSAGE =
-  'SoundCloud is asking this server to solve a captcha before it allows write actions ' +
-  '(likes, reposts, comments, follows and playlists). SoundCloud blocks those actions ' +
-  'from many datacenter and VPN addresses. Reading and streaming still work. ' +
-  'Run Wavefront from your own network to enable write actions.';
+  'SoundCloud is asking for a captcha check before it allows write actions (likes, ' +
+  'reposts, comments, follows and playlists). Reading and streaming still work. ' +
+  'Open Settings → Write access in Wavefront to fix this.';
 
-export async function apiWrite(method, href, { token, body } = {}) {
+const ddCookies = new Map();
+
+/*
+ * DataDome ties its verdict to the User-Agent that solved the challenge. The
+ * browser solves it, but this server replays it, so the browser's UA is stored
+ * next to the cookie and sent on every write afterwards.
+ */
+export function setDdCookie(token, value, ua) {
+  if (!token) return;
+  if (value) ddCookies.set(token, { value, ua: ua || UA });
+  else ddCookies.delete(token);
+}
+
+export function getDdCookie(token) {
+  return (token && ddCookies.get(token)?.value) || '';
+}
+
+export function getDdUa(token) {
+  return (token && ddCookies.get(token)?.ua) || UA;
+}
+
+/*
+ * Ask SoundCloud for a fresh challenge without touching the account.
+ * A PUT to a track id that cannot exist is rejected by the captcha layer first;
+ * if it ever got through it would 404, so nothing is liked, reposted or created.
+ */
+export async function captchaChallenge(token) {
   if (!token) throw new ScError(401, 'Connect your SoundCloud account first');
-  const url = withClientId(href);
+  const url = withClientId('/me/track_reposts/0');
+  const dd = getDdCookie(token);
   const res = await fetch(url, {
-    method,
+    method: 'PUT',
     headers: {
-      'User-Agent': UA,
+      'User-Agent': getDdUa(token),
       Authorization: `OAuth ${token}`,
       'Content-Type': 'application/json',
       Accept: 'application/json, text/plain, */*',
       Origin: 'https://soundcloud.com',
       Referer: 'https://soundcloud.com/',
+      ...(dd ? { Cookie: `datadome=${dd}` } : {}),
+    },
+  });
+  const text = await res.text();
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch {}
+  if (parsed?.url && String(parsed.url).includes('captcha-delivery')) {
+    return { blocked: true, url: parsed.url };
+  }
+  // No challenge: this network is already allowed to write.
+  return { blocked: false, url: null };
+}
+
+export async function apiWrite(method, href, { token, body } = {}) {
+  if (!token) throw new ScError(401, 'Connect your SoundCloud account first');
+  const url = withClientId(href);
+  const dd = getDdCookie(token);
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'User-Agent': getDdUa(token),
+      Authorization: `OAuth ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/plain, */*',
+      Origin: 'https://soundcloud.com',
+      Referer: 'https://soundcloud.com/',
+      ...(dd ? { Cookie: `datadome=${dd}` } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();
   if (res.status === 403 && text.includes('captcha-delivery')) {
-    throw new ScError(403, CAPTCHA_MESSAGE, null, 'captcha');
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {}
+    throw new ScError(403, CAPTCHA_MESSAGE, { url: parsed?.url || null }, 'captcha');
   }
   if (res.status === 401) {
     throw new ScError(401, 'SoundCloud rejected this token. It may have expired — paste a fresh one.', null, 'token');

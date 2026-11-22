@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { api } from '../api.js';
 import { useAuth } from './AuthContext.jsx';
+import { useCaptcha } from './CaptchaContext.jsx';
 import { useToast } from './ToastContext.jsx';
 
 /*
@@ -13,6 +14,23 @@ const LibraryContext = createContext(null);
 export function LibraryProvider({ children }) {
   const { user } = useAuth();
   const toast = useToast();
+  const { solve: solveCaptcha } = useCaptcha();
+
+  // A blocked write means SoundCloud wants its bot check solved. Show it, then
+  // retry the same request once with the result in place.
+  const withCaptcha = useCallback(
+    async (fn) => {
+      try {
+        return await fn();
+      } catch (err) {
+        if (err?.code !== 'captcha') throw err;
+        const solved = await solveCaptcha();
+        if (!solved) throw err;
+        return fn();
+      }
+    },
+    [solveCaptcha]
+  );
 
   // Optimistic overrides for this session, layered over SoundCloud's state.
   const [liked, setLiked] = useState(() => new Map());
@@ -101,7 +119,7 @@ export function LibraryProvider({ children }) {
       markBusy(key, true);
       setLiked((prev) => new Map(prev).set(String(track.id), next));
       try {
-        await api.put(`/api/tracks/${track.id}/like`, { on: next });
+        await withCaptcha(() => api.put(`/api/tracks/${track.id}/like`, { on: next }));
         setCounts((c) => ({ ...c, likes: Math.max(0, c.likes + (next ? 1 : -1)) }));
       } catch (err) {
         setLiked((prev) => {
@@ -114,7 +132,7 @@ export function LibraryProvider({ children }) {
         markBusy(key, false);
       }
     },
-    [user, busy, toast, isLiked]
+    [user, busy, toast, isLiked, withCaptcha]
   );
 
   const toggleRepost = useCallback(
@@ -130,7 +148,7 @@ export function LibraryProvider({ children }) {
       markBusy(key, true);
       setReposted((prev) => new Map(prev).set(String(track.id), next));
       try {
-        await api.put(`/api/tracks/${track.id}/repost`, { on: next });
+        await withCaptcha(() => api.put(`/api/tracks/${track.id}/repost`, { on: next }));
         toast.success(next ? 'Reposted to your profile' : 'Repost removed');
       } catch (err) {
         setReposted((prev) => {
@@ -143,7 +161,7 @@ export function LibraryProvider({ children }) {
         markBusy(key, false);
       }
     },
-    [user, busy, toast, isReposted]
+    [user, busy, toast, isReposted, withCaptcha]
   );
 
   /* ------------------------------ follows ------------------------------ */
@@ -161,7 +179,9 @@ export function LibraryProvider({ children }) {
       markBusy(key, true);
       setFollowed((prev) => new Map(prev).set(String(target.id), next));
       try {
-        await api.put(`/api/users/${encodeURIComponent(target.id)}/follow`, { on: next });
+        await withCaptcha(() =>
+          api.put(`/api/users/${encodeURIComponent(target.id)}/follow`, { on: next })
+        );
         setCounts((c) => ({ ...c, following: Math.max(0, c.following + (next ? 1 : -1)) }));
       } catch (err) {
         setFollowed((prev) => {
@@ -174,7 +194,7 @@ export function LibraryProvider({ children }) {
         markBusy(key, false);
       }
     },
-    [user, busy, toast, isFollowing]
+    [user, busy, toast, isFollowing, withCaptcha]
   );
 
   /* ----------------------------- playlists ----------------------------- */
@@ -186,7 +206,7 @@ export function LibraryProvider({ children }) {
         return null;
       }
       try {
-        const pl = await api.post('/api/playlists', payload);
+        const pl = await withCaptcha(() => api.post('/api/playlists', payload));
         setPlaylists((prev) => [pl, ...prev]);
         setCounts((c) => ({ ...c, playlists: c.playlists + 1 }));
         toast.success('Playlist created on SoundCloud');
@@ -196,13 +216,13 @@ export function LibraryProvider({ children }) {
         return null;
       }
     },
-    [user, toast]
+    [user, toast, withCaptcha]
   );
 
   const updatePlaylist = useCallback(
     async (id, payload) => {
       try {
-        const pl = await api.patch(`/api/playlists/${id}`, payload);
+        const pl = await withCaptcha(() => api.patch(`/api/playlists/${id}`, payload));
         setPlaylists((prev) => prev.map((p) => (String(p.id) === String(pl.id) ? pl : p)));
         return pl;
       } catch (err) {
@@ -210,13 +230,13 @@ export function LibraryProvider({ children }) {
         return null;
       }
     },
-    [toast]
+    [toast, withCaptcha]
   );
 
   const deletePlaylist = useCallback(
     async (id) => {
       try {
-        await api.del(`/api/playlists/${id}`);
+        await withCaptcha(() => api.del(`/api/playlists/${id}`));
         setPlaylists((prev) => prev.filter((p) => String(p.id) !== String(id)));
         setCounts((c) => ({ ...c, playlists: Math.max(0, c.playlists - 1) }));
         toast.success('Playlist deleted');
@@ -226,13 +246,15 @@ export function LibraryProvider({ children }) {
         return false;
       }
     },
-    [toast]
+    [toast, withCaptcha]
   );
 
   const addTrackToPlaylist = useCallback(
     async (playlistId, track) => {
       try {
-        const pl = await api.post(`/api/playlists/${playlistId}/tracks`, { track_id: track.id });
+        const pl = await withCaptcha(() =>
+          api.post(`/api/playlists/${playlistId}/tracks`, { track_id: track.id })
+        );
         setPlaylists((prev) => prev.map((p) => (String(p.id) === String(pl.id) ? pl : p)));
         toast.success(`Added to ${pl.title}`);
         return pl;
@@ -241,13 +263,15 @@ export function LibraryProvider({ children }) {
         return null;
       }
     },
-    [toast]
+    [toast, withCaptcha]
   );
 
   const removeTrackFromPlaylist = useCallback(
     async (playlistId, trackId) => {
       try {
-        const pl = await api.del(`/api/playlists/${playlistId}/tracks/${trackId}`);
+        const pl = await withCaptcha(() =>
+          api.del(`/api/playlists/${playlistId}/tracks/${trackId}`)
+        );
         setPlaylists((prev) => prev.map((p) => (String(p.id) === String(pl.id) ? pl : p)));
         return pl;
       } catch (err) {
@@ -255,7 +279,7 @@ export function LibraryProvider({ children }) {
         return null;
       }
     },
-    [toast]
+    [toast, withCaptcha]
   );
 
   /* ------------------------------ comments ----------------------------- */
@@ -267,30 +291,32 @@ export function LibraryProvider({ children }) {
         return null;
       }
       try {
-        const res = await api.post(`/api/tracks/${trackId}/comments`, {
-          body,
-          timestamp_ms: timestampMs ?? null,
-        });
+        const res = await withCaptcha(() =>
+          api.post(`/api/tracks/${trackId}/comments`, {
+            body,
+            timestamp_ms: timestampMs ?? null,
+          })
+        );
         return res.comment;
       } catch (err) {
         toast.error(err.message || 'Could not post comment');
         return null;
       }
     },
-    [user, toast]
+    [user, toast, withCaptcha]
   );
 
   const deleteComment = useCallback(
     async (commentId) => {
       try {
-        await api.del(`/api/comments/${encodeURIComponent(commentId)}`);
+        await withCaptcha(() => api.del(`/api/comments/${encodeURIComponent(commentId)}`));
         return true;
       } catch (err) {
         toast.error(err.message || 'Could not delete comment');
         return false;
       }
     },
-    [toast]
+    [toast, withCaptcha]
   );
 
   const value = useMemo(

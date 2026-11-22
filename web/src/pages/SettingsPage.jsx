@@ -15,11 +15,17 @@ import {
   BadgeCheck,
   Calendar,
   MapPin,
+  ShieldQuestion,
+  ShieldCheck,
+  ChevronDown,
+  Loader2,
+  Eraser,
 } from 'lucide-react';
-import { formatDate, formatCount } from '../api.js';
+import { formatDate, formatCount, api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useCaptcha } from '../context/CaptchaContext.jsx';
 import { usePrefs } from '../prefs.js';
 import { Avatar } from '../components/Media.jsx';
 import { Modal } from '../components/Modal.jsx';
@@ -28,7 +34,137 @@ const SECTIONS = [
   { id: 'profile', label: 'Account', icon: User },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'playback', label: 'Playback', icon: Headphones },
+  { id: 'write', label: 'Write access', icon: ShieldQuestion },
 ];
+
+function WriteAccessPanel() {
+  const { solve, forget } = useCaptcha();
+  const toast = useToast();
+  const [status, setStatus] = useState(null); // null | { blocked, solved }
+  const [checking, setChecking] = useState(false);
+  const [forgetting, setForgetting] = useState(false);
+
+  const check = async () => {
+    setChecking(true);
+    try {
+      const data = await api.get('/api/captcha');
+      setStatus({ blocked: data.blocked, solved: data.solved });
+    } catch (err) {
+      toast.error(err.message || 'Could not check write access');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const openVerification = async () => {
+    const ok = await solve();
+    if (ok) {
+      setStatus({ blocked: false, solved: true });
+      toast.success('Write access unlocked');
+    }
+  };
+
+  return (
+    <div className="settings-group">
+      <header>
+        <h3>Write access</h3>
+        <p>
+          Likes, reposts, comments, follows and playlist changes go through SoundCloud's bot
+          check. If those actions fail, verify once here.
+        </p>
+      </header>
+      <div className="body">
+        <div className="setting-row">
+          <div className="label-block">
+            <strong>Verification</strong>
+            <span>
+              {status === null
+                ? 'Check whether this connection can currently write to SoundCloud.'
+                : status.solved
+                  ? 'A solved verification is saved for this connection.'
+                  : status.blocked
+                    ? 'SoundCloud is currently asking for a verification.'
+                    : 'SoundCloud is not asking for a verification right now.'}
+            </span>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn sm" onClick={check} disabled={checking}>
+              {checking ? <Loader2 size={13} className="spin" /> : <ShieldQuestion size={13} />}{' '}
+              Check
+            </button>
+            <button type="button" className="btn sm primary" onClick={openVerification}>
+              <ShieldCheck size={13} /> Verify
+            </button>
+          </div>
+        </div>
+
+        <details className="info-banner">
+          <summary>
+            <ShieldQuestion size={14} /> How to solve this without changing anything
+            <ChevronDown size={14} className="chev" />
+          </summary>
+          <div className="info-body">
+            <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+              The check is triggered by a request that <strong>cannot</strong> change your
+              account: it asks SoundCloud to add a repost for a track id that does not exist. The
+              bot check answers first, and if it ever got through it would only return "not found".
+              Nothing is liked, reposted or created.
+            </p>
+            <ol className="step-list">
+              <li className="step">
+                <span className="num">1</span>
+                <div className="step-body">
+                  Press <strong>Verify</strong> above. Wavefront asks SoundCloud for a fresh check
+                  and shows it right here.
+                </div>
+              </li>
+              <li className="step">
+                <span className="num">2</span>
+                <div className="step-body">
+                  Solve the visual or audio puzzle in the panel. When it passes, Wavefront receives
+                  the result automatically and retries your action.
+                </div>
+              </li>
+              <li className="step">
+                <span className="num">3</span>
+                <div className="step-body">
+                  Prefer to do it by hand? Choose <strong>Paste cookie instead</strong> in that
+                  panel, open soundcloud.com in another tab, solve the check there, then copy the{' '}
+                  <code>datadome</code> cookie from DevTools →{' '}
+                  <strong>Application → Cookies → soundcloud.com</strong>.
+                </div>
+              </li>
+            </ol>
+            <p className="hint">
+              The result is tied to this server's network address. If writes start failing again
+              later, press <strong>Verify</strong> once more.
+            </p>
+          </div>
+        </details>
+
+        <div className="setting-row">
+          <div className="label-block">
+            <strong>Forget saved verification</strong>
+            <span>Clears the stored result on the server. Your SoundCloud account is unchanged.</span>
+          </div>
+          <button
+            type="button"
+            className="btn sm danger"
+            disabled={forgetting}
+            onClick={async () => {
+              setForgetting(true);
+              const ok = await forget();
+              if (ok) setStatus((s) => (s ? { ...s, solved: false } : s));
+              setForgetting(false);
+            }}
+          >
+            <Eraser size={13} /> Forget
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const THEMES = [
   {
@@ -308,6 +444,8 @@ export function SettingsPage() {
               </div>
             </div>
           )}
+
+          {section === 'write' && <WriteAccessPanel />}
 
           {section === 'playback' && (
             <>
