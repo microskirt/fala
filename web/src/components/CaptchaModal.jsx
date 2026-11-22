@@ -43,9 +43,8 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
       }
     >
       <p className="mb-3.5 text-sm leading-relaxed text-muted-foreground">
-        SoundCloud asks for a quick verification before it allows likes, reposts, comments,
-        follows and playlist changes. Solve it once and Fala remembers the result for this
-        connection.
+        SoundCloud asks for a verification before it allows writes. Solve it once and Fala
+        remembers the result for this connection.
       </p>
 
       {showFrame ? (
@@ -102,7 +101,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
             <div className="flex flex-col gap-3 border-t px-3.5 py-3.5">
               <ol className="flex flex-col gap-3.5">
                 {[
-                  'Switch back with "Use the check instead". That check is triggered by a request that cannot change your account: it asks SoundCloud to add a repost for a track id that does not exist.',
+                  'Switch back with "Use the check instead". That check cannot change your account: it asks SoundCloud to repost a track id that does not exist, so the bot check answers first.',
                   'Solve the puzzle or audio check in the panel.',
                   'If Fala does not pick the result up by itself, open DevTools (F12) → Application → Cookies → https://soundcloud.com and copy the value of datadome.',
                   'Paste it above and press "Save and test". A correct value is accepted straight away.',

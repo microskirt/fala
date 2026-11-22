@@ -54,7 +54,7 @@ export function CaptchaProvider({ children }) {
   const store = useCallback(
     async (cookie) => {
       // DataDome ties the verdict to the UA that solved it, and this browser is
-      // the one that solved it — so the server has to replay it as this UA.
+      // the one that solved it, so the server has to replay it as this UA.
       await api.post('/api/captcha', {
         cookie,
         ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',

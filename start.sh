@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fala — launcher
+# Fala launcher
 # Builds the React app with bun if needed, then serves it on 0.0.0.0:8090.
 set -euo pipefail
 

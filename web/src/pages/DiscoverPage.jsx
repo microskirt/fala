@@ -88,10 +88,10 @@ export function DiscoverPage() {
             <Flame size={14} /> Discover
           </Eyebrow>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Find your next favourite sound.
+            Find something new to play.
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Trending charts, genre stations and editorial picks — all pulled live from the
+            Trending charts, genre stations and editorial picks, all pulled live from the
             SoundCloud catalogue.
           </p>
           {charts.length > 0 ? (

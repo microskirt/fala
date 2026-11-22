@@ -134,7 +134,7 @@ export function HomePage() {
     <Page>
       <PageHeader
         title={`${greeting()}${isAuthed && user ? `, ${user.username}` : ''}`}
-        description="Here is what is moving on SoundCloud right now — streamed through Fala."
+        description="What is moving on SoundCloud right now, streamed through Fala."
       />
 
       {loading ? (

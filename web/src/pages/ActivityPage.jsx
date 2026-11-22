@@ -55,7 +55,7 @@ export function ActivityPage() {
             </Button>
           }
         >
-          Your SoundCloud stream - new tracks from people you follow - appears here.
+          New tracks from people you follow appear here.
         </EmptyState>
       </Page>
     );

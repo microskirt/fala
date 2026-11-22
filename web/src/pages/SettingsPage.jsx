@@ -108,7 +108,7 @@ function WriteAccessPanel() {
   return (
     <Group
       title="Write access"
-      description="Likes, reposts, comments, follows and playlist changes go through SoundCloud bot check. If those actions fail, verify once here."
+      description="Likes, reposts, comments, follows and playlist changes go through SoundCloud's bot check. If those actions fail, verify once here."
     >
       <Row title="Verification" description={statusText}>
         <Button variant="outline" size="sm" onClick={check} disabled={checking}>
@@ -127,10 +127,9 @@ function WriteAccessPanel() {
         </summary>
         <div className="mt-3 flex flex-col gap-3 text-sm leading-relaxed text-muted-foreground">
           <p>
-            The check is triggered by a request that <strong className="text-foreground">cannot</strong>{' '}
-            change your account: it asks SoundCloud to add a repost for a track id that does not
-            exist. The bot check answers first, and if it ever got through it would only return
-            &ldquo;not found&rdquo;. Nothing is liked, reposted or created.
+            The check uses a request that <strong className="text-foreground">cannot</strong>{' '}
+            change your account. It asks SoundCloud to repost a track id that does not exist, so
+            the bot check answers first and the request would only return &ldquo;not found&rdquo;.
           </p>
           <ol className="flex flex-col gap-3">
             {[
@@ -423,12 +422,12 @@ export function SettingsPage() {
                   {[
                     {
                       id: 'hq',
-                      title: 'High - 160 kbps',
+                      title: 'High (160 kbps)',
                       desc: 'Best available AAC stream. Recommended.',
                     },
                     {
                       id: 'sq',
-                      title: 'Standard - 96 kbps',
+                      title: 'Standard (96 kbps)',
                       desc: 'Balanced quality for slower connections.',
                     },
                     {
@@ -443,7 +442,7 @@ export function SettingsPage() {
                       aria-pressed={prefs.quality === q.id}
                       onClick={() => {
                         setPrefs({ quality: q.id });
-                        toast.success(`Quality set to ${q.title.split(' -')[0]}`);
+                        toast.success(`Quality set to ${q.title.split(' (')[0]}`);
                       }}
                       className={cn(
                         'flex items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors',
@@ -473,7 +472,7 @@ export function SettingsPage() {
                 </div>
               </Group>
 
-              <Group title="Playback behaviour" description="Fine-tune how the player behaves.">
+              <Group title="Playback behaviour" description="Adjust how the player behaves.">
                 <Row
                   title="Autoplay similar tracks"
                   description="Keep the music going when the queue runs out."

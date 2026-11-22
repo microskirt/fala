@@ -571,7 +571,7 @@ const server = http.createServer((req, res) => {
         return;
       }
       console.error('[error]', req.method, req.url, err);
-      json(res, 500, { error: 'Something went wrong on our side' });
+      json(res, 500, { error: 'Something went wrong' });
     })
     .finally(() => {
       if (process.env.LOG_REQUESTS) {

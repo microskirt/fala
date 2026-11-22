@@ -199,7 +199,7 @@ export async function apiWrite(method, href, { token, body } = {}) {
     throw new ScError(403, CAPTCHA_MESSAGE, { url: parsed?.url || null }, 'captcha');
   }
   if (res.status === 401) {
-    throw new ScError(401, 'SoundCloud rejected this token. It may have expired — paste a fresh one.', null, 'token');
+    throw new ScError(401, 'SoundCloud rejected this token. It may have expired, so paste a fresh one.', null, 'token');
   }
   if (!res.ok) {
     let parsed = null;

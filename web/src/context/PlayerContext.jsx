@@ -183,7 +183,7 @@ export function PlayerProvider({ children }) {
     const onError = () => {
       if (!audio.currentSrc) return;
       setBuffering(false);
-      setPlaybackError('Playback error — skipping is available in the queue.');
+      setPlaybackError('Playback error. You can skip from the queue.');
       setPlaying(false);
     };
 

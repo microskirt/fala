@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Fala - a calmer SoundCloud front-end",
+  "description": "A SoundCloud front-end built with React, Vite and Node",
   "scripts": {
     "dev": "node server/index.js --dev",
     "build": "vite build",

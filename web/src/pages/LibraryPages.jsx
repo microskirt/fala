@@ -139,7 +139,7 @@ export function LikesPage() {
       endpoint="/api/me/likes"
       icon={Heart}
       signedOutTitle="Sign in to see your likes"
-      signedOutBody="Connect SoundCloud to build a collection of everything you love."
+      signedOutBody="Connect SoundCloud to see the tracks you have liked."
       description={(n) => `${n} track${n === 1 ? '' : 's'} you have liked`}
       emptyTitle="No likes yet"
       emptyBody="Tap the heart on any track and it will show up here."
@@ -157,7 +157,7 @@ export function RepostsPage() {
       signedOutBody="Connect SoundCloud to share tracks with your followers."
       description={(n) => `${n} track${n === 1 ? '' : 's'} shared to your profile`}
       emptyTitle="Nothing reposted yet"
-      emptyBody="Reposting puts a track on your profile and in your followers feeds."
+      emptyBody="Reposted tracks appear on your profile and in your followers' feeds."
     />
   );
 }
@@ -237,7 +237,7 @@ export function FollowingPage() {
         <ErrorState message={error} onRetry={reload} />
       ) : items.length === 0 ? (
         <EmptyState icon={Users} title="You are not following anyone yet">
-          Find artists you like and hit follow - their activity lands on your home page.
+          Find artists you like and follow them. Their activity shows up on your home page.
         </EmptyState>
       ) : (
         <PersonGrid>
@@ -305,7 +305,7 @@ export function PlaylistsPage() {
             </Button>
           }
         >
-          Playlists are a great way to group tracks for a mood, a set or a drive.
+          Group tracks into playlists by mood or occasion.
         </EmptyState>
       ) : (
         <CardGrid>

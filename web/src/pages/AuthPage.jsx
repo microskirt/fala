@@ -72,18 +72,18 @@ export function AuthPage() {
 
         <div className="relative max-w-md">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Your SoundCloud account, with a better face.
+            SoundCloud, with a cleaner interface.
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Fala is just a front-end. It signs you in with your real SoundCloud account, so
-            your likes, reposts, comments, follows and playlists are the real ones.
+            Fala is a front-end for SoundCloud. You sign in with your real account, so your
+            likes, reposts, comments and playlists are the real ones.
           </p>
           <ul className="mt-6 flex flex-col gap-3 text-sm text-muted-foreground">
             {[
-              [Headphones, 'Lossless-ready streaming with adjustable quality'],
+              [Headphones, 'Adjustable streaming quality'],
               [ListMusic, 'Your real playlists, likes and reposts'],
-              [ShieldCheck, 'No Fala account, no password, no database'],
-              [Globe2, 'Three hand-tuned themes, including Catppuccin Mocha'],
+              [ShieldCheck, 'No Fala account and no password to store'],
+              [Globe2, 'Three themes, including Catppuccin Mocha'],
             ].map(([Icon, text]) => (
               <li key={text} className="flex items-center gap-2.5">
                 <Icon size={16} className="shrink-0 text-primary" />
@@ -94,8 +94,8 @@ export function AuthPage() {
         </div>
 
         <p className="relative text-xs leading-relaxed text-muted-foreground/70">
-          Fala is an independent front-end. Music and metadata belong to SoundCloud and their
-          respective creators.
+          Fala is an independent front-end. Music and metadata belong to SoundCloud and the
+          creators who upload it.
         </p>
       </div>
 
