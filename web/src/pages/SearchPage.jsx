@@ -31,7 +31,7 @@ function SeeAll({ onClick }) {
 }
 
 export function SearchPage() {
-  const { q = '', filter = 'all' } = useSearch();
+  const { q = '', filter = 'all' } = useSearch({ from: '/shell/search' });
   const navigate = useNavigate();
   const [data, setData] = useState({ collection: [], next_href: null, total_results: 0 });
   const [loading, setLoading] = useState(false);

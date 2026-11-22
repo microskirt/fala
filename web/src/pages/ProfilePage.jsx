@@ -44,7 +44,7 @@ function Stat({ value, label }) {
 }
 
 export function ProfilePage() {
-  const { id } = useParams();
+  const { id } = useParams({ from: '/shell/artist/$id' });
   const { user: me } = useAuth();
   const { playQueue } = usePlayer();
 

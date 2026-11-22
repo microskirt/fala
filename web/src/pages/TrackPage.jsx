@@ -189,7 +189,7 @@ function CommentItem({ comment, onDelete }) {
 }
 
 export function TrackPage() {
-  const { id } = useParams();
+  const { id } = useParams({ from: '/shell/track/$id' });
   const toast = useToast();
   const { playTrack, isCurrent, playing, togglePlay, currentTime, duration, seek, queue } =
     usePlayer();

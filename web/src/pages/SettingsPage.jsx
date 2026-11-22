@@ -226,7 +226,7 @@ function ThemeSwatch({ swatch }) {
 }
 
 export function SettingsPage() {
-  const { tab = 'account' } = useSearch();
+  const { tab = 'account' } = useSearch({ from: '/shell/settings' });
   const section = SECTIONS.some((s) => s.id === tab) ? tab : 'account';
   const navigate = useNavigate();
   const { user, disconnect } = useAuth();

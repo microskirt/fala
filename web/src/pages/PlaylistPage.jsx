@@ -86,7 +86,7 @@ function PlaylistTrackRow({ track, index, context, editable, onRemove }) {
 }
 
 export function PlaylistPage() {
-  const { id } = useParams();
+  const { id } = useParams({ from: '/shell/playlist/$id' });
   const navigate = useNavigate();
   const { user } = useAuth();
   const { playQueue, addToQueue } = usePlayer();
