@@ -1,26 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { SearchX, Music2, Users, ListMusic, Disc3, Loader2, Play } from 'lucide-react';
-import { api, formatCount, trackPath, userPath } from '../api.js';
-import { TrackCard, TrackRow, PlaylistCard, ArtistRow } from '../components/Cards.jsx';
-import { EmptyState, Skeleton } from '../components/Media.jsx';
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import { SearchX, Music2, Users, ListMusic, Disc3, Loader2, Sparkles } from 'lucide-react';
+import { api, formatCount } from '@/api.js';
+import { TrackCard, PlaylistCard, ArtistRow } from '@/components/Cards.jsx';
+import { EmptyState } from '@/components/Media.jsx';
+import {
+  Page,
+  PageHeader,
+  CardGrid,
+  PersonGrid,
+  CardGridSkeleton,
+} from '@/components/layout/Page.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { cn } from '@/lib/utils.js';
 
 const FILTERS = [
-  { id: 'all', label: 'Everything', icon: SparkIcon },
+  { id: 'all', label: 'Everything', icon: Sparkles },
   { id: 'tracks', label: 'Tracks', icon: Music2 },
   { id: 'users', label: 'People', icon: Users },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
   { id: 'albums', label: 'Albums', icon: Disc3 },
 ];
 
-function SparkIcon(props) {
-  return <Play {...props} />;
+function SeeAll({ onClick }) {
+  return (
+    <Button variant="ghost" size="sm" onClick={onClick}>
+      See all
+    </Button>
+  );
 }
 
 export function SearchPage() {
-  const [params, setParams] = useSearchParams();
-  const q = params.get('q') || '';
-  const filter = params.get('filter') || 'all';
+  const { q = '', filter = 'all' } = useSearch();
+  const navigate = useNavigate();
   const [data, setData] = useState({ collection: [], next_href: null, total_results: 0 });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -68,10 +80,11 @@ export function SearchPage() {
   };
 
   const setFilter = (next) => {
-    const p = new URLSearchParams(params);
-    if (next === 'all') p.delete('filter');
-    else p.set('filter', next);
-    setParams(p);
+    navigate({
+      to: '/search',
+      search: (prev) => ({ ...prev, filter: next === 'all' ? undefined : next }),
+      replace: true,
+    });
   };
 
   const grouped = useMemo(() => {
@@ -86,55 +99,51 @@ export function SearchPage() {
 
   if (!q.trim()) {
     return (
-      <div className="content-inner">
+      <Page>
         <EmptyState icon={Music2} title="Search the catalogue">
           Look for tracks, artists, playlists and albums. Try “ambient”, “lo-fi beats” or an artist
           name.
         </EmptyState>
-      </div>
+      </Page>
     );
   }
 
-  return (
-    <div className="content-inner">
-      <div className="page-head">
-        <div>
-          <h1>Results for “{q}”</h1>
-          <p>
-            {loading
-              ? 'Searching…'
-              : data.total_results
-              ? `${formatCount(data.total_results)} results`
-              : `${data.collection.length} results`}
-          </p>
-        </div>
-      </div>
+  const countLabel = loading
+    ? 'Searching…'
+    : data.total_results
+      ? `${formatCount(data.total_results)} results`
+      : `${data.collection.length} results`;
 
-      <div className="search-tabs">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            className={`chip ${filter === f.id ? 'active' : ''}`}
-            onClick={() => setFilter(f.id)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+  return (
+    <Page>
+      <PageHeader
+        title={`Results for “${q}”`}
+        description={countLabel}
+        actions={
+          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-muted/40 p-1">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFilter(f.id)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors',
+                  filter === f.id
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <f.icon size={13} /> {f.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {loading ? (
-        <div className="card-grid">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i}>
-              <Skeleton h={0} style={{ paddingBottom: '100%' }} r={8} />
-              <Skeleton w="80%" h={12} style={{ marginTop: 10 }} />
-              <Skeleton w="55%" h={11} style={{ marginTop: 7 }} />
-            </div>
-          ))}
-        </div>
+        <CardGridSkeleton count={12} />
       ) : error ? (
-        <EmptyState title="Search failed" icon={SearchX}>
+        <EmptyState icon={SearchX} title="Search failed">
           {error}
         </EmptyState>
       ) : data.collection.length === 0 ? (
@@ -142,83 +151,77 @@ export function SearchPage() {
           Nothing matched “{q}”. Try a different spelling or a broader term.
         </EmptyState>
       ) : filter === 'all' ? (
-        <>
-          {grouped.users.length > 0 && (
-            <div className="search-group">
-              <h2>
-                People
-                <button type="button" onClick={() => setFilter('users')}>
-                  See all
-                </button>
-              </h2>
-              <div className="search-user-grid">
+        <div className="flex flex-col gap-10">
+          {grouped.users.length > 0 ? (
+            <section>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold tracking-tight">People</h2>
+                <SeeAll onClick={() => setFilter('users')} />
+              </div>
+              <PersonGrid>
                 {grouped.users.slice(0, 6).map((u) => (
                   <ArtistRow key={u.id} user={u} subtitle={u.description} />
                 ))}
-              </div>
-            </div>
-          )}
+              </PersonGrid>
+            </section>
+          ) : null}
 
-          {grouped.tracks.length > 0 && (
-            <div className="search-group">
-              <h2>
-                Tracks
-                <button type="button" onClick={() => setFilter('tracks')}>
-                  See all
-                </button>
-              </h2>
-              <div className="card-grid">
+          {grouped.tracks.length > 0 ? (
+            <section>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold tracking-tight">Tracks</h2>
+                <SeeAll onClick={() => setFilter('tracks')} />
+              </div>
+              <CardGrid>
                 {grouped.tracks.slice(0, 12).map((t) => (
                   <TrackCard key={t.id} track={t} context={grouped.tracks} />
                 ))}
-              </div>
-            </div>
-          )}
+              </CardGrid>
+            </section>
+          ) : null}
 
-          {grouped.playlists.length > 0 && (
-            <div className="search-group">
-              <h2>
-                Playlists &amp; albums
-                <button type="button" onClick={() => setFilter('playlists')}>
-                  See all
-                </button>
-              </h2>
-              <div className="card-grid">
+          {grouped.playlists.length > 0 ? (
+            <section>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold tracking-tight">Playlists &amp; albums</h2>
+                <SeeAll onClick={() => setFilter('playlists')} />
+              </div>
+              <CardGrid>
                 {grouped.playlists.slice(0, 12).map((p) => (
                   <PlaylistCard key={p.id} playlist={p} />
                 ))}
-              </div>
-            </div>
-          )}
-        </>
+              </CardGrid>
+            </section>
+          ) : null}
+        </div>
       ) : filter === 'users' ? (
-        <div className="search-user-grid">
+        <PersonGrid>
           {grouped.users.map((u) => (
             <ArtistRow key={u.id} user={u} subtitle={u.description} />
           ))}
-        </div>
+        </PersonGrid>
       ) : filter === 'tracks' ? (
-        <div className="card-grid">
+        <CardGrid>
           {grouped.tracks.map((t) => (
             <TrackCard key={t.id} track={t} context={grouped.tracks} />
           ))}
-        </div>
+        </CardGrid>
       ) : (
-        <div className="card-grid">
+        <CardGrid>
           {grouped.playlists.map((p) => (
             <PlaylistCard key={p.id} playlist={p} />
           ))}
-        </div>
+        </CardGrid>
       )}
 
-      {data.next_href && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 28 }}>
-          <button type="button" className="btn" onClick={loadMore} disabled={loadingMore}>
-            {loadingMore ? <Loader2 size={15} className="spin" /> : null}
+      {data.next_href ? (
+        <div className="mt-8 flex justify-center">
+          <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? <Loader2 size={15} className="animate-spin" /> : null}
             {loadingMore ? 'Loading…' : 'Load more'}
-          </button>
+          </Button>
         </div>
-      )}
-    </div>
+      ) : null}
+    </Page>
   );
 }

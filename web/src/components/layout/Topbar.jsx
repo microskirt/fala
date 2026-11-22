@@ -1,22 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import {
-  Search,
-  X,
-  Bell,
-  Menu,
-  ArrowLeft,
-  ArrowRight,
-  LogIn,
-  TrendingUp,
-} from 'lucide-react';
-import { api } from '../api.js';
-import { useAuth } from '../context/AuthContext.jsx';
-import { Avatar } from './Media.jsx';
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Search, X, Bell, Menu, ArrowLeft, ArrowRight, LogIn, TrendingUp } from 'lucide-react';
+import { api } from '@/api.js';
+import { useAuth } from '@/context/AuthContext.jsx';
+import { Avatar } from '@/components/Media.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { Input } from '@/components/ui/input.jsx';
 
-export function Topbar({ onToggleSidebar, onOpenAuth }) {
+export function Topbar({ onToggleSidebar }) {
   const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouterState({ select: (s) => s.location });
   const { user, isAuthed } = useAuth();
 
   const [term, setTerm] = useState('');
@@ -26,13 +19,9 @@ export function Topbar({ onToggleSidebar, onOpenAuth }) {
   const inputRef = useRef(null);
   const shellRef = useRef(null);
 
-  // Keep the search field in sync with ?q= when on the search page.
   useEffect(() => {
-    if (location.pathname === '/search') {
-      const q = new URLSearchParams(location.search).get('q') || '';
-      setTerm(q);
-    }
-  }, [location.pathname, location.search]);
+    if (router.pathname === '/search') setTerm(router.search?.q || '');
+  }, [router.pathname, router.search]);
 
   useEffect(() => {
     const onDown = (e) => {
@@ -44,8 +33,8 @@ export function Topbar({ onToggleSidebar, onOpenAuth }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      const isSlash = e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
-      if (isSlash) {
+      const tag = document.activeElement?.tagName;
+      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(tag)) {
         e.preventDefault();
         inputRef.current?.focus();
       }
@@ -82,11 +71,7 @@ export function Topbar({ onToggleSidebar, onOpenAuth }) {
     (value) => {
       const q = String(value ?? term).trim();
       setShowSuggest(false);
-      if (!q) {
-        navigate('/search');
-        return;
-      }
-      navigate(`/search?q=${encodeURIComponent(q)}`);
+      navigate({ to: '/search', search: q ? { q } : {} });
     },
     [term, navigate]
   );
@@ -109,33 +94,37 @@ export function Topbar({ onToggleSidebar, onOpenAuth }) {
   };
 
   return (
-    <header className="topbar">
-      <button
-        type="button"
-        className="icon-btn back-btn"
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-3 backdrop-blur lg:px-5">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="lg:hidden"
         onClick={onToggleSidebar}
         aria-label="Open navigation"
       >
         <Menu size={19} />
-      </button>
+      </Button>
 
-      <div className="nav-arrows">
-        <button type="button" className="icon-btn" onClick={() => navigate(-1)} aria-label="Back">
-          <ArrowLeft size={18} />
-        </button>
-        <button type="button" className="icon-btn" onClick={() => navigate(1)} aria-label="Forward">
-          <ArrowRight size={18} />
-        </button>
+      <div className="hidden items-center gap-1 sm:flex">
+        <Button variant="ghost" size="icon-sm" onClick={() => window.history.back()} aria-label="Back">
+          <ArrowLeft size={17} />
+        </Button>
+        <Button variant="ghost" size="icon-sm" onClick={() => window.history.forward()} aria-label="Forward">
+          <ArrowRight size={17} />
+        </Button>
       </div>
 
-      <div className="search-shell" ref={shellRef}>
-        <div className="input-wrap">
-          <Search size={16} />
-          <input
+      <div className="relative mx-auto w-full max-w-md" ref={shellRef}>
+        <div className="relative">
+          <Search
+            size={15}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
             ref={inputRef}
-            className="input"
             type="search"
             placeholder="Search tracks, artists and playlists"
+            className="h-9 pl-9 pr-9"
             value={term}
             onChange={(e) => {
               setTerm(e.target.value);
@@ -149,7 +138,7 @@ export function Topbar({ onToggleSidebar, onOpenAuth }) {
           {term ? (
             <button
               type="button"
-              className="icon-btn sm search-clear"
+              className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setTerm('');
                 inputRef.current?.focus();
@@ -161,45 +150,49 @@ export function Topbar({ onToggleSidebar, onOpenAuth }) {
           ) : null}
         </div>
 
-        {showSuggest && term.trim() && suggestions.length > 0 && (
-          <div className="suggestions" role="listbox">
+        {showSuggest && term.trim() && suggestions.length > 0 ? (
+          <div className="absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-lg border bg-popover p-1 shadow-lg">
             {suggestions.map((s, i) => (
               <button
                 key={s + i}
                 type="button"
-                className={`suggestion ${i === activeIdx ? 'active' : ''}`}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+                  i === activeIdx ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'
+                }`}
                 onMouseEnter={() => setActiveIdx(i)}
                 onClick={() => submit(s)}
-                role="option"
-                aria-selected={i === activeIdx}
               >
-                <TrendingUp size={14} />
+                <TrendingUp size={14} className="shrink-0 text-muted-foreground" />
                 <span className="truncate">{s}</span>
               </button>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
 
-      <div className="topbar-actions">
+      <div className="ml-auto flex items-center gap-1.5">
         {isAuthed ? (
           <>
+            <Button variant="ghost" size="icon" asChild aria-label="Activity">
+              <Link to="/activity">
+                <Bell size={18} />
+              </Link>
+            </Button>
             <Link
-              to="/notifications"
-              className="icon-btn"
-              aria-label="Activity"
-              title="Activity"
+              to="/artist/$id"
+              params={{ id: String(user.id) }}
+              className="rounded-full ring-offset-2 ring-offset-background transition hover:ring-2 hover:ring-primary/50"
+              aria-label="Your profile"
             >
-              <Bell size={18} />
-            </Link>
-            <Link to={`/artist/${user.id}`} className="avatar-btn" aria-label="Your profile">
               <Avatar src={user.avatar_url} name={user.username} size={32} />
             </Link>
           </>
         ) : (
-          <button type="button" className="btn primary sm" onClick={() => onOpenAuth('login')}>
-            <LogIn size={15} /> <span>Connect SoundCloud</span>
-          </button>
+          <Button size="sm" asChild>
+            <Link to="/login">
+              <LogIn size={15} /> <span className="hidden sm:inline">Connect SoundCloud</span>
+            </Link>
+          </Button>
         )}
       </div>
     </header>

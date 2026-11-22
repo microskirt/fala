@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useParams } from '@tanstack/react-router';
 import {
   Play,
   Pause,
-  Heart,
   Repeat2,
   MessageSquare,
-  ListPlus,
-  Download,
   Share2,
   Link2,
   Loader2,
@@ -18,14 +15,19 @@ import {
   ChevronDown,
   Trash2,
 } from 'lucide-react';
-import { api, formatCount, formatDuration, timeAgo, formatDate, userPath, trackPath } from '../api.js';
-import { usePlayer } from '../context/PlayerContext.jsx';
-import { useLibrary } from '../context/LibraryContext.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
-import { useToast } from '../context/ToastContext.jsx';
-import { Artwork, Avatar, Skeleton, ErrorState, EmptyState } from '../components/Media.jsx';
-import { PlayButton, LikeButton, RepostButton, FollowButton, AddToPlaylistButton, QueueMenuButton } from '../components/Controls.jsx';
-import { TrackCard, TrackRow, TrackStatLine } from '../components/Cards.jsx';
+import { api, formatDuration, timeAgo, formatDate } from '@/api.js';
+import { usePlayer } from '@/context/PlayerContext.jsx';
+import { useLibrary } from '@/context/LibraryContext.jsx';
+import { useAuth } from '@/context/AuthContext.jsx';
+import { useToast } from '@/context/ToastContext.jsx';
+import { Artwork, Avatar, Skeleton, ErrorState } from '@/components/Media.jsx';
+import { LikeButton, FollowButton, AddToPlaylistButton } from '@/components/Controls.jsx';
+import { TrackCard, TrackStatLine } from '@/components/Cards.jsx';
+import { Page, CardGrid } from '@/components/layout/Page.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { Badge } from '@/components/ui/badge.jsx';
+import { cn } from '@/lib/utils.js';
 
 function Waveform({ samples, progress, onSeek, height = 56 }) {
   const ref = useRef(null);
@@ -43,7 +45,7 @@ function Waveform({ samples, progress, onSeek, height = 56 }) {
 
   return (
     <div
-      className="waveform"
+      className="flex w-full cursor-pointer items-center gap-px"
       ref={ref}
       style={{ height }}
       onPointerDown={(e) => {
@@ -71,7 +73,10 @@ function Waveform({ samples, progress, onSeek, height = 56 }) {
         return (
           <span
             key={i}
-            className={`bar ${played ? 'played' : ''}`}
+            className={cn(
+              'block w-full rounded-full transition-colors',
+              played ? 'bg-primary' : 'bg-muted-foreground/35'
+            )}
             style={{ height: h }}
             aria-hidden="true"
           />
@@ -89,13 +94,14 @@ function CommentForm({ track, onPosted, timestampMs }) {
 
   if (!user) {
     return (
-      <div className="comment-form">
-        <div className="notice" style={{ flex: 1 }}>
-          <MessageSquare size={15} />
-          <span>
-            <Link to="/login" className="link-btn">Sign in</Link> to join the conversation.
-          </span>
-        </div>
+      <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-3.5 py-2.5 text-sm text-muted-foreground">
+        <MessageSquare size={15} />
+        <span>
+          <Link to="/login" className="font-medium text-primary hover:underline">
+            Sign in
+          </Link>{' '}
+          to join the conversation.
+        </span>
       </div>
     );
   }
@@ -113,24 +119,20 @@ function CommentForm({ track, onPosted, timestampMs }) {
   };
 
   return (
-    <form className="comment-form" onSubmit={submit}>
+    <form className="flex items-center gap-2.5" onSubmit={submit}>
       <Avatar src={user.avatar_url} name={user.username} size={38} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <input
-          className="input"
-          placeholder={
-            timestampMs
-              ? `Comment at ${formatDuration(timestampMs)}…`
-              : 'Write a comment…'
-          }
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          maxLength={1000}
-        />
-      </div>
-      <button type="submit" className="btn primary" disabled={!body.trim() || busy}>
-        {busy ? <Loader2 size={14} className="spin" /> : 'Post'}
-      </button>
+      <Input
+        className="flex-1"
+        placeholder={
+          timestampMs ? `Comment at ${formatDuration(timestampMs)}…` : 'Write a comment…'
+        }
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        maxLength={1000}
+      />
+      <Button type="submit" disabled={!body.trim() || busy}>
+        {busy ? <Loader2 size={14} className="animate-spin" /> : 'Post'}
+      </Button>
     </form>
   );
 }
@@ -141,54 +143,59 @@ function CommentItem({ comment, onDelete }) {
   const canDelete = user && comment.user && String(user.id) === String(comment.user.id);
 
   return (
-    <div className="comment">
-      <Link to={userPath(comment.user)}>
+    <div className="group flex gap-3 border-b border-border/60 py-3.5 last:border-0">
+      <Link to="/artist/$id" params={{ id: String(comment.user?.id) }} className="shrink-0">
         <Avatar src={comment.user?.avatar_url} name={comment.user?.username} size={36} />
       </Link>
-      <div className="body">
-        <div className="head">
-          <Link to={userPath(comment.user)}>
-            <strong>{comment.user?.username || 'Listener'}</strong>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Link
+            to="/artist/$id"
+            params={{ id: String(comment.user?.id) }}
+            className="text-sm font-semibold text-foreground hover:underline"
+          >
+            {comment.user?.username || 'Listener'}
           </Link>
           <span>{timeAgo(comment.created_at)}</span>
-          {comment.timestamp_ms != null && (
+          {comment.timestamp_ms != null ? (
             <button
               type="button"
-              className="stamp"
+              className="inline-flex items-center gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold text-primary tabular-nums hover:bg-primary/25"
               onClick={() => seek(comment.timestamp_ms)}
               title="Jump to this moment"
             >
               <Play size={9} fill="currentColor" /> {formatDuration(comment.timestamp_ms)}
             </button>
-          )}
-          {comment.source === 'soundcloud' && (
-            <span className="badge" style={{ height: 18, fontSize: 10 }}>SoundCloud</span>
-          )}
+          ) : null}
+          {comment.source === 'soundcloud' ? (
+            <Badge variant="secondary" className="h-[18px] text-[10px]">
+              SoundCloud
+            </Badge>
+          ) : null}
         </div>
-        <div className="text">{comment.body}</div>
+        <p className="mt-1 text-sm leading-relaxed break-words">{comment.body}</p>
       </div>
-      {canDelete && (
-        <button
-          type="button"
-          className="icon-btn sm"
+      {canDelete ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
           onClick={() => onDelete(comment.id)}
           aria-label="Delete comment"
-          title="Delete comment"
         >
           <Trash2 size={14} />
-        </button>
-      )}
+        </Button>
+      ) : null}
     </div>
   );
 }
 
 export function TrackPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const toast = useToast();
-  const { user } = useAuth();
-  const { playTrack, isCurrent, playing, togglePlay, currentTime, duration, seek, queue } = usePlayer();
-  const { isLiked, isReposted, toggleLike, toggleRepost, deleteComment } = useLibrary();
+  const { playTrack, isCurrent, playing, togglePlay, currentTime, duration, seek, queue } =
+    usePlayer();
+  const { isReposted, toggleRepost, deleteComment } = useLibrary();
 
   const [track, setTrack] = useState(null);
   const [related, setRelated] = useState([]);
@@ -276,31 +283,34 @@ export function TrackPage() {
 
   if (loading) {
     return (
-      <div className="content-inner">
-        <div className="track-hero">
-          <Skeleton h={0} style={{ paddingBottom: '100%' }} r={12} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Skeleton w={120} h={12} />
-            <Skeleton w="70%" h={30} />
-            <Skeleton w="40%" h={14} />
-            <Skeleton w="55%" h={40} style={{ marginTop: 12 }} />
+      <Page>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+          <Skeleton className="aspect-square w-full rounded-xl" />
+          <div className="flex flex-col gap-3.5">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-3.5 w-2/5" />
+            <Skeleton className="mt-3 h-10 w-1/2" />
           </div>
         </div>
-      </div>
+      </Page>
     );
   }
 
   if (error || !track) {
     return (
-      <div className="content-inner">
-        <ErrorState message={error || 'This track could not be found.'} onRetry={() => navigate(0)} />
-      </div>
+      <Page>
+        <ErrorState
+          message={error || 'This track could not be found.'}
+          onRetry={() => window.location.reload()}
+        />
+      </Page>
     );
   }
 
-  const liked = isLiked(track);
   const reposted = isReposted(track);
-  const contextList = queue.length && active ? queue : [track, ...related.filter((r) => r.kind === 'track')];
+  const contextList =
+    queue.length && active ? queue : [track, ...related.filter((r) => r.kind === 'track')];
   const tags = (track.tag_list || '')
     .split(/\s+/)
     .map((t) => t.replace(/^"|"$/g, ''))
@@ -308,78 +318,87 @@ export function TrackPage() {
     .slice(0, 12);
 
   return (
-    <div className="content-inner">
-      <div className="track-hero">
-        <div className="cover">
-          <Artwork src={track.artwork_url} alt={track.title} size="100%" rounded={0} />
+    <Page>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+        <div className="mx-auto w-full max-w-[340px] lg:mx-0">
+          <Artwork
+            src={track.artwork_url}
+            alt={track.title}
+            size="100%"
+            rounded={12}
+            className="aspect-square shadow-lg"
+          />
         </div>
 
-        <div className="detail">
-          <div className="eyebrow">
-            <Music2 size={13} /> {track.genre || 'Track'}
-            {track.policy === 'BLOCK' && <span className="badge accent">Unavailable</span>}
-          </div>
-          <h1>{track.title}</h1>
-
-          <div className="artist-line">
-            {track.user && (
-              <>
-                <Link to={userPath(track.user)}>
-                  <Avatar src={track.user.avatar_url} name={track.user.username} size={30} />
-                </Link>
-                <Link className="name" to={userPath(track.user)}>
-                  {track.user.username}
-                </Link>
-                {track.user.verified && <BadgeCheck size={15} color="var(--accent)" />}
-                <FollowButton target={track.user} size="sm" />
-              </>
-            )}
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold tracking-wider text-primary uppercase">
+            <span className="inline-flex items-center gap-1.5">
+              <Music2 size={13} /> {track.genre || 'Track'}
+            </span>
+            {track.policy === 'BLOCK' ? <Badge variant="destructive">Unavailable</Badge> : null}
           </div>
 
-          <div className="actions">
+          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
+            {track.title}
+          </h1>
+
+          {track.user ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2.5">
+              <Link to="/artist/$id" params={{ id: String(track.user.id) }}>
+                <Avatar src={track.user.avatar_url} name={track.user.username} size={30} />
+              </Link>
+              <Link
+                to="/artist/$id"
+                params={{ id: String(track.user.id) }}
+                className="inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+              >
+                {track.user.username}
+                {track.user.verified ? <BadgeCheck size={15} className="text-primary" /> : null}
+              </Link>
+              <FollowButton target={track.user} size="sm" />
+            </div>
+          ) : null}
+
+          <div className="mt-5 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="play-fab lg"
+              className="grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
               onClick={() => (active ? togglePlay() : playTrack(track, contextList))}
               aria-label={active && playing ? 'Pause' : 'Play'}
             >
               {active && playing ? (
                 <Pause size={22} fill="currentColor" />
               ) : (
-                <Play size={22} fill="currentColor" style={{ marginLeft: 2 }} />
+                <Play size={22} fill="currentColor" className="ml-0.5" />
               )}
             </button>
 
             <LikeButton track={track} showCount size={19} />
-            <button
-              type="button"
-              className={`btn ${reposted ? '' : 'ghost'}`}
-              onClick={() => toggleRepost(track)}
-              style={reposted ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
-            >
+
+            <Button variant={reposted ? 'secondary' : 'ghost'} onClick={() => toggleRepost(track)}>
               <Repeat2 size={16} /> {reposted ? 'Reposted' : 'Repost'}
-            </button>
+            </Button>
+
             <AddToPlaylistButton track={track} size={18} />
-            <button type="button" className="icon-btn" onClick={copyLink} title="Copy link" aria-label="Copy link">
+
+            <Button variant="ghost" size="icon" onClick={copyLink} title="Copy link" aria-label="Copy link">
               <Link2 size={17} />
-            </button>
-            {track.permalink_url && (
-              <a
-                className="icon-btn"
-                href={track.permalink_url}
-                target="_blank"
-                rel="noreferrer"
-                title="Open on SoundCloud"
-                aria-label="Open on SoundCloud"
-              >
-                <Share2 size={17} />
-              </a>
-            )}
+            </Button>
+
+            {track.permalink_url ? (
+              <Button variant="ghost" size="icon" asChild title="Open on SoundCloud">
+                <a href={track.permalink_url} target="_blank" rel="noreferrer" aria-label="Open on SoundCloud">
+                  <Share2 size={17} />
+                </a>
+              </Button>
+            ) : null}
           </div>
 
           {waveform ? (
-            <div className="waveform-wrap" style={{ marginTop: 4 }}>
-              <span className="wave-time">{formatDuration(active ? currentTime : 0)}</span>
+            <div className="mt-6 flex items-center gap-3">
+              <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                {formatDuration(active ? currentTime : 0)}
+              </span>
               <Waveform
                 samples={waveform}
                 progress={progress}
@@ -388,62 +407,82 @@ export function TrackPage() {
                   seek(ratio * (track.full_duration || track.duration || 0));
                 }}
               />
-              <span className="wave-time right">{formatDuration(track.duration)}</span>
+              <span className="w-10 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                {formatDuration(track.duration)}
+              </span>
             </div>
           ) : null}
 
-          <TrackStatLine track={track} />
+          <div className="mt-5">
+            <TrackStatLine track={track} />
+          </div>
 
-          {track.description && (
-            <div>
-              <div className={`description ${descExpanded ? 'expanded' : ''}`}>{track.description}</div>
-              {track.description.length > 220 && (
+          {track.description ? (
+            <div className="mt-4">
+              <p
+                className={cn(
+                  'text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground',
+                  !descExpanded && 'line-clamp-4'
+                )}
+              >
+                {track.description}
+              </p>
+              {track.description.length > 220 ? (
                 <button
                   type="button"
-                  className="desc-toggle"
+                  className="mt-1 text-xs font-medium text-primary hover:underline"
                   onClick={() => setDescExpanded((v) => !v)}
                 >
                   {descExpanded ? 'Show less' : 'Show more'}
                 </button>
-              )}
+              ) : null}
             </div>
-          )}
+          ) : null}
 
-          <div className="tag-row">
-            {tags.map((tag) => (
-              <Link key={tag} to={`/search?q=${encodeURIComponent(tag)}`} className="badge">
-                <Tag size={10} /> {tag}
-              </Link>
-            ))}
-          </div>
+          {tags.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {tags.map((tag) => (
+                <Link
+                  key={tag}
+                  to="/search"
+                  search={{ q: tag }}
+                  className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                >
+                  <Tag size={10} /> {tag}
+                </Link>
+              ))}
+            </div>
+          ) : null}
 
-          <div className="meta-line">
-            {track.display_date && (
-              <span>
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {track.display_date ? (
+              <span className="inline-flex items-center gap-1.5">
                 <Calendar size={13} /> {formatDate(track.display_date)}
               </span>
-            )}
-            {track.label_name && <span>Label: {track.label_name}</span>}
-            {track.license && <span>{track.license.replace(/-/g, ' ')}</span>}
+            ) : null}
+            {track.label_name ? <span>Label: {track.label_name}</span> : null}
+            {track.license ? <span>{track.license.replace(/-/g, ' ')}</span> : null}
           </div>
         </div>
       </div>
 
-      <div className="section">
-        <div className="section-head">
-          <h2>
+      <section className="mt-12">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <MessageSquare size={18} /> Comments
-            <span className="pill-count">{comments.length}</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+              {comments.length}
+            </span>
           </h2>
-          {active && (
-            <button
-              type="button"
-              className="btn sm"
+          {active ? (
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setCommentTimestamp(commentTimestamp ? null : currentTime)}
             >
               {commentTimestamp ? 'Cancel timestamp' : 'Comment at current time'}
-            </button>
-          )}
+            </Button>
+          ) : null}
         </div>
 
         <CommentForm
@@ -455,39 +494,41 @@ export function TrackPage() {
           }}
         />
 
-        <div className="comments">
-          {comments.length === 0 && (
-            <div className="empty-state" style={{ padding: '28px 20px' }}>
-              <p className="muted">No comments yet. Be the first to say something.</p>
-            </div>
-          )}
+        <div className="mt-4">
+          {comments.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No comments yet. Be the first to say something.
+            </p>
+          ) : null}
           {comments.map((c) => (
             <CommentItem key={c.id} comment={c} onDelete={handleDeleteComment} />
           ))}
         </div>
 
-        {nextComments && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
-            <button type="button" className="btn" onClick={loadMoreComments} disabled={loadingComments}>
-              {loadingComments ? <Loader2 size={14} className="spin" /> : <ChevronDown size={14} />}
+        {nextComments ? (
+          <div className="mt-4 flex justify-center">
+            <Button variant="outline" onClick={loadMoreComments} disabled={loadingComments}>
+              {loadingComments ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <ChevronDown size={14} />
+              )}
               {loadingComments ? 'Loading…' : 'Load more comments'}
-            </button>
+            </Button>
           </div>
-        )}
-      </div>
+        ) : null}
+      </section>
 
-      {related.length > 0 && (
-        <div className="section">
-          <div className="section-head">
-            <h2>You might also like</h2>
-          </div>
-          <div className="card-grid">
+      {related.length > 0 ? (
+        <section className="mt-12">
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">You might also like</h2>
+          <CardGrid>
             {related.map((t) => (
               <TrackCard key={t.id} track={t} context={related} />
             ))}
-          </div>
-        </div>
-      )}
-    </div>
+          </CardGrid>
+        </section>
+      ) : null}
+    </Page>
   );
 }

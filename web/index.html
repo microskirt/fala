@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#121212" />
+    <meta name="theme-color" content="#0c0c0e" />
     <title>Wavefront</title>
     <meta name="description" content="Wavefront — discover, stream and share music." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -14,7 +14,11 @@
         if (saved === 'light' || saved === 'dark' || saved === 'mocha') {
           document.documentElement.dataset.theme = saved;
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', saved === 'light' ? '#ffffff' : saved === 'mocha' ? '#1e1e2e' : '#121212');
+          if (meta)
+            meta.setAttribute(
+              'content',
+              saved === 'light' ? '#ffffff' : saved === 'mocha' ? '#1e1e2e' : '#0c0c0e'
+            );
         }
       } catch (e) {}
     </script>

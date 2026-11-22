@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Radio, Play, Flame, Disc3, Headphones, TrendingUp, Music2, ArrowRight } from 'lucide-react';
-import { api } from '../api.js';
-import { usePlayer } from '../context/PlayerContext.jsx';
-import { TrackCard, PlaylistCard, SectionScroller, TrackRow } from '../components/Cards.jsx';
-import { Skeleton, ErrorState, EmptyState } from '../components/Media.jsx';
+import { Flame, Play, TrendingUp } from 'lucide-react';
+import { api } from '@/api.js';
+import { usePlayer } from '@/context/PlayerContext.jsx';
+import { TrackCard } from '@/components/Cards.jsx';
+import { ErrorState } from '@/components/Media.jsx';
+import { Page, Section, CardGrid, CardGridSkeleton } from '@/components/layout/Page.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { cn } from '@/lib/utils.js';
 
 export function DiscoverPage() {
   const { playQueue } = usePlayer();
@@ -53,129 +55,127 @@ export function DiscoverPage() {
 
   if (loading) {
     return (
-      <div className="content-inner">
-        <Skeleton w={220} h={28} style={{ marginBottom: 8 }} />
-        <Skeleton w={340} h={14} style={{ marginBottom: 26 }} />
-        <div className="card-grid">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i}>
-              <Skeleton h={0} style={{ paddingBottom: '100%' }} r={8} />
-              <Skeleton w="80%" h={12} style={{ marginTop: 10 }} />
-            </div>
-          ))}
+      <Page>
+        <div className="mb-8 flex flex-col gap-2">
+          <div className="h-7 w-52 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-80 animate-pulse rounded bg-muted" />
         </div>
-      </div>
+        <CardGridSkeleton count={12} />
+      </Page>
     );
   }
 
   if (error) {
     return (
-      <div className="content-inner">
+      <Page>
         <ErrorState message={error} onRetry={load} />
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="content-inner">
-      <div className="home-hero">
-        <span className="eyebrow">
-          <Flame size={12} /> Discover
-        </span>
-        <h1>Find your next favourite sound.</h1>
-        <p>
-          Trending charts, genre stations and editorial picks — all pulled live from the
-          SoundCloud catalogue.
-        </p>
-        {charts.length > 0 && (
-          <div className="hero-actions">
-            <button type="button" className="btn primary" onClick={() => playQueue(charts, 0)}>
-              <Play size={15} fill="currentColor" /> Play the charts
-            </button>
+    <Page>
+      <div className="relative mb-10 overflow-hidden rounded-xl border bg-card p-6 sm:p-9">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(70% 120% at 15% 0%, color-mix(in srgb, var(--primary) 20%, transparent), transparent 70%)',
+          }}
+        />
+        <div className="relative max-w-2xl">
+          <div className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-primary uppercase">
+            <Flame size={12} /> Discover
           </div>
-        )}
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            Find your next favourite sound.
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Trending charts, genre stations and editorial picks — all pulled live from the
+            SoundCloud catalogue.
+          </p>
+          {charts.length > 0 ? (
+            <Button className="mt-5" onClick={() => playQueue(charts, 0)}>
+              <Play size={15} fill="currentColor" /> Play the charts
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      <section className="section">
-        <div className="section-head">
-          <div>
-            <h2>
-              <Disc3 size={19} /> Browse by genre
-            </h2>
-            <div className="section-sub">Trending tracks in the genres people are playing now</div>
-          </div>
-        </div>
-        <div className="chip-row">
+      <Section title="Browse by genre" description="Trending tracks in the genres people are playing now">
+        <div className="flex flex-wrap gap-2">
           {genres.map((g) => (
             <button
               key={g.id}
               type="button"
-              className={`chip ${activeGenre?.id === g.id ? 'active' : ''}`}
               onClick={() => openGenre(g)}
+              className={cn(
+                'rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors',
+                activeGenre?.id === g.id
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
+              )}
             >
               {g.title}
             </button>
           ))}
-          {genres.length === 0 && <span className="faint">Genre stations are unavailable right now.</span>}
+          {genres.length === 0 ? (
+            <span className="text-sm text-muted-foreground">
+              Genre stations are unavailable right now.
+            </span>
+          ) : null}
         </div>
 
-        {activeGenre && (
-          <div style={{ marginTop: 22 }}>
-            <div className="section-toolbar">
-              <h3 className="row" style={{ gap: 8 }}>
+        {activeGenre ? (
+          <div className="mt-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="flex items-center gap-2 text-base font-semibold">
                 <TrendingUp size={16} /> Trending in {activeGenre.title}
               </h3>
-              {genreTracks.length > 0 && (
-                <button
-                  type="button"
-                  className="btn sm primary"
-                  onClick={() => playQueue(genreTracks, 0)}
-                >
+              {genreTracks.length > 0 ? (
+                <Button size="sm" onClick={() => playQueue(genreTracks, 0)}>
                   <Play size={13} fill="currentColor" /> Play station
-                </button>
-              )}
+                </Button>
+              ) : null}
             </div>
             {genreLoading ? (
-              <div className="card-grid">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} h={0} style={{ paddingBottom: '100%' }} r={8} />
-                ))}
-              </div>
+              <CardGridSkeleton count={6} />
             ) : genreTracks.length === 0 ? (
-              <p className="muted" style={{ fontSize: 13 }}>
+              <p className="text-sm text-muted-foreground">
                 No tracks available for this station right now.
               </p>
             ) : (
-              <div className="card-grid">
+              <CardGrid>
                 {genreTracks.map((t) => (
                   <TrackCard key={t.id} track={t} context={genreTracks} />
                 ))}
-              </div>
+              </CardGrid>
             )}
           </div>
-        )}
-      </section>
+        ) : null}
+      </Section>
 
-      <section className="section">
-        <div className="section-head">
-          <div>
-            <h2>
-              <TrendingUp size={19} /> Global charts
-            </h2>
-            <div className="section-sub">The most played tracks across SoundCloud</div>
-          </div>
-          {charts.length > 0 && (
-            <button type="button" className="btn sm" onClick={() => playQueue(charts, 0)}>
+      <Section
+        title={
+          <span className="inline-flex items-center gap-2">
+            <TrendingUp size={19} /> Global charts
+          </span>
+        }
+        description="The most played tracks across SoundCloud"
+        actions={
+          charts.length > 0 ? (
+            <Button variant="outline" size="sm" onClick={() => playQueue(charts, 0)}>
               <Play size={13} fill="currentColor" /> Play all
-            </button>
-          )}
-        </div>
-        <div className="card-grid">
+            </Button>
+          ) : null
+        }
+      >
+        <CardGrid>
           {charts.map((t) => (
             <TrackCard key={t.id} track={t} context={charts} />
           ))}
-        </div>
-      </section>
-    </div>
+        </CardGrid>
+      </Section>
+    </Page>
   );
 }

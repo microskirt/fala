@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Loader2, ShieldQuestion, ChevronDown, ClipboardPaste } from 'lucide-react';
-import { Modal } from './Modal.jsx';
+import { Modal } from '@/components/Modal.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { Label } from '@/components/ui/label.jsx';
 
 export function CaptchaModal({ open, url, loading, saving, error, onClose, onSubmitCookie }) {
   const [manual, setManual] = useState(false);
@@ -23,131 +26,110 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
       title="Verify write access"
       footer={
         <>
-          {!manual && (
-            <button type="button" className="btn ghost" onClick={() => setManual(true)}>
+          {!manual ? (
+            <Button variant="ghost" onClick={() => setManual(true)} className="mr-auto">
               <ClipboardPaste size={14} /> Paste cookie instead
-            </button>
-          )}
-          {manual && url && (
-            <button type="button" className="btn ghost" onClick={() => setManual(false)}>
+            </Button>
+          ) : null}
+          {manual && url ? (
+            <Button variant="ghost" onClick={() => setManual(false)} className="mr-auto">
               <ShieldQuestion size={14} /> Use the check instead
-            </button>
-          )}
-          <button type="button" className="btn" onClick={onClose} disabled={saving}>
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
+          </Button>
         </>
       }
     >
-      <p className="muted" style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
+      <p className="mb-3.5 text-sm leading-relaxed text-muted-foreground">
         SoundCloud asks for a quick verification before it allows likes, reposts, comments,
         follows and playlist changes. Solve it once and Wavefront remembers the result for this
         connection.
       </p>
 
-      {showFrame && (
-        <div className="captcha-frame-wrap">
+      {showFrame ? (
+        <div className="h-[420px] w-full overflow-hidden rounded-lg border bg-white">
           <iframe
             title="SoundCloud verification"
             src={url}
             referrerPolicy="origin"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            className="size-full border-0"
           />
         </div>
-      )}
+      ) : null}
 
-      {loading && (
-        <div className="captcha-frame-wrap">
-          <div className="captcha-loading">
-            <Loader2 size={20} className="spin" />
-            <span>Asking SoundCloud for a fresh check…</span>
-          </div>
+      {loading ? (
+        <div className="flex h-[420px] w-full flex-col items-center justify-center gap-2.5 rounded-lg border bg-muted/40 text-sm text-muted-foreground">
+          <Loader2 size={20} className="animate-spin" />
+          <span>Asking SoundCloud for a fresh check…</span>
         </div>
-      )}
+      ) : null}
 
-      {manual && (
-        <div className="form-grid">
-          <label className="field">
-            <span className="label">datadome cookie value</span>
-            <input
-              className="input"
+      {manual ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="dd-cookie">datadome cookie value</Label>
+            <Input
+              id="dd-cookie"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="datadome=… or just the value"
               spellCheck={false}
               autoComplete="off"
             />
-          </label>
-          <button
-            type="button"
-            className="btn primary"
+          </div>
+          <Button
             disabled={saving || !value.trim()}
             onClick={() => onSubmitCookie(value.trim())}
+            className="w-fit"
           >
             {saving ? (
               <>
-                <Loader2 size={15} className="spin" /> Checking…
+                <Loader2 size={15} className="animate-spin" /> Checking…
               </>
             ) : (
               'Save and test'
             )}
-          </button>
-          <details className="info-banner">
-            <summary>
+          </Button>
+
+          <details className="group rounded-lg border bg-muted/40">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
               <ShieldQuestion size={14} /> How to get this cookie yourself
-              <ChevronDown size={14} className="chev" />
+              <ChevronDown size={14} className="ml-auto transition-transform group-open:rotate-180" />
             </summary>
-            <div className="info-body">
-              <ol className="step-list">
-                <li className="step">
-                  <span className="num">1</span>
-                  <div className="step-body">
-                    Switch back with <strong>Use the check instead</strong>. That check is triggered
-                    by a request that <strong>cannot</strong> change your account: it asks
-                    SoundCloud to add a repost for a track id that does not exist.
-                  </div>
-                </li>
-                <li className="step">
-                  <span className="num">2</span>
-                  <div className="step-body">Solve the puzzle or audio check in the panel.</div>
-                </li>
-                <li className="step">
-                  <span className="num">3</span>
-                  <div className="step-body">
-                    If Wavefront does not pick the result up by itself, open DevTools (
-                    <strong>F12</strong>) → <strong>Application</strong> → <strong>Cookies</strong>{' '}
-                    → <strong>https://soundcloud.com</strong> and copy the value of{' '}
-                    <code>datadome</code>.
-                  </div>
-                </li>
-                <li className="step">
-                  <span className="num">4</span>
-                  <div className="step-body">
-                    Paste it above and press <strong>Save and test</strong>. A correct value is
-                    accepted straight away.
-                  </div>
-                </li>
+            <div className="flex flex-col gap-3 border-t px-3.5 py-3.5">
+              <ol className="flex flex-col gap-3.5">
+                {[
+                  'Switch back with "Use the check instead". That check is triggered by a request that cannot change your account: it asks SoundCloud to add a repost for a track id that does not exist.',
+                  'Solve the puzzle or audio check in the panel.',
+                  'If Wavefront does not pick the result up by itself, open DevTools (F12) → Application → Cookies → https://soundcloud.com and copy the value of datadome.',
+                  'Paste it above and press "Save and test". A correct value is accepted straight away.',
+                ].map((text, i) => (
+                  <li key={i} className="flex gap-3 text-sm leading-relaxed text-muted-foreground">
+                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                      {i + 1}
+                    </span>
+                    <span>{text}</span>
+                  </li>
+                ))}
               </ol>
-              <p className="hint">
+              <p className="text-xs text-muted-foreground/80">
                 The value expires after a while. If writes start failing again, repeat these steps.
               </p>
             </div>
           </details>
         </div>
-      )}
+      ) : null}
 
-      {saving && !manual && (
-        <p className="hint" style={{ marginTop: 12 }}>
-          <Loader2 size={13} className="spin" style={{ verticalAlign: '-2px' }} /> Saving the
-          verification…
+      {saving && !manual ? (
+        <p className="mt-3 text-xs text-muted-foreground">
+          <Loader2 size={13} className="inline animate-spin" /> Saving the verification…
         </p>
-      )}
+      ) : null}
 
-      {error && (
-        <p className="hint error" style={{ marginTop: 12 }}>
-          {error}
-        </p>
-      )}
+      {error ? <p className="mt-3 text-xs text-destructive">{error}</p> : null}
     </Modal>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@tanstack/react-router';
 import {
   Radio,
   KeyRound,
@@ -14,8 +14,11 @@ import {
   EyeOff,
   Loader2,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext.jsx';
-import { useToast } from '../context/ToastContext.jsx';
+import { useAuth } from '@/context/AuthContext.jsx';
+import { useToast } from '@/context/ToastContext.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { Label } from '@/components/ui/label.jsx';
 
 export function AuthPage() {
   const navigate = useNavigate();
@@ -28,7 +31,7 @@ export function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (isAuthed) navigate('/', { replace: true });
+    if (isAuthed) navigate({ to: '/', replace: true });
   }, [isAuthed, navigate]);
 
   const submit = async (e) => {
@@ -38,7 +41,7 @@ export function AuthPage() {
     try {
       const account = await connect(token);
       toast.success(`Connected as @${account.permalink}`);
-      navigate('/', { replace: true });
+      navigate({ to: '/', replace: true });
     } catch (err) {
       setError(err.message || 'Could not connect that token');
     } finally {
@@ -47,102 +50,114 @@ export function AuthPage() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-art">
-        <Link to="/" className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            <Radio size={17} strokeWidth={2.4} />
+    <div className="grid min-h-dvh lg:grid-cols-2">
+      {/* Pitch side */}
+      <div className="relative hidden flex-col justify-between overflow-hidden border-r bg-card/40 p-10 lg:flex">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-70"
+          style={{
+            background:
+              'radial-gradient(60% 50% at 20% 10%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 70%), radial-gradient(50% 45% at 85% 85%, color-mix(in srgb, var(--info) 16%, transparent), transparent 70%)',
+          }}
+        />
+        <Link to="/" className="relative flex items-center gap-2.5">
+          <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+            <Radio size={18} strokeWidth={2.4} />
           </span>
-          <span>
-            Wavefront
-            <small>Sound, reimagined</small>
+          <span className="leading-tight">
+            <span className="block text-base font-semibold tracking-tight">Wavefront</span>
+            <span className="block text-xs text-muted-foreground">Sound, reimagined</span>
           </span>
         </Link>
 
-        <div className="pitch">
-          <h1>Your SoundCloud account, with a better face.</h1>
-          <p>
+        <div className="relative max-w-md">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Your SoundCloud account, with a better face.
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             Wavefront is just a front-end. It signs you in with your real SoundCloud account, so
             your likes, reposts, comments, follows and playlists are the real ones.
           </p>
-          <ul className="feature-list">
-            <li>
-              <Headphones size={16} /> Lossless-ready streaming with adjustable quality
-            </li>
-            <li>
-              <ListMusic size={16} /> Your real playlists, likes and reposts
-            </li>
-            <li>
-              <ShieldCheck size={16} /> No Wavefront account, no password, no database
-            </li>
-            <li>
-              <Globe2 size={16} /> Three hand-tuned themes, including Catppuccin Mocha
-            </li>
+          <ul className="mt-6 flex flex-col gap-3 text-sm text-muted-foreground">
+            {[
+              [Headphones, 'Lossless-ready streaming with adjustable quality'],
+              [ListMusic, 'Your real playlists, likes and reposts'],
+              [ShieldCheck, 'No Wavefront account, no password, no database'],
+              [Globe2, 'Three hand-tuned themes, including Catppuccin Mocha'],
+            ].map(([Icon, text]) => (
+              <li key={text} className="flex items-center gap-2.5">
+                <Icon size={16} className="shrink-0 text-primary" />
+                {text}
+              </li>
+            ))}
           </ul>
         </div>
 
-        <div className="foot">
-          Wavefront is an independent front-end. Music and metadata belong to SoundCloud and
-          their respective creators.
-        </div>
+        <p className="relative text-xs leading-relaxed text-muted-foreground/70">
+          Wavefront is an independent front-end. Music and metadata belong to SoundCloud and their
+          respective creators.
+        </p>
       </div>
 
-      <div className="auth-form-side">
-        <div className="auth-card">
-          <div className="head">
-            <h1>Connect SoundCloud</h1>
-            <p>
-              Paste your SoundCloud <code>oauth_token</code>. Wavefront uses it to talk to
-              SoundCloud as you.
+      {/* Form side */}
+      <div className="flex items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-md">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight">Connect SoundCloud</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Paste your SoundCloud <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">oauth_token</code>.
+              Wavefront uses it to talk to SoundCloud as you.
             </p>
           </div>
 
-          {error && (
-            <div className="auth-alert" role="alert">
-              <AlertCircle size={15} style={{ flex: 'none', marginTop: 1 }} />
+          {error ? (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
+              <AlertCircle size={15} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
-          )}
+          ) : null}
 
-          <div className="auth-alert info" style={{ marginBottom: 16 }}>
-            <ShieldCheck size={15} style={{ flex: 'none', marginTop: 1 }} />
+          <div className="mb-5 flex items-start gap-2 rounded-lg border bg-muted/50 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
+            <ShieldCheck size={15} className="mt-0.5 shrink-0 text-success" />
             <span>
-              The token stays in this browser and is sent only to your own Wavefront server,
-              which forwards it to SoundCloud. It is never saved to disk or committed.
+              The token stays in this browser and is sent only to your own Wavefront server, which
+              forwards it to SoundCloud. It is never saved to disk or committed.
             </span>
           </div>
 
-          <ol className="step-list" style={{ marginBottom: 18 }}>
-            <li className="step">
-              <span className="num">1</span>
-              <div className="step-body">
+          <ol className="mb-5 flex flex-col gap-3">
+            {[
+              <>
                 Open{' '}
-                <a href="https://soundcloud.com" target="_blank" rel="noreferrer">
-                  soundcloud.com <ExternalLink size={12} style={{ verticalAlign: '-1px' }} />
+                <a href="https://soundcloud.com" target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                  soundcloud.com <ExternalLink size={11} className="inline" />
                 </a>{' '}
                 and sign in as usual.
-              </div>
-            </li>
-            <li className="step">
-              <span className="num">2</span>
-              <div className="step-body">
-                Open developer tools, go to <strong>Application → Cookies → soundcloud.com</strong>{' '}
-                and copy the value of <code>oauth_token</code>.
-              </div>
-            </li>
-            <li className="step">
-              <span className="num">3</span>
-              <div className="step-body">Paste it below.</div>
-            </li>
+              </>,
+              <>
+                Open developer tools, go to{' '}
+                <strong className="text-foreground">Application → Cookies → soundcloud.com</strong>{' '}
+                and copy the value of <code className="rounded bg-muted px-1 font-mono text-[11px]">oauth_token</code>.
+              </>,
+              <>Paste it below.</>,
+            ].map((text, i) => (
+              <li key={i} className="flex gap-3 text-sm leading-relaxed text-muted-foreground">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                  {i + 1}
+                </span>
+                <span>{text}</span>
+              </li>
+            ))}
           </ol>
 
-          <form className="form-grid" onSubmit={submit}>
-            <label className="field">
-              <span className="label">SoundCloud oauth_token</span>
-              <div className="input-wrap">
-                <KeyRound size={16} />
-                <input
-                  className="input"
+          <form className="flex flex-col gap-4" onSubmit={submit}>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="token">SoundCloud oauth_token</Label>
+              <div className="relative">
+                <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="token"
+                  className="pl-9 pr-10 font-mono text-xs"
                   type={reveal ? 'text' : 'password'}
                   value={token}
                   onChange={(e) => setTokenInput(e.target.value)}
@@ -153,35 +168,35 @@ export function AuthPage() {
                 />
                 <button
                   type="button"
-                  className="icon-btn sm"
+                  className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
                   onClick={() => setReveal((v) => !v)}
                   aria-label={reveal ? 'Hide token' : 'Show token'}
                 >
                   {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
-            </label>
+            </div>
 
-            <button type="submit" className="btn primary lg block" disabled={busy || !token.trim()}>
+            <Button type="submit" size="lg" className="w-full" disabled={busy || !token.trim()}>
               {busy ? (
                 <>
-                  <Loader2 size={16} className="spin" /> Checking with SoundCloud…
+                  <Loader2 size={16} className="animate-spin" /> Checking with SoundCloud…
                 </>
               ) : (
                 <>
                   Connect account <ArrowRight size={16} />
                 </>
               )}
-            </button>
+            </Button>
           </form>
 
-          <div className="notice">
-            <ShieldCheck size={15} />
+          <p className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground/80">
+            <ShieldCheck size={14} className="mt-0.5 shrink-0" />
             <span>
               You can disconnect at any time from Settings. To revoke access fully, sign out of
               SoundCloud or change your password.
             </span>
-          </div>
+          </p>
         </div>
       </div>
     </div>
