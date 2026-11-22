@@ -1,0 +1,25 @@
+{
+  "name": "wavefront",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A SoundCloud front-end clone",
+  "scripts": {
+    "dev": "node server/index.js --dev",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "hls.js": "1.5.17",
+    "lucide-react": "0.454.0",
+    "qrcode": "1.5.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.26.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.3",
+    "vite": "5.4.10"
+  }
+}

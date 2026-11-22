@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# runtime data: SQLite database, cached SoundCloud client_id.
+# contains password hashes, TOTP secrets and backup codes — never commit.
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# logs & local env
+*.log
+.env
+.env.*
+!.env.example
+
+# editor / OS noise
+.DS_Store
+.vscode/
+.idea/
