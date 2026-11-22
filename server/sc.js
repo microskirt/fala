@@ -457,19 +457,25 @@ export async function resolve(url) {
 }
 
 export async function userTab(id, tab, { limit = 24, next, token = null } = {}) {
-  const allowed = ['tracks', 'likes', 'playlists', 'albums', 'followers', 'followings', 'spotlight', 'comments', 'toptracks'];
+  const allowed = ['tracks', 'likes', 'playlists', 'albums', 'followers', 'followings', 'spotlight', 'comments', 'toptracks', 'reposts'];
   if (!allowed.includes(tab)) throw new ScError(400, 'bad tab');
   if (next) {
     const data = await apiGet(next, { ttl: 120_000, token });
     return mapCollection(data, (item) => mapUserTabItem(tab, item));
   }
-  const data = await apiGet(`/users/${id}/${tab}?limit=${limit}`, { ttl: 120_000, token });
+  // Reposts live on the activity stream, not on /users/:id/reposts.
+  const url =
+    tab === 'reposts'
+      ? `/stream/users/${id}/reposts?limit=${limit}`
+      : `/users/${id}/${tab}?limit=${limit}`;
+  const data = await apiGet(url, { ttl: 120_000, token });
   return mapCollection(data, (item) => mapUserTabItem(tab, item));
 }
 
 function mapUserTabItem(tab, item) {
   if (!item) return null;
   if (tab === 'followers' || tab === 'followings') return slimUser(item);
+  if (tab === 'reposts') return slimTrack(item.track || (item.kind === 'track' ? item : null));
   if (item.kind === 'track') return slimTrack(item);
   if (item.kind === 'playlist') return slimPlaylist(item);
   if (item.kind === 'comment') return item;

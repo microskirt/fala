@@ -3,14 +3,13 @@ import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
 import { Search, X, Bell, Menu, ArrowLeft, ArrowRight, LogIn, TrendingUp } from 'lucide-react';
 import { api } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
-import { Avatar } from '@/components/Media.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 
 export function Topbar({ onToggleSidebar }) {
   const navigate = useNavigate();
   const router = useRouterState({ select: (s) => s.location });
-  const { user, isAuthed } = useAuth();
+  const { isAuthed } = useAuth();
 
   const [term, setTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -174,21 +173,11 @@ export function Topbar({ onToggleSidebar }) {
 
       <div className="ml-auto flex items-center gap-1.5">
         {isAuthed ? (
-          <>
-            <Button variant="ghost" size="icon" asChild aria-label="Activity">
-              <Link to="/activity">
-                <Bell size={18} />
-              </Link>
-            </Button>
-            <Link
-              to="/artist/$id"
-              params={{ id: String(user.id) }}
-              className="rounded-full ring-offset-2 ring-offset-background transition hover:ring-2 hover:ring-primary/50"
-              aria-label="Your profile"
-            >
-              <Avatar src={user.avatar_url} name={user.username} size={32} />
+          <Button variant="ghost" size="icon" asChild aria-label="Activity">
+            <Link to="/activity">
+              <Bell size={18} />
             </Link>
-          </>
+          </Button>
         ) : (
           <Button size="sm" asChild>
             <Link to="/login">
