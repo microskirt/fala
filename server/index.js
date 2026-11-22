@@ -306,7 +306,9 @@ route('GET', '/api/tracks/:id', async (ctx) => {
 
 route('GET', '/api/tracks/:id/stream', async (ctx) => {
   const quality = ctx.query.get('quality') || 'hq';
-  return sc.streamUrl(ctx.params.id, quality);
+  // The token decides which transcodings exist. Without it SoundCloud never
+  // offers the Go+ 256 kbps preset, so pass it through.
+  return sc.streamUrl(ctx.params.id, quality, { token: ctx.token || null });
 });
 
 route('GET', '/api/tracks/:id/waveform', async (ctx) => {

@@ -234,7 +234,9 @@ function rememberUsers(data) {
 /* ----------------------------- normalisation ----------------------------- */
 
 const QUALITY_PRESETS = {
-  hq: ['aac_160k', 'abr_sq', 'aac_96k'],
+  // 256 kbps is a Go+ preset. SoundCloud only lists it when the request carries
+  // a Go+ token, so it leads the chain and free accounts fall through.
+  hq: ['aac_256k', 'abr_hq', 'aac_160k', 'abr_sq', 'aac_96k'],
   sq: ['aac_96k', 'aac_160k'],
   lq: ['aac_96k'],
 };
@@ -556,8 +558,8 @@ export async function likers(id, { limit = 12 } = {}) {
   }
 }
 
-export async function streamUrl(id, quality = 'hq') {
-  const data = await apiGet(`/tracks/${id}`, { ttl: 120_000 });
+export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
+  const data = await apiGet(`/tracks/${id}`, { ttl: 120_000, token });
   if (!data.streamable) throw new ScError(404, 'This track is not streamable');
   const policy = String(data.policy || '');
   if (policy === 'BLOCK' || policy === 'SNIP') {
@@ -571,8 +573,16 @@ export async function streamUrl(id, quality = 'hq') {
     chosen = transcodings.find((t) => t.preset === preset);
     if (chosen) break;
   }
+  if (!chosen) {
+    // Preset names vary between uploads, so fall back to the quality field.
+    const wanted = quality === 'lq' ? ['lq'] : quality === 'sq' ? ['sq', 'lq'] : ['hq', 'sq', 'lq'];
+    for (const q of wanted) {
+      chosen = transcodings.find((t) => t.quality === q);
+      if (chosen) break;
+    }
+  }
   if (!chosen) chosen = transcodings[0];
-  const resolved = await apiGet(chosen.url, { ttl: 60_000 });
+  const resolved = await apiGet(chosen.url, { ttl: 60_000, token });
   return {
     url: resolved.url,
     mime: chosen.format?.mime_type,
