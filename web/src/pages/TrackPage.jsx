@@ -34,6 +34,12 @@ import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu.jsx';
 import { Modal } from '@/components/Modal.jsx';
 import { cn } from '@/lib/utils.js';
 import { placeLabel } from '@/lib/places.js';
@@ -619,7 +625,6 @@ export function TrackPage() {
   // SoundCloud's own total counts replies, so it is used instead of the number
   // of top-level rows loaded so far.
   const [commentTotal, setCommentTotal] = useState(0);
-  const [shareOpen, setShareOpen] = useState(false);
 
   const active = isCurrent(track);
 
@@ -905,15 +910,7 @@ export function TrackPage() {
 
             <AddToPlaylistButton track={track} size={18} />
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShareOpen(true)}
-              title="Copy link"
-              aria-label="Copy link"
-            >
-              <Link2 size={16} />
-            </Button>
+            <ShareButton track={track} onCopy={copyLink} />
           </div>
 
           {waveform ? (
@@ -1033,12 +1030,6 @@ export function TrackPage() {
         </section>
       ) : null}
 
-      <ShareDialog
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        track={track}
-        onCopy={copyLink}
-      />
     </Page>
   );
 }
@@ -1047,7 +1038,7 @@ export function TrackPage() {
  * Two links lead to the same song, so the choice is shown instead of guessed:
  * this copy of the page, or the original on SoundCloud.
  */
-function ShareDialog({ open, onClose, track, onCopy }) {
+function ShareButton({ track, onCopy }) {
   if (!track) return null;
   const here = `${window.location.origin}${trackPath(track)}`;
   const rows = [
@@ -1058,29 +1049,28 @@ function ShareDialog({ open, onClose, track, onCopy }) {
   ].filter(Boolean);
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Copy link"
-      description="Pick where the link should point."
-    >
-      <div className="space-y-2">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" title="Copy link" aria-label="Copy link">
+          <Link2 size={16} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
         {rows.map((row) => {
           const Icon = row.icon;
           return (
-            <div key={row.id} className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+            /*
+             * Selecting an item closes the menu on its own, so the only work
+             * here is handing the address to the copy helper, which raises the
+             * toast. No dialog and no page wide overlay.
+             */
+            <DropdownMenuItem key={row.id} onSelect={() => onCopy(row.url, row.label)}>
               <Icon size={16} className="shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{row.label}</div>
-                <div className="truncate text-xs text-muted-foreground">{row.url}</div>
-              </div>
-              <Button size="sm" onClick={() => onCopy(row.url, row.label)}>
-                Copy
-              </Button>
-            </div>
+              <span className="truncate">{row.label}</span>
+            </DropdownMenuItem>
           );
         })}
-      </div>
-    </Modal>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
