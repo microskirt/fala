@@ -53,26 +53,20 @@ function SignInPrompt({ icon, title, children }) {
 
 function TrackCollectionPage({
   title,
-  description,
   endpoint,
   icon,
   emptyTitle,
   emptyBody,
   signedOutTitle,
   signedOutBody,
-  countKey,
 }) {
   const { isAuthed } = useAuth();
   const { playQueue } = usePlayer();
-  const { counts } = useLibrary();
   const { items, loading, loadingMore, error, reload, next, loadMore } = usePagedList(
     endpoint,
     { limit: 100 }
   );
   const sentinel = useAutoLoad({ hasMore: !!next, loading: loadingMore, onLoad: loadMore });
-  // The header count comes from the account totals, not from however many rows
-  // happened to load.
-  const total = countKey ? counts?.[countKey] || items.length : items.length;
 
   if (!isAuthed) {
     return (
@@ -89,7 +83,6 @@ function TrackCollectionPage({
     <Page>
       <PageHeader
         title={title}
-        description={description(total)}
         actions={
           items.length > 0 ? (
             <Button onClick={() => playQueue(items, 0)}>
@@ -126,10 +119,8 @@ export function LikesPage() {
       title="Likes"
       endpoint="/api/me/likes"
       icon={Heart}
-      countKey="likes"
       signedOutTitle="Sign in to see your likes"
       signedOutBody="Connect SoundCloud to see the tracks you have liked."
-      description={(n) => `${n} track${n === 1 ? '' : 's'} you have liked`}
       emptyTitle="No likes yet"
       emptyBody="Tap the heart on any track and it will show up here."
     />
@@ -144,7 +135,6 @@ export function RepostsPage() {
       icon={Repeat2}
       signedOutTitle="Sign in to see your reposts"
       signedOutBody="Connect SoundCloud to share tracks with your followers."
-      description={(n) => `${n} track${n === 1 ? '' : 's'} shared to your profile`}
       emptyTitle="Nothing reposted yet"
       emptyBody="Reposted tracks appear on your profile and in your followers' feeds."
     />
@@ -208,14 +198,11 @@ export function HistoryPage() {
 
 export function FollowingPage() {
   const { isAuthed } = useAuth();
-  const { counts } = useLibrary();
   const { items, loading, loadingMore, error, reload, next, loadMore } = usePagedList(
     '/api/me/following',
     { limit: 100 }
   );
   const sentinel = useAutoLoad({ hasMore: !!next, loading: loadingMore, onLoad: loadMore });
-  // The account total is authoritative; the loaded rows are only a page.
-  const total = counts?.following || items.length;
 
   if (!isAuthed) {
     return (
@@ -230,10 +217,7 @@ export function FollowingPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Following"
-        description={`${total} account${total === 1 ? '' : 's'} you follow`}
-      />
+      <PageHeader title="Following" />
       {loading ? (
         <PersonGridSkeleton />
       ) : error ? (
@@ -293,7 +277,6 @@ export function PlaylistsPage() {
     <Page>
       <PageHeader
         title="Playlists"
-        description={`${playlists.length} playlist${playlists.length === 1 ? '' : 's'}`}
         actions={
           <Button onClick={() => setCreating(true)}>
             <Plus size={16} /> New playlist
