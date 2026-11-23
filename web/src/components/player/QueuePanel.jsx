@@ -114,27 +114,22 @@ export function QueuePanel() {
             {queue.length} track{queue.length === 1 ? '' : 's'}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          {queue.length > 1 ? (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={clearQueue}
-              aria-label="Clear queue"
-              title="Clear the queue, keep this song playing"
-            >
-              <Trash2 size={16} />
-            </Button>
-          ) : null}
+        {/*
+         * No close button: the queue toggle in the player bar and a click
+         * outside both close the panel, so a third way to do the same thing
+         * only added clutter. Clearing the queue is the one action left.
+         */}
+        {queue.length > 1 ? (
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => setQueueOpen(false)}
-            aria-label="Close queue"
+            onClick={clearQueue}
+            aria-label="Clear queue"
+            title="Clear the queue, keep this song playing"
           >
-            <X size={16} />
+            <Trash2 size={16} />
           </Button>
-        </div>
+        ) : null}
       </div>
 
       <div
