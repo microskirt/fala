@@ -1,7 +1,6 @@
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
 import {
   Home,
-  Search,
   Heart,
   ListMusic,
   Repeat2,
@@ -86,7 +85,6 @@ export function Sidebar({ open, onNavigate }) {
       <nav className="scrollbar-thin flex-1 overflow-y-auto px-2 pb-4">
         <div className="flex flex-col gap-0.5">
           <NavLink to="/" icon={Home} label="Home" onClick={onNavigate} />
-          <NavLink to="/search" icon={Search} label="Search" onClick={onNavigate} />
         </div>
 
         <NavHeading>Your library</NavHeading>
