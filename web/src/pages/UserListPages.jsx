@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams } from '@tanstack/react-router';
 import { Users, UserPlus } from 'lucide-react';
 import { api } from '@/api.js';
 import { usePagedList } from '@/lib/usePagedList.js';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
+import { useUserId } from '@/lib/useResolvedId.js';
 import { ErrorState, EmptyState } from '@/components/Media.jsx';
 import { ArtistRow } from '@/components/Cards.jsx';
 import { Page, PageHeader, PersonGrid, PersonGridSkeleton, LoadMore } from '@/components/layout/Page.jsx';
@@ -15,10 +15,12 @@ import { Page, PageHeader, PersonGrid, PersonGridSkeleton, LoadMore } from '@/co
  * open their own lists.
  */
 function UserListPage({ tab, title, description, emptyTitle, emptyBody, icon }) {
-  const { id } = useParams({ strict: false });
+  // The list answers on the id form and on the artist slug form.
+  const { id, error: resolveError } = useUserId();
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
+    if (!id) return undefined;
     let cancelled = false;
     api
       .get(`/api/users/${encodeURIComponent(id)}`)
@@ -30,7 +32,7 @@ function UserListPage({ tab, title, description, emptyTitle, emptyBody, icon }) 
   }, [id]);
 
   const { items, next, loading, loadingMore, error, loadMore } = usePagedList(
-    `/api/users/${encodeURIComponent(id)}/tab?tab=${tab}`,
+    id ? `/api/users/${encodeURIComponent(id)}/tab?tab=${tab}` : '',
     { limit: 60 }
   );
   const sentinelRef = useAutoLoad({ hasMore: !!next, loading: loadingMore, onLoad: loadMore });
@@ -41,7 +43,9 @@ function UserListPage({ tab, title, description, emptyTitle, emptyBody, icon }) 
         title={title}
         description={profile ? description(profile.username) : description('this artist')}
       />
-      {loading ? (
+      {resolveError ? (
+        <ErrorState message={resolveError} onRetry={() => window.location.reload()} />
+      ) : !id || loading ? (
         <PersonGridSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={() => window.location.reload()} />

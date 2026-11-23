@@ -55,7 +55,7 @@ import { Modal } from '@/components/Modal.jsx';
 import { cn } from '@/lib/utils.js';
 import { placeLabel } from '@/lib/places.js';
 import { ClampedText } from '@/components/ClampedText.jsx';
-import { resolveTrackParam, playlistLink, userLink } from '@/lib/scRoute.js';
+import { resolveTrackParam, playlistLink, userLink, trackSubLink } from '@/lib/scRoute.js';
 
 function Waveform({ samples, progress, onSeek, height = 96 }) {
   const ref = useRef(null);
@@ -721,7 +721,7 @@ function ArtistCard({ user }) {
  * likes and reposts lead to the people behind them, which is why those two are
  * links and the play count is not.
  */
-function TrackStats({ track, id }) {
+function TrackStats({ track }) {
   const row = 'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors';
   return (
     <section className="rounded-xl border bg-card px-3 py-3">
@@ -736,8 +736,7 @@ function TrackStats({ track, id }) {
           </span>
         </div>
         <Link
-          to="/track/$id/likes"
-          params={{ id: String(id) }}
+          {...trackSubLink(track, 'likes')}
           className={cn(row, 'text-muted-foreground hover:bg-accent hover:text-foreground')}
           title="See who liked this track"
         >
@@ -747,8 +746,7 @@ function TrackStats({ track, id }) {
           <span className="font-semibold tabular-nums">{formatCount(track.likes_count)}</span>
         </Link>
         <Link
-          to="/track/$id/reposts"
-          params={{ id: String(id) }}
+          {...trackSubLink(track, 'reposts')}
           className={cn(row, 'text-muted-foreground hover:bg-accent hover:text-foreground')}
           title="See who reposted this track"
         >
@@ -767,7 +765,7 @@ function TrackStats({ track, id }) {
  * as two loose links, which made them read like actions. They are facts about
  * the song, so they belong in a box with the rest of them, below Top listeners.
  */
-function TrackCollections({ counts, id }) {
+function TrackCollections({ counts, track }) {
   const playlists = counts?.playlists;
   const albums = counts?.albums;
   const hasPlaylists = playlists?.total > 0;
@@ -783,8 +781,7 @@ function TrackCollections({ counts, id }) {
       <div className="mt-2 space-y-0.5">
         {hasPlaylists ? (
           <Link
-            to="/track/$id/playlists"
-            params={{ id: String(id) }}
+            {...trackSubLink(track, 'playlists')}
             className={row}
             title="See the playlists this track is in"
           >
@@ -799,8 +796,7 @@ function TrackCollections({ counts, id }) {
         ) : null}
         {hasAlbums ? (
           <Link
-            to="/track/$id/albums"
-            params={{ id: String(id) }}
+            {...trackSubLink(track, 'albums')}
             className={row}
             title="See the albums this track is in"
           >
@@ -1243,10 +1239,10 @@ export function TrackPage() {
 
         <aside className="flex min-w-0 flex-col gap-4">
           <ArtistCard user={artist || track.user} />
-          <TrackStats track={track} id={id} />
+          <TrackStats track={track} />
           <AlsoLiked people={alsoLiked} />
           {isAuthed ? <TopListeners trackId={track.id} /> : null}
-          <TrackCollections counts={counts} id={id} />
+          <TrackCollections counts={counts} track={track} />
         </aside>
       </div>
 

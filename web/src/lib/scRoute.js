@@ -57,6 +57,30 @@ export function userLink(user) {
   return { to: '/artist/$id', params: { id: String(user?.id) } };
 }
 
+/*
+ * Subpages hang off the same slug as the page they belong to, so a list keeps
+ * the artist's own address: /artist/song/likes rather than /track/123/likes.
+ * The id form stays as the fallback for anything without a permalink.
+ */
+export function trackSubLink(track, sub) {
+  const seg = scSegments(track);
+  if (seg && seg.length === 2) {
+    return {
+      to: `/$artist/$track/${sub}`,
+      params: { artist: seg[0], track: seg[1] },
+    };
+  }
+  return { to: `/track/$id/${sub}`, params: { id: String(track?.id) } };
+}
+
+export function userSubLink(user, sub) {
+  const seg = scSegments(user);
+  if (seg && seg.length === 1) {
+    return { to: `/$artist/${sub}`, params: { artist: seg[0] } };
+  }
+  return { to: `/artist/$id/${sub}`, params: { id: String(user?.id) } };
+}
+
 export function playlistLink(playlist) {
   const raw = String(playlist?.id);
   const isSystem = playlist?.kind === 'system-playlist' || raw.startsWith('system:');

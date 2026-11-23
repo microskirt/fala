@@ -1,8 +1,9 @@
-import { useParams, Link } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { Heart, ListMusic, Disc3, Repeat2 } from 'lucide-react';
 import { formatCount } from '@/api.js';
 import { usePagedList } from '@/lib/usePagedList.js';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
+import { useTrackId } from '@/lib/useResolvedId.js';
 import { Artwork, Avatar, ErrorState, EmptyState } from '@/components/Media.jsx';
 import { BadgeCheck } from 'lucide-react';
 import { userLink, playlistLink } from '@/lib/scRoute.js';
@@ -77,17 +78,23 @@ function PlaylistTile({ playlist }) {
  * rest of the app.
  */
 function CollectionPage({ endpoint, title, description, emptyTitle, emptyBody, mode, icon }) {
-  // These routes are flat siblings of the song page, so read the params loosely.
-  const { id } = useParams({ strict: false });
-  const { items, next, loading, loadingMore, error, loadMore } = usePagedList(endpoint(id), {
-    limit: 60,
-  });
+  /*
+   * The list answers on both the id form and the artist slug form, so the id
+   * may still have to be resolved from the words in the address.
+   */
+  const { id, error: resolveError } = useTrackId();
+  const { items, next, loading, loadingMore, error, loadMore } = usePagedList(
+    id ? endpoint(id) : '',
+    { limit: 60 }
+  );
   const sentinelRef = useAutoLoad({ hasMore: !!next, loading: loadingMore, onLoad: loadMore });
 
   return (
     <Page>
       <PageHeader title={title} description={description} />
-      {loading ? (
+      {resolveError ? (
+        <ErrorState message={resolveError} onRetry={() => window.location.reload()} />
+      ) : !id || loading ? (
         mode === 'people' ? <PersonGridSkeleton /> : <CardGridSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={() => window.location.reload()} />

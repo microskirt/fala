@@ -131,6 +131,48 @@ const slugPlaylistRoute = createRoute({
   component: PlaylistPage,
 });
 
+/*
+ * The lists behind a song and the follower lists behind an artist hang off the
+ * same slug, so the address stays in SoundCloud's own shape instead of falling
+ * back to a numeric id. Static words like followers outrank $track, so these
+ * do not shadow the song route.
+ */
+const slugTrackLikersRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/$track/likes',
+  component: TrackLikersPage,
+});
+
+const slugTrackRepostersRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/$track/reposts',
+  component: TrackRepostersPage,
+});
+
+const slugTrackPlaylistsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/$track/playlists',
+  component: TrackPlaylistsPage,
+});
+
+const slugTrackAlbumsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/$track/albums',
+  component: TrackAlbumsPage,
+});
+
+const slugArtistFollowersRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/followers',
+  component: UserFollowersPage,
+});
+
+const slugArtistFollowingRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/following',
+  component: UserFollowingPage,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/settings',
@@ -204,6 +246,12 @@ const routeTree = rootRoute.addChildren([
     slugArtistRoute,
     slugTrackRoute,
     slugPlaylistRoute,
+    slugTrackLikersRoute,
+    slugTrackRepostersRoute,
+    slugTrackPlaylistsRoute,
+    slugTrackAlbumsRoute,
+    slugArtistFollowersRoute,
+    slugArtistFollowingRoute,
   ]),
 ]);
 

@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea.jsx';
 import { cn } from '@/lib/utils.js';
 import { placeLabel } from '@/lib/places.js';
 import { ClampedText } from '@/components/ClampedText.jsx';
-import { resolveUserParam } from '@/lib/scRoute.js';
+import { resolveUserParam, userSubLink } from '@/lib/scRoute.js';
 
 const TABS = [
   { id: 'tracks', label: 'Tracks', icon: Music2 },
@@ -377,14 +377,12 @@ export function ProfilePage() {
             <Stat
               value={profile.followers_count}
               label="followers"
-              to="/artist/$id/followers"
-              params={{ id: String(profile.id) }}
+              {...userSubLink(profile, 'followers')}
             />
             <Stat
               value={profile.followings_count}
               label="following"
-              to="/artist/$id/following"
-              params={{ id: String(profile.id) }}
+              {...userSubLink(profile, 'following')}
             />
           </div>
 
