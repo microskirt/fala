@@ -101,13 +101,11 @@ export function TrackList({ children, className }) {
  * The bottom of every paged list. The element it renders is the sentinel the
  * scroll observer watches, so the wheel doubles as the trigger target.
  */
-export function LoadMore({ sentinelRef, loading, done, doneLabel }) {
+export function LoadMore({ sentinelRef, loading }) {
   return (
     <div ref={sentinelRef} className="flex h-16 items-center justify-center text-muted-foreground">
       {loading ? (
         <Loader2 size={20} className="animate-spin" aria-label="Loading more" />
-      ) : done && doneLabel ? (
-        <span className="text-xs">{doneLabel}</span>
       ) : null}
     </div>
   );

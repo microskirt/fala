@@ -109,12 +109,7 @@ function CollectionPage({ endpoint, title, description, emptyTitle, emptyBody, m
               ))}
             </CardGrid>
           )}
-          <LoadMore
-            sentinelRef={sentinelRef}
-            loading={loadingMore}
-            done={!next}
-            doneLabel={items.length > 0 ? 'That is everything' : null}
-          />
+          <LoadMore sentinelRef={sentinelRef} loading={loadingMore} />
         </>
       )}
     </Page>
