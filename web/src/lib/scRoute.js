@@ -81,6 +81,27 @@ export function userSubLink(user, sub) {
   return { to: `/artist/$id/${sub}`, params: { id: String(user?.id) } };
 }
 
+/*
+ * A playlist subpage keeps the playlist's own address: the likes list lives at
+ * /artist/sets/playlist/likes rather than /playlist/123/likes. Generated mixes
+ * have no readable address, so they keep the id form.
+ */
+export function playlistSubLink(playlist, sub) {
+  const raw = String(playlist?.id);
+  const isSystem = playlist?.kind === 'system-playlist' || raw.startsWith('system:');
+  const seg = isSystem ? null : scSegments(playlist);
+  if (seg && seg.length === 3 && seg[1] === 'sets') {
+    return {
+      to: `/$artist/sets/$playlist/${sub}`,
+      params: { artist: seg[0], playlist: seg[2] },
+    };
+  }
+  return {
+    to: `/playlist/$id/${sub}`,
+    params: { id: isSystem ? `system:${raw.replace(/^system:/, '')}` : `sc:${raw}` },
+  };
+}
+
 export function playlistLink(playlist) {
   const raw = String(playlist?.id);
   const isSystem = playlist?.kind === 'system-playlist' || raw.startsWith('system:');

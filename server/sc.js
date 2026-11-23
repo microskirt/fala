@@ -1032,6 +1032,17 @@ export async function likers(id, { limit = 50, next } = {}) {
   return mapCollection(data, slimUser);
 }
 
+/*
+ * A playlist keeps its likers on its own endpoint. The shape is the same as
+ * the track list, so the page behind it can reuse the same people grid.
+ */
+export async function playlistLikers(id, { limit = 50, next } = {}) {
+  const data = next
+    ? await apiGet(next)
+    : await apiGet(`/playlists/${id}/likers?limit=${limit}`, { ttl: 120_000 });
+  return mapCollection(data, slimUser);
+}
+
 // The playlists a track sits in, and the albums separately, since a track can
 // appear in both and the song page shows the counts apart.
 async function trackCollections(id, kind, { limit = 50, next } = {}) {

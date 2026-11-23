@@ -3,7 +3,7 @@ import { Heart, ListMusic, Disc3, Repeat2 } from 'lucide-react';
 import { formatCount } from '@/api.js';
 import { usePagedList } from '@/lib/usePagedList.js';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
-import { useTrackId } from '@/lib/useResolvedId.js';
+import { useTrackId, usePlaylistId } from '@/lib/useResolvedId.js';
 import { Artwork, Avatar, ErrorState, EmptyState } from '@/components/Media.jsx';
 import { BadgeCheck } from 'lucide-react';
 import { userLink, playlistLink } from '@/lib/scRoute.js';
@@ -77,12 +77,23 @@ function PlaylistTile({ playlist }) {
  * so the list has an address, a back button and the same scroll loader as the
  * rest of the app.
  */
-function CollectionPage({ endpoint, title, description, emptyTitle, emptyBody, mode, icon }) {
+function CollectionPage({
+  endpoint,
+  title,
+  description,
+  emptyTitle,
+  emptyBody,
+  mode,
+  icon,
+  // Which address family the list answers on. Songs resolve from the track
+  // slug, playlists from the playlist slug.
+  useId = useTrackId,
+}) {
   /*
    * The list answers on both the id form and the artist slug form, so the id
    * may still have to be resolved from the words in the address.
    */
-  const { id, error: resolveError } = useTrackId();
+  const { id, error: resolveError } = useId();
   const { items, next, loading, loadingMore, error, loadMore } = usePagedList(
     id ? endpoint(id) : '',
     { limit: 60 }
@@ -176,6 +187,25 @@ export function TrackAlbumsPage() {
       emptyBody="This track does not belong to an album so far."
       mode="playlists"
       icon={Disc3}
+    />
+  );
+}
+
+/*
+ * The people behind the like count on a playlist. Albums use the same page,
+ * since a like on either is the same kind of like.
+ */
+export function PlaylistLikersPage() {
+  return (
+    <CollectionPage
+      endpoint={(id) => `/api/playlists/${encodeURIComponent(id)}/likers`}
+      title="Liked by"
+      description="Everyone who pressed the heart on this playlist"
+      emptyTitle="Nobody has liked this playlist yet"
+      emptyBody="Be the first one to give it a heart."
+      mode="people"
+      icon={Heart}
+      useId={usePlaylistId}
     />
   );
 }

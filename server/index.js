@@ -602,6 +602,18 @@ route('PUT', '/api/playlists/:id/like', async (ctx) => {
   return sc.likePlaylist(token, ctx.params.id, !!ctx.body.on);
 });
 
+// Who liked the playlist, for the counter on the playlist page.
+route('GET', '/api/playlists/:id/likers', async (ctx) => {
+  let id = ctx.params.id;
+  if (id.startsWith('sc-playlist:')) id = id.slice('sc-playlist:'.length);
+  const data = await sc.playlistLikers(id, {
+    limit: pageLimit(ctx.query, 50),
+    next: ctx.query.get('next'),
+  });
+  const flags = await flagsFor(ctx.token);
+  return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
+});
+
 // A cover arrives as a data URI, so these two allow a larger body than the
 // megabyte the rest of the API works within.
 const ARTWORK_BODY_LIMIT = 8_000_000;

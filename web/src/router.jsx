@@ -15,6 +15,7 @@ import {
   TrackRepostersPage,
   TrackPlaylistsPage,
   TrackAlbumsPage,
+  PlaylistLikersPage,
 } from './pages/TrackListPages.jsx';
 import {
   LikesPage,
@@ -88,6 +89,13 @@ const playlistRoute = createRoute({
   component: PlaylistPage,
 });
 
+// The like count on a playlist opens the people behind it, like the song page.
+const playlistLikersRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/playlist/$id/likes',
+  component: PlaylistLikersPage,
+});
+
 const artistRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/artist/$id',
@@ -129,6 +137,12 @@ const slugPlaylistRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/$artist/sets/$playlist',
   component: PlaylistPage,
+});
+
+const slugPlaylistLikersRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/sets/$playlist/likes',
+  component: PlaylistLikersPage,
 });
 
 /*
@@ -233,6 +247,7 @@ const routeTree = rootRoute.addChildren([
     trackPlaylistsRoute,
     trackAlbumsRoute,
     playlistRoute,
+    playlistLikersRoute,
     artistRoute,
     artistFollowersRoute,
     artistFollowingRoute,
@@ -246,6 +261,7 @@ const routeTree = rootRoute.addChildren([
     slugArtistRoute,
     slugTrackRoute,
     slugPlaylistRoute,
+    slugPlaylistLikersRoute,
     slugTrackLikersRoute,
     slugTrackRepostersRoute,
     slugTrackPlaylistsRoute,
