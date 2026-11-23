@@ -826,7 +826,10 @@ query TopFans($trackUrn: ID!) {
   topFans(input: {trackUrn: $trackUrn}) {
     firstPeriodDays
     hasArtistOptedOut
-    allTime { fans { fan { urn username permalink permalinkUrl avatarUrl followersCount verified city country } totalPlays } }
+    allTime {
+      viewer { currentRank totalPlays }
+      fans { fan { urn username permalink permalinkUrl avatarUrl followersCount verified city country } totalPlays }
+    }
     firstPeriod { fans { fan { urn username permalink permalinkUrl avatarUrl followersCount verified city country } totalPlays } }
   }
 }`;
@@ -836,6 +839,10 @@ query TopFans($trackUrn: ID!) {
  * keeps two windows here: the last `firstPeriodDays` days (seven, at the time of
  * writing) and all time. The windowed query elsewhere in this file ignores the
  * track and answers for the signed in account, so it is not used here.
+ *
+ * All time also carries a `viewer` block: where the signed in account itself
+ * stands. SoundCloud leaves it null when the account never played the track, and
+ * the first period tab has no viewer block at all, so only all time asks for it.
  */
 export async function topListeners(token, trackId, { window = 'ALL_TIME', limit = 5 } = {}) {
   const data = await graphql(token, {
@@ -849,11 +856,20 @@ export async function topListeners(token, trackId, { window = 'ALL_TIME', limit 
     .slice(0, limit)
     .map((row) => ({ plays: row?.totalPlays ?? 0, user: slimGraphUser(row?.fan) }))
     .filter((row) => row.user);
+
+  // The viewer's own standing, when there is one to report.
+  const seen = block.allTime?.viewer || null;
+  const viewer =
+    which === 'allTime' && seen && seen.currentRank != null
+      ? { rank: seen.currentRank, plays: seen.totalPlays ?? 0 }
+      : null;
+
   return {
     window: which === 'firstPeriod' ? 'DAYS_7' : 'ALL_TIME',
     days: block.firstPeriodDays || 7,
     optedOut: !!block.hasArtistOptedOut,
     fans,
+    viewer,
   };
 }
 

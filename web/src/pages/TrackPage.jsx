@@ -624,15 +624,62 @@ function AlsoLiked({ people }) {
  * track. It only offers two windows: the first week and all time. The numbers
  * come from a signed-in-only endpoint, so the panel stays out of the way when
  * there is no token or no data.
+ *
+ * All time also says where the signed in account itself stands, which is how
+ * SoundCloud lets you find yourself in a ranking you are not part of. That
+ * extra row is all time only, because the first week window does not report it.
  */
 const LISTENER_WINDOWS = [
   { id: 'ALL_TIME', label: 'All time' },
   { id: 'DAYS_7', label: 'First 7 days' },
 ];
 
+/*
+ * One place in the ranking. The number sits flush against the card padding on
+ * the left and the play count flush against it on the right, so the row is
+ * inset by the same amount on both sides instead of leaning right.
+ */
+function ListenerRow({ rank, user, plays, isViewer = false }) {
+  return (
+    <Link
+      {...userLink(user)}
+      className={cn(
+        'flex items-center gap-2.5 rounded-md py-1.5 transition-colors hover:bg-accent/60',
+        isViewer && 'bg-primary/10'
+      )}
+    >
+      <span className="w-8 shrink-0 text-left text-xs font-semibold tabular-nums text-muted-foreground">
+        {rank}
+      </span>
+      <Avatar src={user.avatar_url} name={user.username} size={28} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1 truncate text-sm font-medium">
+          <span className="truncate">{user.username}</span>
+          {user.verified ? <BadgeCheck size={13} className="shrink-0 text-primary" /> : null}
+          {isViewer ? (
+            <span className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+              You
+            </span>
+          ) : null}
+        </span>
+        {placeLabel(user.city, user.country_code) ? (
+          <span className="block truncate text-xs text-muted-foreground">
+            {placeLabel(user.city, user.country_code)}
+          </span>
+        ) : null}
+      </span>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {formatCount(plays)} {plays === 1 ? 'play' : 'plays'}
+      </span>
+    </Link>
+  );
+}
+
 function TopListeners({ trackId }) {
+  const { user: me } = useAuth();
   const [window, setWindow] = useState('ALL_TIME');
   const [fans, setFans] = useState(null);
+  const [viewer, setViewer] = useState(null);
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
 
@@ -644,9 +691,14 @@ function TopListeners({ trackId }) {
       .then((r) => {
         if (cancelled) return;
         setFans(r.fans || []);
+        setViewer(r.viewer || null);
         if (r.days) setDays(r.days);
       })
-      .catch(() => !cancelled && setFans([]))
+      .catch(() => {
+        if (cancelled) return;
+        setFans([]);
+        setViewer(null);
+      })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -656,6 +708,14 @@ function TopListeners({ trackId }) {
   // A track with no plays in the window has no ranking, and an empty box would
   // just be noise under the player.
   if (!loading && (!fans || fans.length === 0)) return null;
+
+  /*
+   * When the account is already in the shown ranks, that row is marked instead
+   * of repeating it underneath. Otherwise the standing gets its own row at the
+   * bottom, set apart by a rule so it does not read as the next place.
+   */
+  const inList = viewer != null && viewer.rank <= fans.length;
+  const ownRow = viewer != null && !inList && me ? viewer : null;
 
   return (
     <section className="rounded-xl border bg-card px-4 py-3.5">
@@ -689,36 +749,27 @@ function TopListeners({ trackId }) {
           ))}
         </div>
       ) : (
-        <ol className="mt-2.5 space-y-0.5">
+        <ol className="mt-2.5">
           {fans.map((entry, i) => (
             <li key={`${entry.user.id}-${i}`}>
-              <Link
-                {...userLink(entry.user)}
-                className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent/60"
-              >
-                <span className="w-4 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground">
-                  {i + 1}
-                </span>
-                <Avatar src={entry.user.avatar_url} name={entry.user.username} size={28} />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1 truncate text-sm font-medium">
-                    {entry.user.username}
-                    {entry.user.verified ? (
-                      <BadgeCheck size={13} className="shrink-0 text-primary" />
-                    ) : null}
-                  </span>
-                  {placeLabel(entry.user.city, entry.user.country_code) ? (
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {placeLabel(entry.user.city, entry.user.country_code)}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                  {formatCount(entry.plays)} {entry.plays === 1 ? 'play' : 'plays'}
-                </span>
-              </Link>
+              <ListenerRow
+                rank={i + 1}
+                user={entry.user}
+                plays={entry.plays}
+                isViewer={inList && viewer.rank === i + 1}
+              />
             </li>
           ))}
+          {ownRow ? (
+            <li className="mt-1.5 border-t pt-1.5">
+              <ListenerRow
+                rank={ownRow.rank}
+                user={me}
+                plays={ownRow.plays}
+                isViewer
+              />
+            </li>
+          ) : null}
         </ol>
       )}
     </section>
