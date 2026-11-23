@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Bell, Heart, Repeat2, ListMusic, Loader2 } from 'lucide-react';
+import { Bell, Heart, Repeat2, ListMusic, MessageSquare, UserPlus, Loader2 } from 'lucide-react';
 import { api, timeAgo } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { Avatar, Artwork } from '@/components/Media.jsx';
 import { Button } from '@/components/ui/button.jsx';
+import { KEYS, readKey, writeKey } from '@/lib/storage.js';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx';
@@ -18,7 +18,17 @@ const COPY = {
   'track-repost': { verb: 'reposted your track', icon: Repeat2 },
   'playlist-like': { verb: 'liked your playlist', icon: ListMusic },
   'playlist-repost': { verb: 'reposted your playlist', icon: ListMusic },
+  comment: { verb: 'commented on your track', icon: MessageSquare },
+  'comment-like': { verb: 'liked your comment', icon: Heart },
+  affiliation: { verb: 'added you as a collaborator', icon: UserPlus },
+  follow: { verb: 'followed you', icon: UserPlus },
 };
+
+// Newest first, so the first entry identifies the whole batch.
+function newestStamp(items) {
+  const first = items[0];
+  return first ? String(first.id ?? first.created_at ?? '') : '';
+}
 
 export function NotificationsMenu() {
   const { isAuthed } = useAuth();
@@ -26,6 +36,20 @@ export function NotificationsMenu() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [seen, setSeen] = useState(() => readKey(KEYS.notificationsSeen));
+
+  useEffect(() => {
+    if (!isAuthed) return;
+    let cancelled = false;
+    // Fetch on mount too, so the dot reflects reality before the menu is opened.
+    api
+      .get('/api/me/notifications?limit=30')
+      .then((res) => !cancelled && setItems(res.collection || []))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthed]);
 
   useEffect(() => {
     if (!open || !isAuthed) return;
@@ -42,13 +66,46 @@ export function NotificationsMenu() {
     };
   }, [open, isAuthed]);
 
+  /*
+   * A browser that has never opened the menu has nothing recorded, so it shows
+   * the dot once to teach the interaction. Opening the menu stores the newest
+   * entry and clears it until something newer actually arrives.
+   */
+  const hasUnread = useMemo(() => {
+    if (!isAuthed || items.length === 0) return false;
+    if (seen === null) return true;
+    return newestStamp(items) !== seen;
+  }, [isAuthed, items, seen]);
+
+  const markSeen = () => {
+    const stamp = newestStamp(items);
+    if (!stamp) return;
+    setSeen(stamp);
+    writeKey(KEYS.notificationsSeen, stamp);
+  };
+
   if (!isAuthed) return null;
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) markSeen();
+      }}
+    >
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Notifications" title="Notifications">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label={hasUnread ? 'Notifications, unread' : 'Notifications'}
+          title="Notifications"
+        >
           <Bell size={18} />
+          {hasUnread ? (
+            <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-background" />
+          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[360px] p-0">
@@ -66,11 +123,11 @@ export function NotificationsMenu() {
             <p className="px-3 py-8 text-center text-sm text-muted-foreground">{error}</p>
           ) : items.length === 0 ? (
             <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-              Nothing yet. Likes and reposts on your tracks show up here.
+              Nothing yet. Likes, reposts and comments on your tracks show up here.
             </p>
           ) : (
             items.map((n) => {
-              const meta = COPY[n.type] || { verb: 'did something', icon: Bell };
+              const meta = COPY[n.type] || { verb: 'sent you an update', icon: Bell };
               const Icon = meta.icon;
               const track = n.track;
               return (
@@ -96,6 +153,11 @@ export function NotificationsMenu() {
                       </Link>{' '}
                       <span className="text-muted-foreground">{meta.verb}</span>
                     </div>
+                    {n.comment?.body ? (
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                        {n.comment.body}
+                      </p>
+                    ) : null}
                     {track ? (
                       <Link
                         to="/track/$id"

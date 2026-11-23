@@ -14,8 +14,10 @@ import {
   Music2,
   ChevronDown,
   Trash2,
+  ListMusic,
+  Disc3,
 } from 'lucide-react';
-import { api, formatDuration, timeAgo, formatDate } from '@/api.js';
+import { api, formatCount, formatDuration, timeAgo, formatDate } from '@/api.js';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -32,6 +34,7 @@ import { Page, CardGrid, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
+import { Modal } from '@/components/Modal.jsx';
 import { cn } from '@/lib/utils.js';
 
 function Waveform({ samples, progress, onSeek, height = 96 }) {
@@ -196,12 +199,200 @@ function CommentItem({ comment, onDelete }) {
   );
 }
 
+/*
+ * A modal list for the counts on the song card: who liked the track, and which
+ * playlists or albums it sits in. Each loads its own pages so the card itself
+ * stays cheap.
+ */
+function PagedListModal({ open, onClose, title, endpoint, emptyText, renderRow }) {
+  const [items, setItems] = useState([]);
+  const [next, setNext] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setItems([]);
+    setNext(null);
+    setError(null);
+    setLoading(true);
+    api
+      .get(endpoint)
+      .then((res) => {
+        if (cancelled) return;
+        setItems(res.collection || []);
+        setNext(res.next_href || null);
+      })
+      .catch((err) => !cancelled && setError(err.message || 'Could not load this list'))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, endpoint]);
+
+  const loadMore = async () => {
+    if (!next || loading) return;
+    setLoading(true);
+    try {
+      const sep = endpoint.includes('?') ? '&' : '?';
+      const res = await api.get(`${endpoint}${sep}next=${encodeURIComponent(next)}`);
+      setItems((prev) => [...prev, ...(res.collection || [])]);
+      setNext(res.next_href || null);
+    } catch {}
+    setLoading(false);
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={title} wide>
+      {error ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">{error}</p>
+      ) : items.length === 0 && !loading ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">{emptyText}</p>
+      ) : (
+        <div className="max-h-[60vh] overflow-y-auto">
+          {items.map((item) => renderRow(item, onClose))}
+          {loading ? (
+            <div className="flex justify-center py-3 text-muted-foreground">
+              <Loader2 size={16} className="animate-spin" />
+            </div>
+          ) : null}
+          {next && !loading ? (
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" size="sm" onClick={loadMore}>
+                Load more
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function userRow(u, onClose) {
+  return (
+    <Link
+      key={u.id}
+      to="/artist/$id"
+      params={{ id: String(u.id) }}
+      className="flex items-center gap-2.5 rounded-md px-1.5 py-2 transition-colors hover:bg-accent/60"
+      onClick={onClose}
+    >
+      <Avatar src={u.avatar_url} name={u.username} size={34} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1 truncate text-sm font-medium">
+          {u.username}
+          {u.verified ? <BadgeCheck size={14} className="text-primary" /> : null}
+        </span>
+        {u.followers_count ? (
+          <span className="block text-xs text-muted-foreground">
+            {formatCount(u.followers_count)} followers
+          </span>
+        ) : null}
+      </span>
+    </Link>
+  );
+}
+
+function playlistRow(p, onClose) {
+  return (
+    <Link
+      key={p.id}
+      to="/playlist/$id"
+      params={{ id: String(p.id) }}
+      className="flex items-center gap-2.5 rounded-md px-1.5 py-2 transition-colors hover:bg-accent/60"
+      onClick={onClose}
+    >
+      <Artwork src={p.artwork_url} alt={p.title} size={38} rounded={4} kind="playlist" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{p.title}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {p.user?.username ? `${p.user.username} · ` : ''}
+          {formatCount(p.track_count)} tracks
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+/*
+ * "People you follow also liked this". Three names at most, with the remainder
+ * behind a count that opens the whole list.
+ */
+function AlsoLiked({ people }) {
+  const [open, setOpen] = useState(false);
+  if (!people || people.length === 0) return null;
+
+  const shown = people.slice(0, 3);
+  const rest = people.length - shown.length;
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2.5 rounded-lg border bg-muted/30 px-3 py-2.5">
+      <div className="flex -space-x-2">
+        {shown.map((u) => (
+          <Link
+            key={u.id}
+            to="/artist/$id"
+            params={{ id: String(u.id) }}
+            className="relative rounded-full ring-2 ring-background"
+            title={u.username}
+          >
+            <Avatar src={u.avatar_url} name={u.username} size={26} />
+          </Link>
+        ))}
+      </div>
+      <p className="min-w-0 text-sm text-muted-foreground">
+        {shown.map((u, i) => (
+          <span key={u.id}>
+            <Link
+              to="/artist/$id"
+              params={{ id: String(u.id) }}
+              className="font-medium text-foreground hover:underline"
+            >
+              {u.username}
+            </Link>
+            {i < shown.length - 1 ? ', ' : ''}
+          </span>
+        ))}
+        {rest > 0 ? (
+          <>
+            {' and '}
+            <button
+              type="button"
+              className="font-medium text-primary hover:underline"
+              onClick={() => setOpen(true)}
+            >
+              {rest} more following {rest === 1 ? 'person' : 'people'}
+            </button>
+            {' liked this'}
+          </>
+        ) : (
+          ' liked this'
+        )}
+      </p>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="People you follow who liked this"
+        wide
+      >
+        <div className="max-h-[60vh] overflow-y-auto">
+          {people.map((u) => userRow(u, () => setOpen(false)))}
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 export function TrackPage() {
   const { id } = useParams({ from: '/shell/track/$id' });
   const toast = useToast();
   const { playTrack, isCurrent, playing, togglePlay, currentTime, duration, seek, queue } =
     usePlayer();
   const { isReposted, toggleRepost, deleteComment } = useLibrary();
+  const { isAuthed } = useAuth();
 
   const [track, setTrack] = useState(null);
   const [related, setRelated] = useState([]);
@@ -213,6 +404,9 @@ export function TrackPage() {
   const [error, setError] = useState(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [commentTimestamp, setCommentTimestamp] = useState(null);
+  const [counts, setCounts] = useState(null);
+  const [alsoLiked, setAlsoLiked] = useState([]);
+  const [listModal, setListModal] = useState(null);
 
   const active = isCurrent(track);
   const progress = active && duration > 0 ? Math.min(1, currentTime / duration) : 0;
@@ -243,6 +437,18 @@ export function TrackPage() {
           .then((r) => !cancelled && setRelated(r.collection || []))
           .catch(() => {});
 
+        api
+          .get(`/api/tracks/${id}/collection-counts`)
+          .then((c) => !cancelled && setCounts(c))
+          .catch(() => {});
+
+        if (isAuthed) {
+          api
+            .get(`/api/tracks/${id}/also-liked`)
+            .then((r) => !cancelled && setAlsoLiked(r.collection || []))
+            .catch(() => {});
+        }
+
         const c = await api.get(`/api/tracks/${id}/comments?limit=100`);
         if (!cancelled) {
           setComments(c.collection || []);
@@ -258,7 +464,7 @@ export function TrackPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, isAuthed]);
 
   const loadMoreComments = async () => {
     if (!nextComments || loadingComments) return;
@@ -379,7 +585,48 @@ export function TrackPage() {
               )}
             </button>
 
-            <LikeButton track={track} showCount size={18} />
+            <LikeButton track={track} size={18} />
+
+            {/*
+             * The heart toggles the like. The count next to it is its own
+             * button, because clicking a number should show who is behind it
+             * rather than like the track a second time.
+             */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              onClick={() => setListModal('likers')}
+              title="See who liked this track"
+            >
+              {formatCount(track.likes_count)} {track.likes_count === 1 ? 'like' : 'likes'}
+            </button>
+
+            {counts?.playlists?.total > 0 ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                onClick={() => setListModal('playlists')}
+                title="See the playlists this track is in"
+              >
+                <ListMusic size={16} />
+                {counts.playlists.complete ? '' : 'More than '}
+                {formatCount(counts.playlists.total)}{' '}
+                {counts.playlists.total === 1 && counts.playlists.complete ? 'playlist' : 'playlists'}
+              </button>
+            ) : null}
+
+            {counts?.albums?.total > 0 ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                onClick={() => setListModal('albums')}
+                title="See the albums this track is in"
+              >
+                <Disc3 size={16} />
+                {formatCount(counts.albums.total)}{' '}
+                {counts.albums.total === 1 ? 'album' : 'albums'}
+              </button>
+            ) : null}
 
             <Button variant={reposted ? 'secondary' : 'ghost'} onClick={() => toggleRepost(track)}>
               <Repeat2 size={16} /> {reposted ? 'Reposted' : 'Repost'}
@@ -424,6 +671,35 @@ export function TrackPage() {
           <div className="mt-5">
             <TrackStatLine track={track} />
           </div>
+
+          <AlsoLiked people={alsoLiked} />
+
+          <PagedListModal
+            open={listModal === 'likers'}
+            onClose={() => setListModal(null)}
+            title="Liked by"
+            endpoint={`/api/tracks/${id}/likers?limit=50`}
+            emptyText="Nobody has liked this track yet."
+            renderRow={userRow}
+          />
+
+          <PagedListModal
+            open={listModal === 'playlists'}
+            onClose={() => setListModal(null)}
+            title="In playlists"
+            endpoint={`/api/tracks/${id}/playlists?limit=50`}
+            emptyText="This track is not in any playlist yet."
+            renderRow={playlistRow}
+          />
+
+          <PagedListModal
+            open={listModal === 'albums'}
+            onClose={() => setListModal(null)}
+            title="On albums"
+            endpoint={`/api/tracks/${id}/albums?limit=50`}
+            emptyText="This track is not on any album yet."
+            renderRow={playlistRow}
+          />
 
           {track.description ? (
             <div className="mt-4">

@@ -11,6 +11,7 @@ export const KEYS = {
   theme: `${PREFIX}theme`,
   prefs: `${PREFIX}prefs`,
   volume: `${PREFIX}volume`,
+  notificationsSeen: `${PREFIX}notifications_seen`,
 };
 
 export function readKey(key) {

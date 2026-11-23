@@ -70,6 +70,45 @@ function SeekLine({ value, max, onSeek }) {
   );
 }
 
+/*
+ * The volume bar lives inside the icon: hovering opens a vertical slider
+ * above it, so the bar itself stays as thin as SoundCloud's.
+ */
+function VolumeControl({ volume, muted, icon: Icon, onToggleMute, onVolume }) {
+  const shown = muted ? 0 : Math.round(volume * 100);
+
+  return (
+    <div className="group relative flex items-center">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={onToggleMute}
+        aria-label={muted ? 'Unmute' : 'Mute'}
+        title={muted ? 'Unmute' : 'Mute'}
+      >
+        <Icon size={15} />
+      </Button>
+
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 -translate-x-1/2 pb-2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+        <div className="flex flex-col items-center gap-2 rounded-lg border bg-popover px-2.5 py-3 shadow-lg">
+          <span className="text-[10px] tabular-nums text-muted-foreground">{shown}</span>
+          {/* Radix sliders are horizontal, so the vertical bar is a rotated one. */}
+          <div className="flex h-24 w-6 items-center justify-center">
+            <Slider
+              className="w-24 origin-center -rotate-90"
+              value={[shown]}
+              max={100}
+              step={1}
+              onValueChange={([v]) => onVolume(v / 100)}
+              aria-label="Volume"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Player() {
   const {
     current,
@@ -234,17 +273,13 @@ export function Player() {
           >
             <ListMusic size={15} />
           </Button>
-          <div className="hidden items-center gap-1.5 md:flex">
-            <Button variant="ghost" size="icon-sm" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'}>
-              <VolumeIcon size={15} />
-            </Button>
-            <Slider
-              className="w-20"
-              value={[muted ? 0 : volume * 100]}
-              max={100}
-              step={1}
-              onValueChange={([v]) => setVolume(v / 100)}
-              aria-label="Volume"
+          <div className="hidden md:block">
+            <VolumeControl
+              volume={volume}
+              muted={muted}
+              icon={VolumeIcon}
+              onToggleMute={toggleMute}
+              onVolume={setVolume}
             />
           </div>
         </div>

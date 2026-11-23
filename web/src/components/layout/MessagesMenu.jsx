@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from '@tanstack/react-router';
 import { MessageSquare, Loader2, Send } from 'lucide-react';
 import { api, timeAgo } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -49,13 +48,14 @@ export function MessagesMenu() {
   }, [open, isAuthed]);
 
   const openThread = async (conversation) => {
-    setActive(conversation);
+    const peer = otherUser(conversation, user?.id);
+    if (!peer) return;
+    setActive({ conversation, peer });
     setMessages([]);
     setLoadingThread(true);
     try {
-      const res = await api.get(
-        `/api/me/conversations/${encodeURIComponent(conversation.id)}/messages?limit=100`
-      );
+      // Threads are keyed by the other person, not by the conversation id.
+      const res = await api.get(`/api/me/conversations/${peer.id}/messages?limit=100`);
       // The endpoint returns newest first; the thread reads oldest at the top.
       setMessages([...(res.collection || [])].reverse());
     } catch (err) {
@@ -71,11 +71,16 @@ export function MessagesMenu() {
     if (!body || sending || !active) return;
     setSending(true);
     try {
-      const res = await api.post(
-        `/api/me/conversations/${encodeURIComponent(active.id)}/messages`,
-        { body }
-      );
-      if (res.message) setMessages((prev) => [...prev, res.message]);
+      await api.post(`/api/me/conversations/${active.peer.id}/messages`, { body });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `local-${Date.now()}`,
+          content: body,
+          sender_id: user?.id,
+          created_at: new Date().toISOString(),
+        },
+      ]);
       setDraft('');
     } catch (err) {
       toast.error(err.message || 'Could not send that message');
@@ -112,8 +117,8 @@ export function MessagesMenu() {
           ) : (
             <span className="text-sm font-semibold">Messages</span>
           )}
-          <span className="text-xs text-muted-foreground">
-            {active ? otherUser(active, user?.id)?.username : conversations.length}
+          <span className="truncate text-xs text-muted-foreground">
+            {active ? active.peer.username : conversations.length}
           </span>
         </div>
         <DropdownMenuSeparator className="my-0" />

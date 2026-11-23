@@ -416,6 +416,45 @@ route('GET', '/api/tracks/:id/reposters', async (ctx) => {
   return { collection: remote.map((u) => decorateUser(u, flags)) };
 });
 
+route('GET', '/api/tracks/:id/likers', async (ctx) => {
+  const data = await sc.likers(ctx.params.id, {
+    limit: pageLimit(ctx.query, 50),
+    next: ctx.query.get('next'),
+  });
+  const flags = await flagsFor(ctx.token);
+  return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
+});
+
+route('GET', '/api/tracks/:id/playlists', async (ctx) => {
+  return sc.trackPlaylists(ctx.params.id, {
+    limit: pageLimit(ctx.query, 50),
+    next: ctx.query.get('next'),
+  });
+});
+
+route('GET', '/api/tracks/:id/albums', async (ctx) => {
+  return sc.trackAlbums(ctx.params.id, {
+    limit: pageLimit(ctx.query, 50),
+    next: ctx.query.get('next'),
+  });
+});
+
+// Both counts in one call, since the song page shows them side by side.
+route('GET', '/api/tracks/:id/collection-counts', async (ctx) => {
+  const [playlists, albums] = await Promise.all([
+    sc.trackCollectionCount(ctx.params.id, 'playlists').catch(() => ({ total: 0, complete: true })),
+    sc.trackCollectionCount(ctx.params.id, 'albums').catch(() => ({ total: 0, complete: true })),
+  ]);
+  return { playlists, albums };
+});
+
+route('GET', '/api/tracks/:id/also-liked', async (ctx) => {
+  const token = requireToken(ctx);
+  const data = await sc.alsoLiked(token, ctx.params.id);
+  const flags = await flagsFor(token);
+  return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
+});
+
 route('PUT', '/api/tracks/:id/like', async (ctx) => {
   const token = requireToken(ctx);
   return sc.like(token, ctx.params.id, !!ctx.body.on);

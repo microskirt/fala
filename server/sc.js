@@ -534,13 +534,17 @@ export async function notifications(token, { limit = 50, next } = {}) {
     : await apiGet(`/activities?limit=${limit}`, { token });
   return mapCollection(data, (a) => {
     if (!a) return null;
+    // Comment activities carry the comment itself, not a track, so lift its
+    // track up and keep the body for the notification copy.
+    const comment = a.comment || null;
     return {
       id: a.uuid || a.cursor,
       type: a.type,
       created_at: a.created_at,
       user: a.user ? slimUser(a.user) : null,
-      track: a.track ? slimTrack(a.track) : null,
+      track: a.track ? slimTrack(a.track) : comment?.track ? slimTrack(comment.track) : null,
       playlist: a.playlist ? slimPlaylist(a.playlist) : null,
+      comment: comment ? { id: comment.id, body: comment.body || '' } : null,
     };
   });
 }
@@ -578,35 +582,36 @@ export async function conversations(token, { limit = 50, next } = {}) {
   return mapCollection(data, slimConversation);
 }
 
-export async function conversationMessages(token, conversationId, { limit = 100, next } = {}) {
+/*
+ * Messages are addressed by the *other person*, not by a conversation id.
+ * `/users/:me/conversations/:other/messages` reads the thread and
+ * `POST /users/:me/conversations/:other` sends into it, creating it on first
+ * use. Passing a conversation URN instead makes SoundCloud answer
+ * "Did not get or could not parse the 'other' param."
+ */
+export async function conversationMessages(token, otherId, { limit = 100, next } = {}) {
   const id = await meId(token);
   const data = next
     ? await apiGet(next, { token })
     : await apiGet(
-        `/users/${id}/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}`,
+        `/users/${id}/conversations/${encodeURIComponent(otherId)}/messages?limit=${limit}`,
         { token }
       );
   return mapCollection(data, slimMessage);
 }
 
-// Opens a conversation with `recipientId` and sends the first message.
+// Sends a message to `recipientId`, opening the conversation if needed.
 export async function startConversation(token, recipientId, body) {
   const id = await meId(token);
-  const data = await apiWrite('POST', `/users/${id}/conversations`, {
+  await apiWrite('POST', `/users/${id}/conversations/${encodeURIComponent(recipientId)}`, {
     token,
-    body: { recipients: [Number(recipientId)], message: { content: body } },
+    body: { message: { content: body } },
   });
-  return slimConversation(data);
+  return { recipient_id: Number(recipientId), content: body };
 }
 
-export async function sendMessage(token, conversationId, body) {
-  const id = await meId(token);
-  const data = await apiWrite(
-    'POST',
-    `/users/${id}/conversations/${encodeURIComponent(conversationId)}`,
-    { token, body: { message: { content: body } } }
-  );
-  return slimMessage(data?.last_message || data);
+export async function sendMessage(token, recipientId, body) {
+  return startConversation(token, recipientId, body);
 }
 
 export async function comments(id, { limit = 30, next } = {}) {
@@ -648,13 +653,74 @@ export async function reposters(id, { limit = 12 } = {}) {
   return (data.collection || []).map(slimUser).filter(Boolean);
 }
 
-export async function likers(id, { limit = 12 } = {}) {
-  try {
-    const data = await apiGet(`/tracks/${id}/likers?limit=${limit}`, { ttl: 300_000 });
-    return (data.collection || []).map(slimUser).filter(Boolean);
-  } catch {
-    return [];
+export async function likers(id, { limit = 50, next } = {}) {
+  const data = next
+    ? await apiGet(next)
+    : await apiGet(`/tracks/${id}/likers?limit=${limit}`, { ttl: 120_000 });
+  return mapCollection(data, slimUser);
+}
+
+// The playlists a track sits in, and the albums separately, since a track can
+// appear in both and the song page shows the counts apart.
+async function trackCollections(id, kind, { limit = 50, next } = {}) {
+  const data = next
+    ? await apiGet(next)
+    : await apiGet(`/tracks/${id}/${kind}?limit=${limit}`, { ttl: 300_000 });
+  return mapCollection(data, slimPlaylist);
+}
+
+export async function trackPlaylists(id, opts = {}) {
+  return trackCollections(id, 'playlists', opts);
+}
+
+export async function trackAlbums(id, opts = {}) {
+  return trackCollections(id, 'albums', opts);
+}
+
+/*
+ * SoundCloud returns no total for these collections, so the count is a bounded
+ * walk over the pages. Popular tracks sit in thousands of playlists and nobody
+ * needs an exact figure, so it stops early and reports that it did.
+ */
+export async function trackCollectionCount(id, kind, { pages = 5, pageSize = 200 } = {}) {
+  let total = 0;
+  let next = null;
+  let complete = false;
+
+  for (let i = 0; i < pages; i += 1) {
+    const page = await trackCollections(id, kind, { limit: pageSize, next });
+    total += page.collection.length;
+    next = page.next_href;
+    if (!next) {
+      complete = true;
+      break;
+    }
   }
+
+  return { total, complete };
+}
+
+/*
+ * People the caller follows who liked a track. SoundCloud has no server-side
+ * filter for this, so the two lists are intersected here. Liking is spread over
+ * many pages, so a bounded number of pages is scanned before giving up.
+ */
+export async function alsoLiked(token, trackId, { pages = 6 } = {}) {
+  const following = await followIds(token);
+  if (!following.size) return { collection: [], following_count: 0, more: 0 };
+
+  const found = [];
+  let next = null;
+  for (let i = 0; i < pages; i += 1) {
+    const page = await likers(trackId, { limit: 200, next });
+    for (const user of page.collection) {
+      if (following.has(String(user.id))) found.push(user);
+    }
+    next = page.next_href;
+    if (!next) break;
+  }
+
+  return { collection: found, following_count: following.size, more: Math.max(0, found.length - 3) };
 }
 
 export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
@@ -733,8 +799,12 @@ export async function home({ token = null } = {}) {
     'artist-stations-global',
   ];
 
+  // Shelves nobody asked for, shown to signed-in and anonymous visitors alike.
+  const ALWAYS_HIDDEN = ['soundcloud:selections:buzzing'];
+
   for (const sel of selections) {
     const urn = String(sel.urn || '');
+    if (ALWAYS_HIDDEN.some((g) => urn.includes(g))) continue;
     if (token && GENERIC.some((g) => urn.includes(g))) continue;
     const items = sel.items?.collection || [];
     if (!items.length) continue;

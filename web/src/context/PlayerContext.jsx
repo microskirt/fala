@@ -97,6 +97,11 @@ export function PlayerProvider({ children }) {
           String(info.mime || '').includes('mpegurl');
         const nativeHls = audio.canPlayType('application/vnd.apple.mpegurl');
 
+        // hls.js owns the media element once attached. Calling audio.load()
+        // afterwards resets it and makes the stream error out, which is what
+        // used to break playback when switching between queued tracks.
+        let usingHls = false;
+
         if (looksHls && !nativeHls) {
           const mod = await import('hls.js');
           if (cancelled || loadId !== loadIdRef.current) return;
@@ -113,15 +118,16 @@ export function PlayerProvider({ children }) {
               }
             });
             hlsRef.current = hls;
-          } else {
-            audio.src = src;
+            usingHls = true;
           }
-        } else {
+        }
+
+        if (!usingHls) {
           audio.src = src;
+          audio.load();
         }
 
         if (info.duration) setDuration(info.duration);
-        audio.load();
         if (playingRef.current) {
           try {
             await audio.play();
@@ -302,16 +308,25 @@ export function PlayerProvider({ children }) {
     } catch {}
   }, []);
 
-  const setVolume = useCallback(
-    (v) => {
-      const clamped = Math.max(0, Math.min(1, v));
-      setVolumeState(clamped);
-      if (clamped > 0 && muted) setMuted(false);
-    },
-    [muted]
-  );
+  /*
+   * Volume and mute stay in sync: dragging to zero mutes, dragging back up
+   * unmutes, and unmuting with a zero volume restores an audible level.
+   */
+  const setVolume = useCallback((v) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    setVolumeState(clamped);
+    setMuted(clamped === 0);
+  }, []);
 
-  const toggleMute = useCallback(() => setMuted((m) => !m), []);
+  const toggleMute = useCallback(() => {
+    if (muted) {
+      // Coming back from muted with a zeroed bar needs an audible level.
+      setVolumeState((cur) => (cur > 0 ? cur : 0.6));
+      setMuted(false);
+    } else {
+      setMuted(true);
+    }
+  }, [muted]);
 
   const addToQueue = useCallback(
     (input) => {

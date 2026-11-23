@@ -8,14 +8,23 @@ import { PlayButton, AddToQueueButton, AddToPlaylistButton } from '@/components/
 import { Page, PageHeader, TrackList, TrackListSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 
-const VERBS = {
-  track: 'shared a track',
-  comment: 'commented',
-  like: 'liked a track',
-  repost: 'reposted',
-  follow: 'followed someone',
-  playlist: 'shared a playlist',
-};
+/*
+ * A `track` entry is either the artist posting their own track or someone
+ * reposting a track by another artist. Only the second reads as a repost, and
+ * it has to name the original artist.
+ */
+function describe(item, track) {
+  const actor = item.user;
+  const owner = track?.user;
+  const ownTrack = actor && owner && String(actor.id) === String(owner.id);
+  if (item.type === 'track') return ownTrack ? 'shared a track' : 'reposted a track from';
+  if (item.type === 'comment') return 'commented';
+  if (item.type === 'like') return 'liked a track';
+  if (item.type === 'repost') return 'reposted a track from';
+  if (item.type === 'follow') return 'followed someone';
+  if (item.type === 'playlist') return 'shared a playlist';
+  return 'shared something';
+}
 
 export function ActivityPage() {
   const { isAuthed } = useAuth();
@@ -114,7 +123,19 @@ export function ActivityPage() {
                     >
                       {item.user?.username || 'Someone'}
                     </Link>{' '}
-                    {VERBS[item.type] || 'shared something'}
+                    {describe(item, track)}
+                    {track.user && String(track.user.id) !== String(item.user?.id) ? (
+                      <>
+                        {' '}
+                        <Link
+                          to="/artist/$id"
+                          params={{ id: String(track.user.id) }}
+                          className="hover:text-foreground"
+                        >
+                          {track.user.username}
+                        </Link>
+                      </>
+                    ) : null}
                     <span className="opacity-60"> · {timeAgo(item.created_at)}</span>
                   </div>
                 </div>
