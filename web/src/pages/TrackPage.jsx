@@ -443,7 +443,7 @@ function AlsoLiked({ people }) {
   const rest = people.length - shown.length;
 
   return (
-    <div className="flex flex-wrap items-center gap-2.5 rounded-lg border bg-muted/30 px-3 py-2.5">
+    <div className="flex flex-wrap items-center gap-2.5 rounded-xl border bg-card px-3 py-2.5">
       <div className="flex -space-x-2">
         {shown.map((u) => (
           <Link
@@ -728,6 +728,12 @@ export function TrackPage() {
   const [commentTimestamp, setCommentTimestamp] = useState(null);
   const [counts, setCounts] = useState(null);
   const [alsoLiked, setAlsoLiked] = useState([]);
+  /*
+   * The user object inside a track is a cut down copy, and its track count is
+   * often zero even for an artist with dozens of uploads. The artist card asks
+   * the user endpoint for the real record instead.
+   */
+  const [artist, setArtist] = useState(null);
   // SoundCloud's own total counts replies, so it is used instead of the number
   // of top-level rows loaded so far.
   const [commentTotal, setCommentTotal] = useState(0);
@@ -780,6 +786,7 @@ export function TrackPage() {
     setTrack(null);
     setWaveform(null);
     setComments([]);
+    setArtist(null);
     (async () => {
       try {
         const t = await api.get(`/api/tracks/${id}`);
@@ -787,6 +794,13 @@ export function TrackPage() {
         setTrack(t);
         setCommentTotal(t.comment_count || 0);
         setLoading(false);
+
+        if (t.user?.id) {
+          api
+            .get(`/api/users/${t.user.id}`)
+            .then((u) => !cancelled && setArtist(u))
+            .catch(() => {});
+        }
 
         if (t.waveform_url) {
           api
@@ -1003,8 +1017,15 @@ export function TrackPage() {
               </Link>
             ) : null}
 
-            <Button variant={reposted ? 'secondary' : 'ghost'} onClick={() => toggleRepost(track)}>
-              <Repeat2 size={16} /> {reposted ? 'Reposted' : 'Repost'}
+            <Button
+              variant={reposted ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => toggleRepost(track)}
+              aria-pressed={reposted}
+              aria-label={reposted ? 'Undo repost' : 'Repost'}
+              title={reposted ? 'Reposted' : 'Repost'}
+            >
+              <Repeat2 size={16} />
             </Button>
 
             <AddToQueueButton track={track} size={18} />
@@ -1130,7 +1151,7 @@ export function TrackPage() {
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4">
-          <ArtistCard user={track.user} />
+          <ArtistCard user={artist || track.user} />
           <TrackStats track={track} id={id} />
           <AlsoLiked people={alsoLiked} />
           {isAuthed ? <TopListeners trackId={track.id} /> : null}
