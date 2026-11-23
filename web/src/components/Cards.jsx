@@ -44,7 +44,6 @@ export function TrackCard({ track, context, showStats = true }) {
            */}
           <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
             <AddToQueueButton track={track} size={16} />
-            <AddToPlaylistButton track={track} size={16} />
           </div>
           <div className="pointer-events-auto">
             <PlayButton track={track} context={context} />
