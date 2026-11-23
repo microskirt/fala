@@ -21,6 +21,14 @@ const PlayerContext = createContext(null);
  */
 const PlayerTimeContext = createContext(0);
 
+/*
+ * Volume changes on every pixel of a slider drag, and the player bar is the
+ * only thing that shows it. Leaving it in the main context re-rendered every
+ * page and card that calls usePlayer, which made the drag feel like it was
+ * catching up in steps. Its own context keeps a drag to the bar alone.
+ */
+const PlayerVolumeContext = createContext(null);
+
 function readStoredVolume() {
   const raw = readKey(KEYS.volume);
   if (raw !== null) {
@@ -75,11 +83,18 @@ export function PlayerProvider({ children }) {
     playingRef.current = playing;
   }, [playing]);
 
+  /*
+   * The audible change is instant, but the saved value is written once the
+   * drag settles. A slider drag fires many times a second, and a synchronous
+   * localStorage write on each one is what made the knob feel like it was
+   * sticking. Losing the last write on a hard reload is not a real risk.
+   */
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = muted ? 0 : volume;
-    writeKey(KEYS.volume, String(volume));
+    const id = setTimeout(() => writeKey(KEYS.volume, String(volume)), 150);
+    return () => clearTimeout(id);
   }, [volume, muted]);
 
   /*
@@ -532,8 +547,6 @@ export function PlayerProvider({ children }) {
       playing,
       buffering,
       duration,
-      volume,
-      muted,
       shuffle,
       repeat,
       queueOpen,
@@ -544,8 +557,6 @@ export function PlayerProvider({ children }) {
       next,
       prev,
       seek,
-      setVolume,
-      toggleMute,
       setShuffle,
       setRepeat,
       addToQueue,
@@ -567,11 +578,18 @@ export function PlayerProvider({ children }) {
 
   const time = useMemo(() => ({ currentTime, duration }), [currentTime, duration]);
 
+  const volumeValue = useMemo(
+    () => ({ volume, muted, setVolume, toggleMute }),
+    [volume, muted, setVolume, toggleMute]
+  );
+
   return (
     <PlayerContext.Provider value={value}>
       <PlayerTimeContext.Provider value={time}>
-        {children}
-        <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" />
+        <PlayerVolumeContext.Provider value={volumeValue}>
+          {children}
+          <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" />
+        </PlayerVolumeContext.Provider>
       </PlayerTimeContext.Provider>
     </PlayerContext.Provider>
   );
@@ -585,4 +603,14 @@ export function usePlayer() {
 
 export function usePlayerTime() {
   return useContext(PlayerTimeContext);
+}
+
+/*
+ * Volume and mute live apart from the rest of the player so a slider drag does
+ * not re-render every card on the page. Only the player bar reads this.
+ */
+export function usePlayerVolume() {
+  const ctx = useContext(PlayerVolumeContext);
+  if (!ctx) throw new Error('usePlayerVolume must be used inside PlayerProvider');
+  return ctx;
 }
