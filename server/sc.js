@@ -1462,10 +1462,28 @@ export async function like(token, trackId, on) {
   return { liked: !!on };
 }
 
-export async function repost(token, trackId, on) {
+/*
+ * A repost can carry a short caption. SoundCloud stores it on its own endpoint
+ * after the repost exists, so the caption is a second write. If that write is
+ * refused the repost itself still stands, and the caller is told the note was
+ * dropped rather than being shown a failure for the whole action.
+ */
+export async function repost(token, trackId, on, caption) {
   await apiWrite(on ? 'PUT' : 'DELETE', `/me/track_reposts/${trackId}`, { token });
   invalidateToken(token);
-  return { reposted: !!on };
+
+  const text = typeof caption === 'string' ? caption.trim() : '';
+  if (!on || !text) return { reposted: !!on, captionSaved: null };
+
+  try {
+    await apiWrite('PUT', `/me/track_reposts/${trackId}/caption`, {
+      token,
+      body: { caption: text },
+    });
+    return { reposted: true, captionSaved: true };
+  } catch {
+    return { reposted: true, captionSaved: false };
+  }
 }
 
 export async function follow(token, userId, on) {

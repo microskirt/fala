@@ -17,6 +17,7 @@ import {
   MapPin,
   Users,
   PlayCircle,
+  X,
 } from 'lucide-react';
 import {
   api,
@@ -43,6 +44,7 @@ import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
+import { Textarea } from '@/components/ui/textarea.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
 import {
   DropdownMenu,
@@ -713,7 +715,7 @@ export function TrackPage() {
   const toast = useToast();
   const { playTrack, isCurrent, playing, togglePlay, duration, seek, queue, audioRef } =
     usePlayer();
-  const { isReposted, toggleRepost, deleteComment } = useLibrary();
+  const { deleteComment } = useLibrary();
   const { isAuthed } = useAuth();
 
   const [track, setTrack] = useState(null);
@@ -909,7 +911,6 @@ export function TrackPage() {
     );
   }
 
-  const reposted = isReposted(track);
   const contextList =
     queue.length && active ? queue : [track, ...related.filter((r) => r.kind === 'track')];
   /*
@@ -1017,16 +1018,7 @@ export function TrackPage() {
               </Link>
             ) : null}
 
-            <Button
-              variant={reposted ? 'secondary' : 'ghost'}
-              size="icon"
-              onClick={() => toggleRepost(track)}
-              aria-pressed={reposted}
-              aria-label={reposted ? 'Undo repost' : 'Repost'}
-              title={reposted ? 'Reposted' : 'Repost'}
-            >
-              <Repeat2 size={16} />
-            </Button>
+            <RepostControl track={track} />
 
             <AddToQueueButton track={track} size={18} />
 
@@ -1170,6 +1162,129 @@ export function TrackPage() {
       ) : null}
 
     </Page>
+  );
+}
+
+/*
+ * Reposting from the song page offers a short note, which SoundCloud shows
+ * alongside the repost in the feed. The note is optional: the X in the corner
+ * closes the field and reposts with nothing attached, which is what the plain
+ * button did in one click before. Undoing a repost skips the field entirely,
+ * since there is no note to write.
+ */
+function RepostControl({ track }) {
+  const { isReposted, toggleRepost, isBusy } = useLibrary();
+  const { user } = useAuth();
+  const reposted = isReposted(track);
+  const busy = isBusy('repost:' + track?.id);
+
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const wrapRef = useRef(null);
+  const fieldRef = useRef(null);
+
+  // Escape and a click outside both close the field without writing anything.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    const onDown = (e) => {
+      const el = wrapRef.current;
+      if (el && !el.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open) fieldRef.current?.focus();
+  }, [open]);
+
+  const submit = async (text) => {
+    setSaving(true);
+    const ok = await toggleRepost(track, text);
+    setSaving(false);
+    if (ok) {
+      setOpen(false);
+      setNote('');
+    }
+  };
+
+  const onClick = () => {
+    // Signing in and undoing are both single clicks with nothing to write.
+    if (!user || reposted) {
+      toggleRepost(track);
+      return;
+    }
+    setOpen((v) => !v);
+  };
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <Button
+        variant={reposted ? 'secondary' : 'ghost'}
+        size="icon"
+        onClick={onClick}
+        aria-pressed={reposted}
+        aria-expanded={open}
+        aria-label={reposted ? 'Undo repost' : 'Repost'}
+        title={reposted ? 'Reposted' : 'Repost'}
+        disabled={busy}
+      >
+        <Repeat2 size={16} />
+      </Button>
+
+      {open ? (
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-72 rounded-xl border bg-popover p-3 shadow-lg">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              Add a note to the repost
+            </span>
+            <button
+              type="button"
+              onClick={() => submit('')}
+              disabled={saving}
+              className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Repost without a note"
+              title="Repost without a note"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          <Textarea
+            ref={fieldRef}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={140}
+            rows={3}
+            placeholder="Say something about this song"
+            aria-label="Repost note"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                submit(note);
+              }
+            }}
+          />
+
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {140 - note.length}
+            </span>
+            <Button size="sm" onClick={() => submit(note)} disabled={saving}>
+              {saving ? <Loader2 size={14} className="animate-spin" /> : 'Repost'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

@@ -511,7 +511,7 @@ route('PUT', '/api/tracks/:id/like', async (ctx) => {
 
 route('PUT', '/api/tracks/:id/repost', async (ctx) => {
   const token = requireToken(ctx);
-  return sc.repost(token, ctx.params.id, !!ctx.body.on);
+  return sc.repost(token, ctx.params.id, !!ctx.body.on, ctx.body.caption);
 });
 
 /* --------------------------------- users ---------------------------------- */

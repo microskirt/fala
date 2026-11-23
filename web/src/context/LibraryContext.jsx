@@ -142,21 +142,33 @@ export function LibraryProvider({ children }) {
     [user, busy, toast, isLiked, withCaptcha]
   );
 
+  /*
+   * A repost may carry a short caption. Passing nothing keeps the old plain
+   * behaviour, which is what the undo path and the small buttons use.
+   */
   const toggleRepost = useCallback(
-    async (track) => {
-      if (!track) return;
+    async (track, caption) => {
+      if (!track) return false;
       if (!user) {
         toast.error('Connect your SoundCloud account to repost');
-        return;
+        return false;
       }
       const key = 'repost:' + track.id;
-      if (busy.has(key)) return;
+      if (busy.has(key)) return false;
       const next = !isReposted(track);
       markBusy(key, true);
       setReposted((prev) => new Map(prev).set(String(track.id), next));
       try {
-        await withCaptcha(() => api.put(`/api/tracks/${track.id}/repost`, { on: next }));
-        toast.success(next ? 'Reposted to your profile' : 'Repost removed');
+        const note = next && typeof caption === 'string' ? caption.trim() : '';
+        const result = await withCaptcha(() =>
+          api.put(`/api/tracks/${track.id}/repost`, { on: next, caption: note || undefined })
+        );
+        if (next && result?.captionSaved === false) {
+          toast.error('Reposted, but the note was not saved');
+        } else {
+          toast.success(next ? 'Reposted to your profile' : 'Repost removed');
+        }
+        return true;
       } catch (err) {
         setReposted((prev) => {
           const copy = new Map(prev);
