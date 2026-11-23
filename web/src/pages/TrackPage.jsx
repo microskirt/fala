@@ -1040,10 +1040,9 @@ export function TrackPage() {
             />
           ) : null}
 
-          {track.label_name || track.license ? (
+          {track.label_name ? (
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {track.label_name ? <span>Label: {track.label_name}</span> : null}
-              {track.license ? <span>{track.license.replace(/-/g, ' ')}</span> : null}
+              <span>Label: {track.label_name}</span>
             </div>
           ) : null}
         </div>
@@ -1094,6 +1093,12 @@ export function TrackPage() {
                 No description was written for this song.
               </p>
             )}
+
+            {track.license ? (
+              <p className="mt-4 text-xs text-muted-foreground">
+                License: {track.license.replace(/-/g, ' ')}
+              </p>
+            ) : null}
           </section>
 
           <section className="mt-12">
