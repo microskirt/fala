@@ -8,7 +8,6 @@ import { PlaylistPage } from './pages/PlaylistPage.jsx';
 import { ProfilePage } from './pages/ProfilePage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { ActivityPage } from './pages/ActivityPage.jsx';
-import { LibraryPage } from './pages/LibraryPage.jsx';
 import { NotFoundPage } from './pages/NotFoundPage.jsx';
 import {
   LikesPage,
@@ -76,12 +75,6 @@ const activityRoute = createRoute({
   component: ActivityPage,
 });
 
-const libraryRoute = createRoute({
-  getParentRoute: () => shellRoute,
-  path: '/library',
-  component: LibraryPage,
-});
-
 const likesRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/likes',
@@ -128,7 +121,6 @@ const routeTree = rootRoute.addChildren([
     artistRoute,
     settingsRoute,
     activityRoute,
-    libraryRoute,
     likesRoute,
     repostsRoute,
     followingRoute,

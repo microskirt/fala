@@ -522,6 +522,91 @@ function mapActivityItem(a) {
   };
 }
 
+/* ------------------------------ notifications ----------------------------- */
+
+// SoundCloud's notification feed lives at /activities. It is scoped to the
+// caller's token and lists who liked or reposted their tracks.
+export async function notifications(token, { limit = 50, next } = {}) {
+  const data = next
+    ? await apiGet(next, { token })
+    : await apiGet(`/activities?limit=${limit}`, { token });
+  return mapCollection(data, (a) => {
+    if (!a) return null;
+    return {
+      id: a.uuid || a.cursor,
+      type: a.type,
+      created_at: a.created_at,
+      user: a.user ? slimUser(a.user) : null,
+      track: a.track ? slimTrack(a.track) : null,
+      playlist: a.playlist ? slimPlaylist(a.playlist) : null,
+    };
+  });
+}
+
+/* ------------------------------ conversations ----------------------------- */
+
+function slimMessage(m) {
+  if (!m) return null;
+  const content = typeof m.content === 'string' ? m.content : '';
+  return {
+    id: m.id,
+    content,
+    created_at: m.sent_at || m.created_at || null,
+    sender_id: m.sender_id ?? m.user_id ?? m.user?.id ?? null,
+    user: m.user ? slimUser(m.user) : null,
+  };
+}
+
+function slimConversation(c) {
+  if (!c) return null;
+  return {
+    id: c.id,
+    kind: 'conversation',
+    users: (c.users || []).map(slimUser).filter(Boolean),
+    read: !!c.read,
+    last_message: slimMessage(c.last_message),
+  };
+}
+
+export async function conversations(token, { limit = 50, next } = {}) {
+  const id = await meId(token);
+  const data = next
+    ? await apiGet(next, { token })
+    : await apiGet(`/users/${id}/conversations?limit=${limit}`, { token });
+  return mapCollection(data, slimConversation);
+}
+
+export async function conversationMessages(token, conversationId, { limit = 100, next } = {}) {
+  const id = await meId(token);
+  const data = next
+    ? await apiGet(next, { token })
+    : await apiGet(
+        `/users/${id}/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}`,
+        { token }
+      );
+  return mapCollection(data, slimMessage);
+}
+
+// Opens a conversation with `recipientId` and sends the first message.
+export async function startConversation(token, recipientId, body) {
+  const id = await meId(token);
+  const data = await apiWrite('POST', `/users/${id}/conversations`, {
+    token,
+    body: { recipients: [Number(recipientId)], message: { content: body } },
+  });
+  return slimConversation(data);
+}
+
+export async function sendMessage(token, conversationId, body) {
+  const id = await meId(token);
+  const data = await apiWrite(
+    'POST',
+    `/users/${id}/conversations/${encodeURIComponent(conversationId)}`,
+    { token, body: { message: { content: body } } }
+  );
+  return slimMessage(data?.last_message || data);
+}
+
 export async function comments(id, { limit = 30, next } = {}) {
   if (next) {
     const data = await apiGet(next, { ttl: 30_000 });

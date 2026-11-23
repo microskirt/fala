@@ -6,6 +6,7 @@ import {
   Repeat2,
   ListPlus,
   ListEnd,
+  ListStart,
   Plus,
   UserPlus,
   Check,
@@ -184,7 +185,13 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
       }}
     >
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" className={className} aria-label="Add to playlist">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={className}
+          aria-label="Add to playlist"
+          title="Add to playlist"
+        >
           <ListPlus size={size} />
         </Button>
       </DropdownMenuTrigger>
@@ -248,7 +255,7 @@ export function AddToQueueButton({ track, size = 18, className }) {
         toast.success('Added to queue');
       }}
     >
-      <ListPlus size={size} />
+      <ListEnd size={size} />
     </Button>
   );
 }
@@ -277,10 +284,10 @@ export function QueueMenuButton({ track, size = 18 }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => playNextInQueue(track)}>
-          <ListEnd size={16} /> Play next
+          <ListStart size={16} /> Play next
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => addToQueue(track)}>
-          <ListPlus size={16} /> Add to queue
+          <ListEnd size={16} /> Add to queue
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={copy}>

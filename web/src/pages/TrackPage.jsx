@@ -34,7 +34,7 @@ import { Input } from '@/components/ui/input.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
 import { cn } from '@/lib/utils.js';
 
-function Waveform({ samples, progress, onSeek, height = 56 }) {
+function Waveform({ samples, progress, onSeek, height = 96 }) {
   const ref = useRef(null);
   const dragging = useRef(false);
 
@@ -172,9 +172,7 @@ function CommentItem({ comment, onDelete }) {
               <Play size={14} fill="currentColor" /> {formatDuration(comment.timestamp_ms)}
             </button>
           ) : null}
-          {comment.source === 'soundcloud' ? (
-            <Badge variant="secondary">SoundCloud</Badge>
-          ) : null}
+
         </div>
         <p className="mt-1 text-sm leading-relaxed break-words">{comment.body}</p>
       </div>
@@ -447,14 +445,12 @@ export function TrackPage() {
           {tags.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-1.5">
               {tags.map((tag) => (
-                <Link
+                <span
                   key={tag}
-                  to="/search"
-                  search={{ q: tag }}
-                  className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                  className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
                 >
                   <Tag size={14} /> {tag}
-                </Link>
+                </span>
               ))}
             </div>
           ) : null}

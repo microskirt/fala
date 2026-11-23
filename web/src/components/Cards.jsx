@@ -30,12 +30,15 @@ export function TrackCard({ track, context, showStats = true }) {
         <Link to="/track/$id" params={{ id: String(track.id) }} aria-label={track.title}>
           <Artwork src={track.artwork_url} alt={track.title} size="100%" rounded={0} />
         </Link>
-        <div className="absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-          <div className="flex items-center gap-0.5 rounded-full bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
+        {/* The overlay is click-through so the artwork link underneath still works. */}
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <div className="pointer-events-auto flex items-center gap-0.5 rounded-full bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
             <AddToQueueButton track={track} size={16} />
             <AddToPlaylistButton track={track} size={16} />
           </div>
-          <PlayButton track={track} context={context} />
+          <div className="pointer-events-auto">
+            <PlayButton track={track} context={context} />
+          </div>
         </div>
       </div>
       <div className="mt-2.5 min-w-0">

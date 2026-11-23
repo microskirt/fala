@@ -84,10 +84,15 @@ function TrackCollectionPage({
   emptyBody,
   signedOutTitle,
   signedOutBody,
+  countKey,
 }) {
   const { isAuthed } = useAuth();
   const { playQueue } = usePlayer();
+  const { counts } = useLibrary();
   const { items, loading, error, reload } = useList(endpoint, [isAuthed]);
+  // A single page only holds so many rows, so the header count comes from the
+  // account totals instead of however many happened to load.
+  const total = countKey ? counts?.[countKey] || items.length : items.length;
 
   if (!isAuthed) {
     return (
@@ -104,7 +109,7 @@ function TrackCollectionPage({
     <Page>
       <PageHeader
         title={title}
-        description={description(items.length)}
+        description={description(total)}
         actions={
           items.length > 0 ? (
             <Button onClick={() => playQueue(items, 0)}>
@@ -138,6 +143,7 @@ export function LikesPage() {
       title="Likes"
       endpoint="/api/me/likes"
       icon={Heart}
+      countKey="likes"
       signedOutTitle="Sign in to see your likes"
       signedOutBody="Connect SoundCloud to see the tracks you have liked."
       description={(n) => `${n} track${n === 1 ? '' : 's'} you have liked`}

@@ -3,7 +3,6 @@ import {
   Home,
   Search,
   Radio,
-  Library,
   Heart,
   ListMusic,
   Repeat2,
@@ -82,7 +81,7 @@ export function Sidebar({ open, onNavigate }) {
         </span>
         <span className="leading-tight">
           <span className="block text-sm font-semibold tracking-tight">Fala</span>
-          <span className="block text-xs text-muted-foreground">A calmer SoundCloud</span>
+          <span className="block text-xs text-muted-foreground">A working SoundCloud</span>
         </span>
       </Link>
 
@@ -94,7 +93,6 @@ export function Sidebar({ open, onNavigate }) {
 
         <NavHeading>Your library</NavHeading>
         <div className="flex flex-col gap-0.5">
-          <NavLink to="/library" icon={Library} label="Library" onClick={onNavigate} />
           {isAuthed ? (
             <>
               <NavLink

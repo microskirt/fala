@@ -13,7 +13,7 @@ function Switch({ className, ...props }) {
     >
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
-        className="bg-background pointer-events-none block size-4 rounded-full ring-0 shadow-sm transition-transform data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0.5"
+        className="bg-background pointer-events-none block size-4 rounded-full ring-0 shadow-sm transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0.5"
       />
     </SwitchPrimitive.Root>
   );

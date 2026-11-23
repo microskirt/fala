@@ -66,7 +66,7 @@ export function AuthPage() {
           </span>
           <span className="leading-tight">
             <span className="block text-base font-semibold tracking-tight">Fala</span>
-            <span className="block text-xs text-muted-foreground">A calmer SoundCloud</span>
+            <span className="block text-xs text-muted-foreground">A working SoundCloud</span>
           </span>
         </Link>
 

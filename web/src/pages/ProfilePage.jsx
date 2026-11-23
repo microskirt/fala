@@ -11,15 +11,19 @@ import {
   Settings2,
   Loader2,
   Play,
+  MessageSquare,
 } from 'lucide-react';
 import { api, formatCount, formatDate } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
+import { useToast } from '@/context/ToastContext.jsx';
 import { Avatar, Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx';
 import { TrackCard, PlaylistCard, ArtistRow } from '@/components/Cards.jsx';
 import { FollowButton } from '@/components/Controls.jsx';
 import { Page, CardGrid, PersonGrid } from '@/components/layout/Page.jsx';
+import { Modal } from '@/components/Modal.jsx';
 import { Button } from '@/components/ui/button.jsx';
+import { Textarea } from '@/components/ui/textarea.jsx';
 import { cn } from '@/lib/utils.js';
 
 const TABS = [
@@ -43,7 +47,7 @@ function Stat({ value, label, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground hover:[&_strong]:underline"
+      className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
       {inner}
     </button>
@@ -62,6 +66,26 @@ export function ProfilePage() {
   const [tabData, setTabData] = useState({ collection: [], next_href: null });
   const [tabLoading, setTabLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const toast = useToast();
+
+  const sendMessage = async () => {
+    const body = draft.trim();
+    if (!body || sending) return;
+    setSending(true);
+    try {
+      await api.post('/api/me/conversations', { recipient_id: profile.id, body });
+      setDraft('');
+      setComposeOpen(false);
+      toast.success('Message sent');
+    } catch (err) {
+      toast.error(err.message || 'Could not send that message');
+    } finally {
+      setSending(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -257,6 +281,11 @@ export function ProfilePage() {
               ) : (
                 <>
                   <FollowButton target={profile} />
+                  {me ? (
+                    <Button variant="outline" onClick={() => setComposeOpen(true)}>
+                      <MessageSquare size={14} /> Message
+                    </Button>
+                  ) : null}
                   {profile.permalink_url ? (
                     <Button variant="ghost" asChild>
                       <a href={profile.permalink_url} target="_blank" rel="noreferrer">
@@ -325,6 +354,32 @@ export function ProfilePage() {
       </div>
 
       <div className="mt-6">{renderTab()}</div>
+
+      <Modal
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        title={`Message ${profile.username}`}
+        description="Sent through your SoundCloud account."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setComposeOpen(false)} disabled={sending}>
+              Cancel
+            </Button>
+            <Button onClick={sendMessage} disabled={!draft.trim() || sending}>
+              {sending ? <Loader2 size={14} className="animate-spin" /> : null}
+              Send
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Write a message"
+          rows={4}
+          autoFocus
+        />
+      </Modal>
 
       {tabData.next_href ? (
         <div className="mt-6 flex justify-center">

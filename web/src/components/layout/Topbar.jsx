@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
-import { Search, X, Bell, Menu, ArrowLeft, ArrowRight, LogIn, TrendingUp } from 'lucide-react';
+import { Search, X, Menu, ArrowLeft, ArrowRight, LogIn, TrendingUp } from 'lucide-react';
 import { api } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
+import { NotificationsMenu } from '@/components/layout/NotificationsMenu.jsx';
+import { MessagesMenu } from '@/components/layout/MessagesMenu.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 
@@ -173,11 +175,10 @@ export function Topbar({ onToggleSidebar }) {
 
       <div className="ml-auto flex items-center gap-1.5">
         {isAuthed ? (
-          <Button variant="ghost" size="icon" asChild aria-label="Activity">
-            <Link to="/activity">
-              <Bell size={18} />
-            </Link>
-          </Button>
+          <>
+            <MessagesMenu />
+            <NotificationsMenu />
+          </>
         ) : (
           <Button size="sm" asChild>
             <Link to="/login">

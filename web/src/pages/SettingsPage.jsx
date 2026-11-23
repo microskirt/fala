@@ -312,15 +312,6 @@ export function SettingsPage() {
                     <div className="text-xs text-muted-foreground">@{user.permalink}</div>
                   </div>
                 </div>
-                <Row
-                  title="Followers"
-                  description={`${formatCount(user.followers_count)} people follow you`}
-                />
-                <Row
-                  title="Following"
-                  description={`You follow ${formatCount(user.followings_count)} accounts`}
-                />
-                <Row title="Tracks" description={`${formatCount(user.track_count)} uploaded`} />
                 {user.city ? (
                   <Row
                     title="Location"

@@ -263,6 +263,54 @@ route('GET', '/api/me/stream', async (ctx) => {
   return sc.myStream(token, { limit: pageLimit(ctx.query, 20) });
 });
 
+route('GET', '/api/me/notifications', async (ctx) => {
+  const token = requireToken(ctx);
+  const data = await sc.notifications(token, {
+    limit: pageLimit(ctx.query, 50),
+    next: ctx.query.get('next'),
+  });
+  const flags = await flagsFor(token);
+  return {
+    ...data,
+    collection: data.collection.map((n) => ({
+      ...n,
+      track: n.track ? decorateTrack(n.track, flags) : null,
+    })),
+  };
+});
+
+route('GET', '/api/me/conversations', async (ctx) => {
+  const token = requireToken(ctx);
+  return sc.conversations(token, {
+    limit: pageLimit(ctx.query, 50),
+    next: ctx.query.get('next'),
+  });
+});
+
+route('GET', '/api/me/conversations/:id/messages', async (ctx) => {
+  const token = requireToken(ctx);
+  return sc.conversationMessages(token, ctx.params.id, {
+    limit: pageLimit(ctx.query, 100),
+    next: ctx.query.get('next'),
+  });
+});
+
+route('POST', '/api/me/conversations', async (ctx) => {
+  const token = requireToken(ctx);
+  const recipientId = ctx.body.recipient_id;
+  const body = String(ctx.body.body || '').trim();
+  if (!recipientId) throw new HttpError(400, 'Pick someone to message');
+  if (!body) throw new HttpError(400, 'Write a message first');
+  return { conversation: await sc.startConversation(token, recipientId, body) };
+});
+
+route('POST', '/api/me/conversations/:id/messages', async (ctx) => {
+  const token = requireToken(ctx);
+  const body = String(ctx.body.body || '').trim();
+  if (!body) throw new HttpError(400, 'Write a message first');
+  return { message: await sc.sendMessage(token, ctx.params.id, body) };
+});
+
 /* -------------------------------- search ---------------------------------- */
 
 route('GET', '/api/search', async (ctx) => {
