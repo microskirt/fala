@@ -59,7 +59,14 @@ export function PlayerProvider({ children }) {
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState('off');
   const [queueOpen, setQueueOpen] = useState(false);
-  const [playbackError, setPlaybackError] = useState(null);
+  /*
+   * A signed media URL can go stale while it waits in the queue, and hls.js can
+   * be left holding a dead stream. Both are recovered by resolving the track
+   * once more, so a bump of this counter re-runs the load for the same song.
+   */
+  const [reloadKey, setReloadKey] = useState(0);
+  const retriedRef = useRef(new Set());
+  const failRef = useRef(() => {});
 
   const current = index >= 0 && index < queue.length ? queue[index] : null;
   const quality = prefs.quality || 'hq';
@@ -114,7 +121,6 @@ export function PlayerProvider({ children }) {
     // Before any request goes out: silence the previous track and put the
     // playhead back at zero, so the bar and the audio agree immediately.
     detach();
-    setPlaybackError(null);
     setBuffering(true);
     setCurrentTime(0);
     setDuration(current.full_duration || current.duration || 0);
@@ -147,11 +153,7 @@ export function PlayerProvider({ children }) {
             hls.loadSource(src);
             hls.attachMedia(audio);
             hls.on(Hls.Events.ERROR, (_evt, data) => {
-              if (data?.fatal) {
-                setPlaybackError('This track could not be streamed right now.');
-                setBuffering(false);
-                setPlaying(false);
-              }
+              if (data?.fatal) failRef.current();
             });
             hlsRef.current = hls;
             usingHls = true;
@@ -167,15 +169,15 @@ export function PlayerProvider({ children }) {
         if (playingRef.current) {
           try {
             await audio.play();
-          } catch {
-            setPlaying(false);
+          } catch (err) {
+            // An interrupted play is the caller changing its mind, not a fault.
+            if (err?.name !== 'AbortError') failRef.current();
+            else setPlaying(false);
           }
         }
-      } catch (err) {
+      } catch {
         if (cancelled || loadId !== loadIdRef.current) return;
-        setPlaybackError(err.message || 'Could not load this track');
-        setBuffering(false);
-        setPlaying(false);
+        failRef.current();
       }
     })();
 
@@ -183,7 +185,28 @@ export function PlayerProvider({ children }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, quality]);
+  }, [current?.id, quality, reloadKey]);
+
+  /*
+   * A failed load is retried once with a fresh stream URL, because the usual
+   * cause is a signed URL that expired while the track sat in the queue. Only
+   * when the retry fails too does the listener hear about it, and then as a
+   * toast: the player bar is not the place for error text.
+   */
+  useEffect(() => {
+    failRef.current = () => {
+      const key = current ? String(current.id) : null;
+      setBuffering(false);
+      setPlaying(false);
+      if (!key) return;
+      if (!retriedRef.current.has(key)) {
+        retriedRef.current.add(key);
+        setReloadKey((n) => n + 1);
+        return;
+      }
+      toast.error('This track will not play. Try another one.');
+    };
+  }, [current, toast]);
 
   const handleEnded = useCallback(() => {
     const audio = audioRef.current;
@@ -224,9 +247,9 @@ export function PlayerProvider({ children }) {
     const syncTime = () => setCurrentTime((audio.currentTime || 0) * 1000);
     const onError = () => {
       if (!audio.currentSrc) return;
-      setBuffering(false);
-      setPlaybackError('Playback error. You can skip from the queue.');
-      setPlaying(false);
+      // The bar never shows this. A stale stream is retried first, and only a
+      // repeat failure reaches the listener, as a toast.
+      failRef.current();
     };
 
     audio.addEventListener('durationchange', onDuration);
@@ -486,7 +509,6 @@ export function PlayerProvider({ children }) {
       shuffle,
       repeat,
       queueOpen,
-      playbackError,
       playTrack,
       playQueue,
       togglePlay,
@@ -508,7 +530,7 @@ export function PlayerProvider({ children }) {
     }),
     [
       queue, index, current, playing, buffering, duration, volume, muted,
-      shuffle, repeat, queueOpen, playbackError, playTrack, playQueue, togglePlay, pause,
+      shuffle, repeat, queueOpen, playTrack, playQueue, togglePlay, pause,
       next, prev, seek, setVolume, toggleMute, addToQueue, playNextInQueue, removeFromQueue,
       clearQueue, isCurrent,
     ]

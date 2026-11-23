@@ -178,7 +178,6 @@ export function Player() {
     shuffle,
     repeat,
     queueOpen,
-    playbackError,
     togglePlay,
     next,
     prev,
@@ -363,12 +362,6 @@ export function Player() {
           </div>
         </div>
       </div>
-
-      {playbackError ? (
-        <div className="border-t border-border/60 px-3 py-1 text-xs text-destructive">
-          {playbackError}
-        </div>
-      ) : null}
     </div>
   );
 }
