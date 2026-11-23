@@ -474,19 +474,19 @@ function AlsoLiked({ people }) {
 
   /*
    * 26px pictures overlap by 8px, so the row is 8px wider than a bare face and
-   * every extra one adds 18px. The slack at the end keeps the last picture off
-   * the border; when not everyone fits, one slot goes to the "..." chip so the
-   * row still stops short of the edge.
+   * every extra one adds 18px. The stack fills the card from the left edge, and
+   * when not everyone fits the "..." chip takes the far right slot, so the row
+   * runs to the same margin on both sides instead of stopping after the last
+   * picture.
    */
   const FACE = 26;
   const STEP = 18;
-  const OVERLAP = 8;
-  const SLACK = 8;
-  const fit = rowWidth
-    ? Math.max(1, Math.floor((rowWidth - SLACK - OVERLAP) / STEP))
-    : 3;
-  const crowded = people.length > fit;
-  const faces = crowded ? people.slice(0, Math.max(1, fit - 1)) : people;
+  const GAP = 8;
+  // How many pictures fit when `reserve` pixels stay free on the right.
+  const fit = (reserve) =>
+    rowWidth ? Math.max(1, Math.floor((rowWidth - reserve - FACE) / STEP) + 1) : 3;
+  const crowded = people.length > fit(0);
+  const faces = crowded ? people.slice(0, fit(FACE + GAP)) : people;
 
   // The sentence stays short no matter how many faces fit above it.
   const named = people.slice(0, 3);
@@ -494,22 +494,24 @@ function AlsoLiked({ people }) {
 
   return (
     <div className="rounded-xl border bg-card px-3 py-2.5">
-      <div ref={rowRef} className="flex items-center -space-x-2 pb-2">
-        {faces.map((u) => (
-          <Link
-            key={u.id}
-            {...userLink(u)}
-            className="relative shrink-0 rounded-full ring-2 ring-background"
-            title={u.username}
-          >
-            <Avatar src={u.avatar_url} name={u.username} size={FACE} />
-          </Link>
-        ))}
+      <div ref={rowRef} className="flex items-center pb-2">
+        <div className="flex min-w-0 items-center -space-x-2">
+          {faces.map((u) => (
+            <Link
+              key={u.id}
+              {...userLink(u)}
+              className="relative shrink-0 rounded-full ring-2 ring-background"
+              title={u.username}
+            >
+              <Avatar src={u.avatar_url} name={u.username} size={FACE} />
+            </Link>
+          ))}
+        </div>
         {crowded ? (
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="relative z-10 flex shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground ring-2 ring-background transition-colors hover:bg-accent hover:text-foreground"
+            className="relative z-10 ml-auto flex shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground ring-2 ring-background transition-colors hover:bg-accent hover:text-foreground"
             style={{ width: FACE, height: FACE }}
             title={`${people.length} people you follow liked this`}
           >
