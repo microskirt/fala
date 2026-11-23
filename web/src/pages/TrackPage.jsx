@@ -13,7 +13,6 @@ import {
   ListMusic,
   Disc3,
   Heart,
-  Headphones,
   MapPin,
   Users,
   PlayCircle,
@@ -603,7 +602,7 @@ function TopListeners({ trackId }) {
     <section className="rounded-xl border bg-card px-4 py-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <Headphones size={15} /> Top listeners
+          Top listeners
         </h3>
         <div className="flex gap-1">
           {LISTENER_WINDOWS.map((w) => (

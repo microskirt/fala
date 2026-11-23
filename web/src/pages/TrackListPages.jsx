@@ -163,7 +163,7 @@ export function TrackAlbumsPage() {
   return (
     <CollectionPage
       endpoint={(id) => `/api/tracks/${id}/albums`}
-      title="On albums"
+      title="In albums"
       description="Albums that include this track"
       emptyTitle="Not on an album yet"
       emptyBody="This track does not belong to an album so far."
