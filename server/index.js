@@ -387,7 +387,44 @@ route('GET', '/api/tracks/:id/waveform', async (ctx) => {
 route('GET', '/api/tracks/:id/comments', async (ctx) => {
   const next = ctx.query.get('next');
   const limit = pageLimit(ctx.query, 30);
-  return sc.comments(ctx.params.id, { limit, next });
+  // Signed in, the richer GraphQL list is used: it carries like counts, the
+  // author's heart and the first page of replies. Signed out, api-v2 is the only
+  // source, and it has none of that.
+  if (ctx.token) {
+    try {
+      const out = await sc.commentThread(ctx.token, ctx.params.id, {
+        first: limit,
+        after: ctx.query.get('after'),
+      });
+      return { ...out, next_href: null };
+    } catch (err) {
+      if (err?.code === 'captcha' || err?.status === 401) throw err;
+      // Fall back to the plain list rather than leaving the page empty.
+    }
+  }
+  const out = await sc.comments(ctx.params.id, { limit, next });
+  return { ...out, next_cursor: null };
+});
+
+route('GET', '/api/tracks/:id/comments/:commentId/replies', async (ctx) => {
+  const token = requireToken(ctx);
+  return sc.commentReplies(token, ctx.params.id, ctx.params.commentId, {
+    first: pageLimit(ctx.query, 20),
+    after: ctx.query.get('after'),
+  });
+});
+
+route('PUT', '/api/tracks/:id/comments/:commentId/like', async (ctx) => {
+  const token = requireToken(ctx);
+  return sc.likeComment(token, ctx.params.id, ctx.params.commentId, !!ctx.body.on);
+});
+
+route('GET', '/api/tracks/:id/listeners', async (ctx) => {
+  const token = requireToken(ctx);
+  return sc.topListeners(token, ctx.params.id, {
+    window: ctx.query.get('window') || 'DAYS_30',
+    limit: pageLimit(ctx.query, 5),
+  });
 });
 
 route('POST', '/api/tracks/:id/comments', async (ctx) => {
@@ -556,7 +593,20 @@ route('POST', '/api/playlists/:id/tracks', async (ctx) => {
   const token = requireToken(ctx);
   const trackId = ctx.body.track_id ?? ctx.body.track?.id;
   if (!trackId) throw new HttpError(400, 'Missing track');
-  return sc.addTrackToPlaylist(token, ctx.params.id, trackId);
+  try {
+    return await sc.addTrackToPlaylist(token, ctx.params.id, trackId);
+  } catch (err) {
+    // Playlist writes fail in ways that are hard to see from the UI, so keep the
+    // shape of the failure in the log. The token never goes in there.
+    console.error('[playlist] add failed', {
+      playlist: ctx.params.id,
+      track: trackId,
+      status: err?.status,
+      code: err?.code,
+      message: err?.message,
+    });
+    throw err;
+  }
 });
 
 route('DELETE', '/api/playlists/:id/tracks/:trackId', async (ctx) => {

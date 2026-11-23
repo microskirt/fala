@@ -88,7 +88,15 @@ function parseJsonBody(text) {
   try {
     return JSON.parse(text);
   } catch {
-    throw new ScError(502, 'SoundCloud sent a response Fala could not read. Try again in a moment.');
+    // A challenge or error page comes back as HTML, which is a different story
+    // from a truncated JSON body, so say which one happened.
+    const html = text.trimStart().startsWith('<');
+    throw new ScError(
+      502,
+      html
+        ? 'SoundCloud answered with a web page instead of data. Try again in a moment.'
+        : 'SoundCloud sent a response Fala could not read. Try again in a moment.'
+    );
   }
 }
 
@@ -221,7 +229,7 @@ export async function apiWrite(method, href, { token, body } = {}) {
     try {
       parsed = text ? JSON.parse(text) : null;
     } catch {}
-    throw new ScError(res.status, parsed?.errors?.[0] || parsed?.error || `SoundCloud responded ${res.status}`, parsed);
+    throw new ScError(res.status, writeErrorMessage(text, parsed, res.status), parsed);
   }
   if (!text) return {};
   try {
@@ -229,6 +237,29 @@ export async function apiWrite(method, href, { token, body } = {}) {
   } catch {
     return {};
   }
+}
+
+/*
+ * Write errors arrive in a few shapes: a JSON body with errors, a JSON body with
+ * error, a plain-text body (api-v2 answers some bad ids with an empty 500) or an
+ * HTML page. SoundCloud also has its own "unable to parse JSON" wording when it
+ * dislikes the body we sent, which is useless to a listener, so it is replaced.
+ */
+function writeErrorMessage(text, parsed, status) {
+  const raw =
+    parsed?.errors?.[0] ||
+    parsed?.error ||
+    (typeof parsed?.message === 'string' ? parsed.message : null);
+  if (raw) {
+    if (/unable to parse json|invalid json|json parse/i.test(raw)) {
+      return 'SoundCloud could not read the playlist update. Try again in a moment.';
+    }
+    return raw;
+  }
+  const trimmed = (text || '').trim();
+  if (trimmed.startsWith('<')) return 'SoundCloud answered with a web page instead of data. Try again in a moment.';
+  if (status === 500) return 'SoundCloud could not apply that change. Try again in a moment.';
+  return `SoundCloud responded ${status}`;
 }
 
 function rememberUsers(data) {
@@ -560,17 +591,27 @@ export async function notifications(token, { limit = 50, next } = {}) {
     : await apiGet(`/activities?limit=${limit}`, { token });
   return mapCollection(data, (a) => {
     if (!a) return null;
-    // Comment activities carry the comment itself, not a track, so lift its
-    // track up and keep the body for the notification copy.
+    /*
+     * Comments and mentions both carry the comment, and the comment carries the
+     * track. A reply to a comment arrives as `mention`, not `comment`, which is
+     * why those used to fall through to a generic sentence.
+     */
     const comment = a.comment || null;
+    const track = a.track || comment?.track || null;
     return {
       id: a.uuid || a.cursor,
       type: a.type,
       created_at: a.created_at,
       user: a.user ? slimUser(a.user) : null,
-      track: a.track ? slimTrack(a.track) : comment?.track ? slimTrack(comment.track) : null,
+      track: track ? slimTrack(track) : null,
       playlist: a.playlist ? slimPlaylist(a.playlist) : null,
-      comment: comment ? { id: comment.id, body: comment.body || '' } : null,
+      comment: comment
+        ? {
+            id: comment.id,
+            body: comment.body || '',
+            timestamp_ms: comment.timestamp ?? null,
+          }
+        : null,
     };
   });
 }
@@ -667,6 +708,280 @@ function slimComment(c) {
     created_at: c.created_at,
     user: slimUser(c.user),
   };
+}
+
+/* ------------------------------- graphql ---------------------------------- */
+
+/*
+ * The web app talks to a separate GraphQL gateway for the parts of SoundCloud
+ * that api-v2 never exposed: listener rankings, comment reactions (likes and the
+ * track author's heart) and comment replies. Every call here needs the listener's
+ * own token, which is why none of it is available signed out.
+ */
+const GRAPH_HOST = 'https://graph.soundcloud.com/graphql';
+
+async function graphql(token, { query, variables }) {
+  if (!token) throw new ScError(401, 'Connect your SoundCloud account first');
+  const res = await fetch(GRAPH_HOST, {
+    method: 'POST',
+    headers: {
+      'User-Agent': UA,
+      Authorization: `OAuth ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Origin: 'https://soundcloud.com',
+      Referer: 'https://soundcloud.com/',
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const text = await res.text();
+  if (res.status === 403 && text.includes('captcha-delivery')) {
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {}
+    throw new ScError(403, CAPTCHA_MESSAGE, { url: parsed?.url || null }, 'captcha');
+  }
+  if (res.status === 401) {
+    throw new ScError(
+      401,
+      'SoundCloud rejected this token. It may have expired, so paste a fresh one.',
+      null,
+      'token'
+    );
+  }
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {}
+  if (!data) {
+    throw new ScError(
+      res.status === 200 ? 502 : res.status,
+      'SoundCloud sent a response Fala could not read. Try again in a moment.'
+    );
+  }
+  if (Array.isArray(data.errors) && data.errors.length) {
+    const first = data.errors[0];
+    throw new ScError(
+      res.status === 200 ? 400 : res.status,
+      first?.message || 'SoundCloud could not run that request'
+    );
+  }
+  return data.data || {};
+}
+
+function graphUserId(urn) {
+  if (!urn) return null;
+  const tail = String(urn).split(':').pop();
+  const n = Number(tail);
+  return Number.isFinite(n) ? n : null;
+}
+
+function slimGraphUser(u) {
+  if (!u) return null;
+  const country = u.country ? String(u.country) : '';
+  return {
+    id: graphUserId(u.urn),
+    kind: 'user',
+    username: u.username || u.permalink || 'Listener',
+    permalink: u.permalink || null,
+    permalink_url:
+      u.permalinkUrl || (u.permalink ? `https://soundcloud.com/${u.permalink}` : null),
+    avatar_url: u.avatarUrl || null,
+    followers_count: u.followersCount ?? 0,
+    verified: !!u.verified,
+    city: u.city || '',
+    country_code: country.length === 2 ? country.toUpperCase() : '',
+    country: country.length === 2 ? '' : country,
+  };
+}
+
+const TOP_FANS_QUERY = `
+query TopFansByWindow($metric: MetricType!, $windowInput: TimeWindowInput!, $trackUrn: String) {
+  topFansByWindow(metric: $metric, windowInput: $windowInput, trackUrn: $trackUrn) {
+    count
+    fan { urn username permalink permalinkUrl avatarUrl followersCount verified }
+  }
+}`;
+
+/*
+ * The listener ranking the insights page shows. It is ranked by plays inside a
+ * time window, and the window is limited to the values SoundCloud accepts.
+ */
+const LISTENER_WINDOWS = new Set(['DAYS_7', 'DAYS_30', 'ALL_TIME']);
+
+export async function topListeners(token, trackId, { window = 'DAYS_30', limit = 5 } = {}) {
+  const timewindow = LISTENER_WINDOWS.has(window) ? window : 'DAYS_30';
+  const data = await graphql(token, {
+    query: TOP_FANS_QUERY,
+    variables: {
+      metric: 'PLAYS',
+      windowInput: { timewindow },
+      trackUrn: `soundcloud:tracks:${trackId}`,
+    },
+  });
+  const rows = Array.isArray(data.topFansByWindow) ? data.topFansByWindow : [];
+  const fans = rows
+    .slice(0, limit)
+    .map((row) => ({ plays: row?.count ?? 0, user: slimGraphUser(row?.fan) }))
+    .filter((row) => row.user);
+  return { window: timewindow, fans };
+}
+
+const COMMENT_REACTIONS = `
+      reactions {
+        creatorReaction(creatorUrn: $creatorUrn)
+        userReaction
+        reactionCounts { reactionTypeValueUrn count }
+      }`;
+
+const COMMENT_USER = `
+      user { urn username permalink permalinkUrl avatarUrl followersCount city country verified }`;
+
+const COMMENT_THREAD_QUERY = `
+query TrackPageCommentsList($urn: ID!, $options: TrackCommentsOptionsInput, $creatorUrn: String) {
+  trackComments(trackUrn: $urn, options: $options) {
+    comments {
+      urn
+      body
+      createdAt
+      trackTime${COMMENT_REACTIONS}${COMMENT_USER}
+      replies {
+        total
+        comments {
+          urn
+          body
+          createdAt
+          trackTime${COMMENT_REACTIONS}${COMMENT_USER}
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+    pageInfo { endCursor }
+  }
+}`;
+
+const COMMENT_REPLIES_QUERY = `
+query TrackPageCommentReplies($trackUrn: ID!, $commentUrn: ID!, $options: TrackCommentRepliesOptionsInput, $creatorUrn: String) {
+  trackCommentReplies(trackUrn: $trackUrn, commentUrn: $commentUrn, options: $options) {
+    comments {
+      urn
+      body
+      createdAt
+      trackTime${COMMENT_REACTIONS}${COMMENT_USER}
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}`;
+
+const COMMENT_LIKE_MUTATION = `
+mutation LikeTrackComment($commentUrn: String!, $trackUrn: String!) {
+  upsertInteraction(input: {
+    targetUrn: $commentUrn
+    parentUrn: $trackUrn
+    interactionTypeUrn: "sc:interactiontype:reaction"
+    interactionTypeValueUrn: "sc:interactiontypevalue:like"
+  }) { __typename }
+}`;
+
+const COMMENT_UNLIKE_MUTATION = `
+mutation UnlikeTrackComment($commentUrn: String!, $trackUrn: String!) {
+  removeInteraction(input: {
+    targetUrn: $commentUrn
+    parentUrn: $trackUrn
+    interactionTypeUrn: "sc:interactiontype:reaction"
+    interactionTypeValueUrn: "sc:interactiontypevalue:like"
+  })
+}`;
+
+function mapGraphComment(c) {
+  if (!c) return null;
+  const counts = c.reactions?.reactionCounts || [];
+  const likes = counts.reduce(
+    (n, r) => (/like/i.test(r?.reactionTypeValueUrn || '') ? n + (r?.count || 0) : n),
+    0
+  );
+  const replies = (c.replies?.comments || []).map(mapGraphComment).filter(Boolean);
+  return {
+    id: graphUserId(c.urn),
+    urn: c.urn,
+    source: 'soundcloud',
+    body: c.body,
+    timestamp_ms: c.trackTime ?? null,
+    created_at: c.createdAt,
+    user: slimGraphUser(c.user),
+    likes,
+    liked: !!c.reactions?.userReaction,
+    creator_liked: !!c.reactions?.creatorReaction,
+    replies,
+    replies_total: c.replies?.total ?? replies.length,
+    replies_cursor: c.replies?.pageInfo?.endCursor || null,
+    replies_more: !!c.replies?.pageInfo?.hasNextPage,
+  };
+}
+
+async function trackAuthorUrn(trackId, token) {
+  try {
+    const data = await apiGet(`/tracks/${trackId}`, { ttl: 120_000, token });
+    return data?.user?.id ? `soundcloud:users:${data.user.id}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/*
+ * Comments with their reactions and first page of replies. This is the only
+ * route that can show like counts, the author's heart and replies, so it is used
+ * whenever a token is present. Signed out callers keep the plain api-v2 list.
+ */
+export async function commentThread(token, trackId, { first = 30, after = null } = {}) {
+  const creatorUrn = await trackAuthorUrn(trackId, token);
+  const options = { first, sort: 'NEWEST' };
+  if (after) options.after = after;
+  const data = await graphql(token, {
+    query: COMMENT_THREAD_QUERY,
+    variables: {
+      urn: `soundcloud:tracks:${trackId}`,
+      options,
+      creatorUrn,
+    },
+  });
+  const block = data.trackComments || {};
+  return {
+    collection: (block.comments || []).map(mapGraphComment).filter(Boolean),
+    next_cursor: block.pageInfo?.endCursor || null,
+  };
+}
+
+export async function commentReplies(token, trackId, commentId, { first = 20, after = null } = {}) {
+  const creatorUrn = await trackAuthorUrn(trackId, token);
+  const options = { first };
+  if (after) options.after = after;
+  const data = await graphql(token, {
+    query: COMMENT_REPLIES_QUERY,
+    variables: {
+      trackUrn: `soundcloud:tracks:${trackId}`,
+      commentUrn: `soundcloud:comments:${commentId}`,
+      options,
+      creatorUrn,
+    },
+  });
+  const block = data.trackCommentReplies || {};
+  return {
+    collection: (block.comments || []).map(mapGraphComment).filter(Boolean),
+    next_cursor: block.pageInfo?.endCursor || null,
+  };
+}
+
+export async function likeComment(token, trackId, commentId, on) {
+  await graphql(token, {
+    query: on ? COMMENT_LIKE_MUTATION : COMMENT_UNLIKE_MUTATION,
+    variables: {
+      commentUrn: `soundcloud:comments:${commentId}`,
+      trackUrn: `soundcloud:tracks:${trackId}`,
+    },
+  });
+  return { liked: !!on };
 }
 
 export async function related(id, { limit = 12 } = {}) {
@@ -1043,8 +1358,9 @@ export async function myCounts(token, { maxPages = 16, pageSize = 200 } = {}) {
     likes: account?.likes_count ?? 0,
     following: account?.followings_count ?? 0,
     playlists: account?.playlist_count ?? 0,
+    reposts: account?.reposts_count ?? 0,
   };
-  const [likes, following, playlists] = await Promise.all([
+  const [likes, following, playlists, reposts] = await Promise.all([
     reported.likes > 0
       ? reported.likes
       : walk(`/users/${id}/track_likes?limit=${pageSize}`).catch(() => 0),
@@ -1054,8 +1370,11 @@ export async function myCounts(token, { maxPages = 16, pageSize = 200 } = {}) {
     reported.playlists > 0
       ? reported.playlists
       : walk(`/users/${id}/playlists?limit=${pageSize}`).catch(() => 0),
+    reported.reposts > 0
+      ? reported.reposts
+      : walk(`/stream/users/${id}/reposts?limit=${pageSize}`).catch(() => 0),
   ]);
-  return { likes, following, playlists };
+  return { likes, following, playlists, reposts };
 }
 
 export async function myPlaylists(token, { limit = 200, next } = {}) {
@@ -1141,20 +1460,19 @@ export async function createPlaylist(token, { title, description, is_private }) 
 
 export async function updatePlaylist(token, playlistId, patch) {
   const current = await apiGet(`/playlists/${playlistId}`, { token });
-  const payload = {
-    playlist: {
-      title: patch.title ?? current.title,
-      description: patch.description ?? current.description,
-      sharing: patch.is_private === undefined
+  const ids = playlistTrackIds(current.tracks);
+  const merged = {
+    ...current,
+    title: patch.title ?? current.title,
+    description: patch.description ?? current.description,
+    sharing:
+      patch.is_private === undefined
         ? current.sharing
         : patch.is_private
           ? 'private'
           : 'public',
-      tracks: (current.tracks || []).map((t) => ({ id: t.id })),
-    },
   };
-  const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: payload });
-  return slimPlaylist(data);
+  return writePlaylist(token, playlistId, merged, ids);
 }
 
 export async function deletePlaylist(token, playlistId) {
@@ -1162,11 +1480,26 @@ export async function deletePlaylist(token, playlistId) {
   return { ok: true };
 }
 
-export async function addTrackToPlaylist(token, playlistId, trackId) {
-  const current = await apiGet(`/playlists/${playlistId}`, { token });
-  const ids = (current.tracks || []).map((t) => t.id);
-  if (!ids.includes(Number(trackId))) ids.push(Number(trackId));
-  const payload = {
+/*
+ * Playlist tracks come back as a mix of full objects and bare stubs, and a
+ * playlist can hold entries with no id at all. Sending those back is what makes
+ * SoundCloud answer with its own "unable to parse JSON" error, so only real ids
+ * ever go out.
+ */
+function playlistTrackIds(tracks) {
+  return (Array.isArray(tracks) ? tracks : [])
+    .map((t) => (t && t.id != null ? Number(t.id) : null))
+    .filter((id) => Number.isFinite(id));
+}
+
+/*
+ * Updating a playlist means PUTting the whole thing back. The full body carries
+ * title and sharing, which is what the UI edits. SoundCloud's own client sends
+ * only the track ids when it just reorders, so that is the fallback for when the
+ * full body is rejected.
+ */
+async function writePlaylist(token, playlistId, current, ids) {
+  const full = {
     playlist: {
       title: current.title,
       description: current.description || '',
@@ -1174,23 +1507,36 @@ export async function addTrackToPlaylist(token, playlistId, trackId) {
       tracks: ids.map((id) => ({ id })),
     },
   };
-  const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: payload });
-  return slimPlaylist(data);
+  try {
+    const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: full });
+    if (data && data.id) return slimPlaylist(data);
+  } catch (err) {
+    if (err?.code === 'captcha' || err?.status === 401 || err?.status === 403) throw err;
+  }
+  // Minimal body: the shape SoundCloud's own player sends for track changes.
+  const minimal = { playlist: { tracks: ids } };
+  try {
+    const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: minimal });
+    if (data && data.id) return slimPlaylist(data);
+  } catch (err) {
+    if (err?.code === 'captcha' || err?.status === 401 || err?.status === 403) throw err;
+  }
+  // Neither shape answered with the playlist, so read it back to show the truth.
+  const fresh = await apiGet(`/playlists/${playlistId}`, { token });
+  return slimPlaylist(fresh);
+}
+
+export async function addTrackToPlaylist(token, playlistId, trackId) {
+  const current = await apiGet(`/playlists/${playlistId}`, { token });
+  const ids = playlistTrackIds(current.tracks);
+  const wanted = Number(trackId);
+  if (!Number.isFinite(wanted)) throw new ScError(400, 'That track cannot be added');
+  if (!ids.includes(wanted)) ids.push(wanted);
+  return writePlaylist(token, playlistId, current, ids);
 }
 
 export async function removeTrackFromPlaylist(token, playlistId, trackId) {
   const current = await apiGet(`/playlists/${playlistId}`, { token });
-  const ids = (current.tracks || [])
-    .map((t) => t.id)
-    .filter((id) => String(id) !== String(trackId));
-  const payload = {
-    playlist: {
-      title: current.title,
-      description: current.description || '',
-      sharing: current.sharing || 'public',
-      tracks: ids.map((id) => ({ id })),
-    },
-  };
-  const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: payload });
-  return slimPlaylist(data);
+  const ids = playlistTrackIds(current.tracks).filter((id) => String(id) !== String(trackId));
+  return writePlaylist(token, playlistId, current, ids);
 }

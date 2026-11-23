@@ -38,7 +38,10 @@ export function LibraryProvider({ children }) {
   const [followed, setFollowed] = useState(() => new Map());
   const [busy, setBusy] = useState(() => new Set());
   const [playlists, setPlaylists] = useState([]);
-  const [counts, setCounts] = useState({ likes: 0, playlists: 0, following: 0 });
+  const [counts, setCounts] = useState({ likes: 0, playlists: 0, following: 0, reposts: 0 });
+  // Artists followed during this session, so the following list grows at once
+  // instead of waiting for a refetch to notice the new row.
+  const [recentFollows, setRecentFollows] = useState([]);
 
   const markBusy = (key, on) =>
     setBusy((prev) => {
@@ -82,7 +85,7 @@ export function LibraryProvider({ children }) {
   const refreshLibrary = useCallback(async () => {
     if (!user) {
       setPlaylists([]);
-      setCounts({ likes: 0, playlists: 0, following: 0 });
+      setCounts({ likes: 0, playlists: 0, following: 0, reposts: 0 });
       return;
     }
     // The list endpoints carry no totals, so real counts come from the counts
@@ -98,6 +101,7 @@ export function LibraryProvider({ children }) {
           likes: counts.likes ?? 0,
           playlists: counts.playlists ?? 0,
           following: counts.following ?? 0,
+          reposts: counts.reposts ?? 0,
         });
       }
     } catch {}
@@ -186,6 +190,12 @@ export function LibraryProvider({ children }) {
           api.put(`/api/users/${encodeURIComponent(target.id)}/follow`, { on: next })
         );
         setCounts((c) => ({ ...c, following: Math.max(0, c.following + (next ? 1 : -1)) }));
+        // The following page reads this, so a fresh follow shows up without a
+        // round trip and without the list looking stale.
+        setRecentFollows((prev) => {
+          const without = prev.filter((u) => String(u.id) !== String(target.id));
+          return next ? [target, ...without] : without;
+        });
       } catch (err) {
         setFollowed((prev) => {
           const copy = new Map(prev);
@@ -322,10 +332,32 @@ export function LibraryProvider({ children }) {
     [toast, withCaptcha]
   );
 
+  const likeComment = useCallback(
+    async (trackId, commentId, on) => {
+      if (!user) {
+        toast.error('Connect your SoundCloud account to like comments');
+        return null;
+      }
+      try {
+        return await withCaptcha(() =>
+          api.put(
+            `/api/tracks/${trackId}/comments/${encodeURIComponent(commentId)}/like`,
+            { on: !!on }
+          )
+        );
+      } catch (err) {
+        toast.error(err.message || 'Could not like that comment');
+        return null;
+      }
+    },
+    [user, toast, withCaptcha]
+  );
+
   const value = useMemo(
     () => ({
       playlists,
       counts,
+      recentFollows,
       isLiked,
       isReposted,
       isFollowing,
@@ -341,12 +373,13 @@ export function LibraryProvider({ children }) {
       refreshLibrary,
       addComment,
       deleteComment,
+      likeComment,
     }),
     [
-      playlists, counts, isLiked, isReposted, isFollowing, isBusy,
+      playlists, counts, recentFollows, isLiked, isReposted, isFollowing, isBusy,
       toggleLike, toggleRepost, toggleFollow, createPlaylist, updatePlaylist,
       deletePlaylist, addTrackToPlaylist, removeTrackFromPlaylist, refreshLibrary,
-      addComment, deleteComment,
+      addComment, deleteComment, likeComment,
     ]
   );
 

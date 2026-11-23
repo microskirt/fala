@@ -11,13 +11,14 @@ import {
   BadgeCheck,
   Calendar,
   Tag,
-  ChevronDown,
   Trash2,
   ListMusic,
   Disc3,
+  Heart,
+  Headphones,
 } from 'lucide-react';
 import { api, formatCount, formatDuration, timeAgo, formatDate } from '@/api.js';
-import { usePlayer } from '@/context/PlayerContext.jsx';
+import { usePlayer, usePlayerTime } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
@@ -29,12 +30,14 @@ import {
   AddToQueueButton,
 } from '@/components/Controls.jsx';
 import { TrackCard, TrackStatLine } from '@/components/Cards.jsx';
-import { Page, CardGrid } from '@/components/layout/Page.jsx';
+import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
+import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
 import { Modal } from '@/components/Modal.jsx';
 import { cn } from '@/lib/utils.js';
+import { placeLabel } from '@/lib/places.js';
 
 function Waveform({ samples, progress, onSeek, height = 96 }) {
   const ref = useRef(null);
@@ -98,10 +101,54 @@ function Waveform({ samples, progress, onSeek, height = 96 }) {
   );
 }
 
-function CommentForm({ track, onPosted, timestampMs }) {
+/*
+ * The waveform subscribes to the playhead on its own, so a moving progress
+ * line never re-renders the comment list or the related tracks below it.
+ */
+function WaveformPlayer({ track, samples, active, onSeek, durationMs }) {
+  const { currentTime, duration } = usePlayerTime();
+  const total = duration || durationMs || 0;
+  const progress = active && total > 0 ? Math.min(1, currentTime / total) : 0;
+
+  return (
+    <div className="mt-6 flex items-center gap-3">
+      <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+        {formatDuration(active ? currentTime : 0)}
+      </span>
+      <Waveform samples={samples} progress={progress} onSeek={onSeek} />
+      <span className="w-10 shrink-0 text-xs tabular-nums text-muted-foreground">
+        {formatDuration(track.duration)}
+      </span>
+    </div>
+  );
+}
+
+/* Reads the playhead itself so only this button re-renders while playing. */
+function TimestampToggle({ active, value, onChange }) {
+  const { currentTime } = usePlayerTime();
+  if (!active) return null;
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => onChange(value == null ? currentTime : null)}
+    >
+      {value == null ? 'Comment at current time' : `Comment at ${formatDuration(value)}`}
+    </Button>
+  );
+}
+
+function CommentForm({ track, onPosted, timestampMs, replyTo = null }) {
   const { addComment } = useLibrary();
   const { user } = useAuth();
-  const [body, setBody] = useState('');
+  /*
+   * SoundCloud has no parent-comment field. A reply is an ordinary comment whose
+   * body opens with the other person's @handle, which is also how the thread is
+   * rebuilt when it is read back. So the handle is seeded here instead of being
+   * sent as a separate relation.
+   */
+  const [body, setBody] = useState(replyTo?.user?.permalink ? `@${replyTo.user.permalink} ` : '');
   const [busy, setBusy] = useState(false);
 
   if (!user) {
@@ -149,15 +196,62 @@ function CommentForm({ track, onPosted, timestampMs }) {
   );
 }
 
-function CommentItem({ comment, onDelete }) {
+/*
+ * One comment, plus its replies when it has any. Likes and the author's heart
+ * only exist for signed in listeners, because SoundCloud serves them from its
+ * GraphQL gateway behind a token.
+ */
+function CommentItem({ comment, trackId, onDelete, isReply = false }) {
   const { user } = useAuth();
   const { seek } = usePlayer();
+  const { likeComment } = useLibrary();
+  const [liked, setLiked] = useState(!!comment.liked);
+  const [likes, setLikes] = useState(comment.likes || 0);
+  const [replying, setReplying] = useState(false);
+  const [replies, setReplies] = useState(comment.replies || []);
+  const [loadingReplies, setLoadingReplies] = useState(false);
+  const [replyCursor, setReplyCursor] = useState(comment.replies_cursor || null);
   const canDelete = user && comment.user && String(user.id) === String(comment.user.id);
+  const canInteract = !!user && !!trackId;
+
+  const toggleLike = async () => {
+    if (!canInteract) return;
+    const next = !liked;
+    setLiked(next);
+    setLikes((n) => Math.max(0, n + (next ? 1 : -1)));
+    const res = await likeComment(trackId, comment.id, next);
+    if (!res) {
+      setLiked(!next);
+      setLikes((n) => Math.max(0, n + (next ? -1 : 1)));
+    }
+  };
+
+  const loadMoreReplies = async () => {
+    if (!replyCursor || loadingReplies) return;
+    setLoadingReplies(true);
+    try {
+      const res = await api.get(
+        `/api/tracks/${trackId}/comments/${comment.id}/replies?after=${encodeURIComponent(replyCursor)}`
+      );
+      setReplies((prev) => [...prev, ...(res.collection || [])]);
+      setReplyCursor(res.next_cursor || null);
+    } catch {}
+    setLoadingReplies(false);
+  };
 
   return (
-    <div className="group flex gap-3 border-b border-border/60 py-3.5 last:border-0">
+    <div
+      className={cn(
+        'group flex gap-3 py-3.5',
+        isReply ? 'border-0 pl-0' : 'border-b border-border/60 last:border-0'
+      )}
+    >
       <Link to="/artist/$id" params={{ id: String(comment.user?.id) }} className="shrink-0">
-        <Avatar src={comment.user?.avatar_url} name={comment.user?.username} size={36} />
+        <Avatar
+          src={comment.user?.avatar_url}
+          name={comment.user?.username}
+          size={isReply ? 28 : 36}
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -168,6 +262,14 @@ function CommentItem({ comment, onDelete }) {
           >
             {comment.user?.username || 'Listener'}
           </Link>
+          {comment.creator_liked ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[0.68rem] font-semibold text-primary"
+              title="The artist liked this comment"
+            >
+              <Heart size={11} fill="currentColor" /> Artist
+            </span>
+          ) : null}
           <span>{timeAgo(comment.created_at)}</span>
           {comment.timestamp_ms != null ? (
             <button
@@ -179,93 +281,90 @@ function CommentItem({ comment, onDelete }) {
               <Play size={14} fill="currentColor" /> {formatDuration(comment.timestamp_ms)}
             </button>
           ) : null}
-
         </div>
         <p className="mt-1 text-sm leading-relaxed break-words">{comment.body}</p>
-      </div>
-      {canDelete ? (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-          onClick={() => onDelete(comment.id)}
-          aria-label="Delete comment"
-        >
-          <Trash2 size={14} />
-        </Button>
-      ) : null}
-    </div>
-  );
-}
 
-/*
- * A modal list for the counts on the song card: who liked the track, and which
- * playlists or albums it sits in. Each loads its own pages so the card itself
- * stays cheap.
- */
-function PagedListModal({ open, onClose, title, endpoint, emptyText, renderRow }) {
-  const [items, setItems] = useState([]);
-  const [next, setNext] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setItems([]);
-    setNext(null);
-    setError(null);
-    setLoading(true);
-    api
-      .get(endpoint)
-      .then((res) => {
-        if (cancelled) return;
-        setItems(res.collection || []);
-        setNext(res.next_href || null);
-      })
-      .catch((err) => !cancelled && setError(err.message || 'Could not load this list'))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [open, endpoint]);
-
-  const loadMore = async () => {
-    if (!next || loading) return;
-    setLoading(true);
-    try {
-      const sep = endpoint.includes('?') ? '&' : '?';
-      const res = await api.get(`${endpoint}${sep}next=${encodeURIComponent(next)}`);
-      setItems((prev) => [...prev, ...(res.collection || [])]);
-      setNext(res.next_href || null);
-    } catch {}
-    setLoading(false);
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title={title} wide>
-      {error ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">{error}</p>
-      ) : items.length === 0 && !loading ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">{emptyText}</p>
-      ) : (
-        <div className="max-h-[60vh] overflow-y-auto">
-          {items.map((item) => renderRow(item, onClose))}
-          {loading ? (
-            <div className="flex justify-center py-3 text-muted-foreground">
-              <Loader2 size={16} className="animate-spin" />
-            </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          {canInteract ? (
+            <button
+              type="button"
+              onClick={toggleLike}
+              className={cn(
+                'inline-flex items-center gap-1 transition-colors hover:text-foreground',
+                liked && 'text-primary hover:text-primary'
+              )}
+              aria-pressed={liked}
+              aria-label={liked ? 'Remove like from comment' : 'Like comment'}
+            >
+              <Heart size={13} fill={liked ? 'currentColor' : 'none'} />
+              {likes > 0 ? <span className="tabular-nums">{formatCount(likes)}</span> : null}
+            </button>
+          ) : likes > 0 ? (
+            <span className="inline-flex items-center gap-1">
+              <Heart size={13} /> {formatCount(likes)}
+            </span>
           ) : null}
-          {next && !loading ? (
-            <div className="flex justify-center pt-2">
-              <Button variant="outline" size="sm" onClick={loadMore}>
-                Load more
-              </Button>
-            </div>
+
+          {!isReply && canInteract ? (
+            <button
+              type="button"
+              onClick={() => setReplying((v) => !v)}
+              className="transition-colors hover:text-foreground"
+            >
+              Reply
+            </button>
+          ) : null}
+
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={() => onDelete(comment.id)}
+              className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+              aria-label="Delete comment"
+            >
+              <Trash2 size={12} /> Delete
+            </button>
           ) : null}
         </div>
-      )}
-    </Modal>
+
+        {replying ? (
+          <div className="mt-2">
+            <CommentForm
+              track={{ id: trackId }}
+              replyTo={comment}
+              onPosted={(reply) => {
+                setReplies((prev) => [...prev, reply]);
+                setReplying(false);
+              }}
+            />
+          </div>
+        ) : null}
+
+        {replies.length > 0 ? (
+          <div className="mt-2 border-l border-border/60 pl-3.5">
+            {replies.map((r) => (
+              <CommentItem
+                key={r.id}
+                comment={r}
+                trackId={trackId}
+                onDelete={onDelete}
+                isReply
+              />
+            ))}
+            {replyCursor ? (
+              <button
+                type="button"
+                onClick={loadMoreReplies}
+                disabled={loadingReplies}
+                className="py-1 text-xs font-medium text-primary hover:underline"
+              >
+                {loadingReplies ? 'Loading replies' : 'Show more replies'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -385,10 +484,112 @@ function AlsoLiked({ people }) {
   );
 }
 
+/*
+ * The listener ranking SoundCloud keeps behind its insights page. It is ranked by
+ * plays inside a time window, and the numbers only come back for a signed in
+ * listener, so the panel renders nothing at all when there is no data.
+ */
+const LISTENER_WINDOWS = [
+  { id: 'DAYS_7', label: 'Last 7 days' },
+  { id: 'DAYS_30', label: 'Last 30 days' },
+  { id: 'ALL_TIME', label: 'All time' },
+];
+
+function TopListeners({ trackId }) {
+  const [window, setWindow] = useState('DAYS_30');
+  const [fans, setFans] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api
+      .get(`/api/tracks/${trackId}/listeners?window=${window}&limit=5`)
+      .then((r) => !cancelled && setFans(r.fans || []))
+      .catch(() => !cancelled && setFans([]))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [trackId, window]);
+
+  // A track with no plays in the window has no ranking, and an empty box would
+  // just be noise under the player.
+  if (!loading && (!fans || fans.length === 0)) return null;
+
+  return (
+    <section className="mt-4 rounded-xl border bg-card px-4 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+          <Headphones size={15} /> Top listeners
+        </h3>
+        <div className="flex gap-1">
+          {LISTENER_WINDOWS.map((w) => (
+            <button
+              key={w.id}
+              type="button"
+              onClick={() => setWindow(w.id)}
+              className={cn(
+                'rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                window === w.id
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              )}
+            >
+              {w.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="mt-3 space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-full" />
+          ))}
+        </div>
+      ) : (
+        <ol className="mt-2.5 space-y-0.5">
+          {fans.map((entry, i) => (
+            <li key={`${entry.user.id}-${i}`}>
+              <Link
+                to="/artist/$id"
+                params={{ id: String(entry.user.id) }}
+                className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent/60"
+              >
+                <span className="w-4 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground">
+                  {i + 1}
+                </span>
+                <Avatar src={entry.user.avatar_url} name={entry.user.username} size={28} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1 truncate text-sm font-medium">
+                    {entry.user.username}
+                    {entry.user.verified ? (
+                      <BadgeCheck size={13} className="shrink-0 text-primary" />
+                    ) : null}
+                  </span>
+                  {placeLabel(entry.user.city, entry.user.country_code) ? (
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {placeLabel(entry.user.city, entry.user.country_code)}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {formatCount(entry.plays)} {entry.plays === 1 ? 'play' : 'plays'}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 export function TrackPage() {
   const { id } = useParams({ from: '/shell/track/$id' });
   const toast = useToast();
-  const { playTrack, isCurrent, playing, togglePlay, currentTime, duration, seek, queue } =
+  const { playTrack, isCurrent, playing, togglePlay, duration, seek, queue, audioRef } =
     usePlayer();
   const { isReposted, toggleRepost, deleteComment } = useLibrary();
   const { isAuthed } = useAuth();
@@ -397,7 +598,9 @@ export function TrackPage() {
   const [related, setRelated] = useState([]);
   const [comments, setComments] = useState([]);
   const [nextComments, setNextComments] = useState(null);
+  const [nextCursor, setNextCursor] = useState(null);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [listeners, setListeners] = useState(null);
   const [waveform, setWaveform] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -405,10 +608,8 @@ export function TrackPage() {
   const [commentTimestamp, setCommentTimestamp] = useState(null);
   const [counts, setCounts] = useState(null);
   const [alsoLiked, setAlsoLiked] = useState([]);
-  const [listModal, setListModal] = useState(null);
 
   const active = isCurrent(track);
-  const progress = active && duration > 0 ? Math.min(1, currentTime / duration) : 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -452,6 +653,14 @@ export function TrackPage() {
         if (!cancelled) {
           setComments(c.collection || []);
           setNextComments(c.next_href || null);
+          setNextCursor(c.next_cursor || null);
+        }
+
+        if (isAuthed) {
+          api
+            .get(`/api/tracks/${id}/listeners?limit=5`)
+            .then((r) => !cancelled && setListeners(r.fans || []))
+            .catch(() => {});
         }
       } catch (err) {
         if (!cancelled) {
@@ -466,17 +675,28 @@ export function TrackPage() {
   }, [id, isAuthed]);
 
   const loadMoreComments = async () => {
-    if (!nextComments || loadingComments) return;
+    if (loadingComments) return;
+    if (!nextComments && !nextCursor) return;
     setLoadingComments(true);
     try {
-      const res = await api.get(
-        `/api/tracks/${id}/comments?next=${encodeURIComponent(nextComments)}`
-      );
+      // Signed in, the richer list pages by cursor. Signed out, api-v2 pages by
+      // next_href. Only one of the two is ever set.
+      const path = nextCursor
+        ? `/api/tracks/${id}/comments?after=${encodeURIComponent(nextCursor)}`
+        : `/api/tracks/${id}/comments?next=${encodeURIComponent(nextComments)}`;
+      const res = await api.get(path);
       setComments((prev) => [...prev, ...(res.collection || [])]);
       setNextComments(res.next_href || null);
+      setNextCursor(res.next_cursor || null);
     } catch {}
     setLoadingComments(false);
   };
+
+  const commentsSentinel = useAutoLoad({
+    hasMore: !!(nextComments || nextCursor),
+    loading: loadingComments,
+    onLoad: loadMoreComments,
+  });
 
   const handleDeleteComment = async (commentId) => {
     const ok = await deleteComment(commentId);
@@ -597,40 +817,40 @@ export function TrackPage() {
              * button, because clicking a number should show who is behind it
              * rather than like the track a second time.
              */}
-            <button
-              type="button"
+            <Link
+              to="/track/$id/likes"
+              params={{ id: String(id) }}
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              onClick={() => setListModal('likers')}
               title="See who liked this track"
             >
               {formatCount(track.likes_count)} {track.likes_count === 1 ? 'like' : 'likes'}
-            </button>
+            </Link>
 
             {counts?.playlists?.total > 0 ? (
-              <button
-                type="button"
+              <Link
+                to="/track/$id/playlists"
+                params={{ id: String(id) }}
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                onClick={() => setListModal('playlists')}
                 title="See the playlists this track is in"
               >
                 <ListMusic size={16} />
                 {counts.playlists.complete ? '' : 'More than '}
                 {formatCount(counts.playlists.total)}{' '}
                 {counts.playlists.total === 1 && counts.playlists.complete ? 'playlist' : 'playlists'}
-              </button>
+              </Link>
             ) : null}
 
             {counts?.albums?.total > 0 ? (
-              <button
-                type="button"
+              <Link
+                to="/track/$id/albums"
+                params={{ id: String(id) }}
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                onClick={() => setListModal('albums')}
                 title="See the albums this track is in"
               >
                 <Disc3 size={16} />
                 {formatCount(counts.albums.total)}{' '}
                 {counts.albums.total === 1 ? 'album' : 'albums'}
-              </button>
+              </Link>
             ) : null}
 
             <Button variant={reposted ? 'secondary' : 'ghost'} onClick={() => toggleRepost(track)}>
@@ -655,22 +875,16 @@ export function TrackPage() {
           </div>
 
           {waveform ? (
-            <div className="mt-6 flex items-center gap-3">
-              <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                {formatDuration(active ? currentTime : 0)}
-              </span>
-              <Waveform
-                samples={waveform}
-                progress={progress}
-                onSeek={(ratio) => {
-                  if (!active) playTrack(track, contextList);
-                  seek(ratio * (track.full_duration || track.duration || 0));
-                }}
-              />
-              <span className="w-10 shrink-0 text-xs tabular-nums text-muted-foreground">
-                {formatDuration(track.duration)}
-              </span>
-            </div>
+            <WaveformPlayer
+              track={track}
+              samples={waveform}
+              active={active}
+              durationMs={track.full_duration || track.duration || 0}
+              onSeek={(ratio) => {
+                if (!active) playTrack(track, contextList);
+                seek(ratio * (track.full_duration || track.duration || 0));
+              }}
+            />
           ) : null}
 
           <div className="mt-5">
@@ -679,32 +893,7 @@ export function TrackPage() {
 
           <AlsoLiked people={alsoLiked} />
 
-          <PagedListModal
-            open={listModal === 'likers'}
-            onClose={() => setListModal(null)}
-            title="Liked by"
-            endpoint={`/api/tracks/${id}/likers?limit=50`}
-            emptyText="Nobody has liked this track yet."
-            renderRow={userRow}
-          />
-
-          <PagedListModal
-            open={listModal === 'playlists'}
-            onClose={() => setListModal(null)}
-            title="In playlists"
-            endpoint={`/api/tracks/${id}/playlists?limit=50`}
-            emptyText="This track is not in any playlist yet."
-            renderRow={playlistRow}
-          />
-
-          <PagedListModal
-            open={listModal === 'albums'}
-            onClose={() => setListModal(null)}
-            title="On albums"
-            endpoint={`/api/tracks/${id}/albums?limit=50`}
-            emptyText="This track is not on any album yet."
-            renderRow={playlistRow}
-          />
+          {isAuthed ? <TopListeners trackId={track.id} /> : null}
 
           {track.description ? (
             <div className="mt-4">
@@ -769,15 +958,11 @@ export function TrackPage() {
               {comments.length}
             </span>
           </h2>
-          {active ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCommentTimestamp(commentTimestamp ? null : currentTime)}
-            >
-              {commentTimestamp ? 'Cancel timestamp' : 'Comment at current time'}
-            </Button>
-          ) : null}
+          <TimestampToggle
+            active={active}
+            value={commentTimestamp}
+            onChange={setCommentTimestamp}
+          />
         </div>
 
         <CommentForm
@@ -796,22 +981,16 @@ export function TrackPage() {
             </p>
           ) : null}
           {comments.map((c) => (
-            <CommentItem key={c.id} comment={c} onDelete={handleDeleteComment} />
+            <CommentItem
+              key={c.id}
+              comment={c}
+              trackId={track.id}
+              onDelete={handleDeleteComment}
+            />
           ))}
         </div>
 
-        {nextComments ? (
-          <div className="mt-4 flex justify-center">
-            <Button variant="outline" onClick={loadMoreComments} disabled={loadingComments}>
-              {loadingComments ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <ChevronDown size={14} />
-              )}
-              {loadingComments ? 'Loading…' : 'Load more comments'}
-            </Button>
-          </div>
-        ) : null}
+        <LoadMore sentinelRef={commentsSentinel} loading={loadingComments} />
       </section>
 
       {related.length > 0 ? (
