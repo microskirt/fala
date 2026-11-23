@@ -7,12 +7,17 @@ import { writeFileSync } from 'node:fs';
 
 const SIZE = 512;
 
+/*
+ * The mark is symmetrical: the two bars on the left are mirrored across the
+ * centre bar, so the icon reads as one clean shape instead of a lopsided one.
+ * The group spans 88..424, which centres it in the 512 square.
+ */
 const BARS = [
-  { x: 96, y: 208, w: 42, h: 96, a: 0.55 },
-  { x: 170, y: 152, w: 42, h: 208, a: 0.8 },
-  { x: 243, y: 104, w: 42, h: 304, a: 1 },
-  { x: 317, y: 168, w: 42, h: 176, a: 0.8 },
-  { x: 390, y: 224, w: 42, h: 64, a: 0.55 },
+  { x: 88, y: 208, w: 42, h: 96, a: 0.55 },
+  { x: 162, y: 152, w: 42, h: 208, a: 0.8 },
+  { x: 235, y: 104, w: 42, h: 304, a: 1 },
+  { x: 308, y: 152, w: 42, h: 208, a: 0.8 },
+  { x: 382, y: 208, w: 42, h: 96, a: 0.55 },
 ];
 
 const RADIUS = 144;
