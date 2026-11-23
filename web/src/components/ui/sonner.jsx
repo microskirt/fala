@@ -1,22 +1,42 @@
 import { Toaster as Sonner } from 'sonner';
 import { useTheme } from '@/context/ThemeContext.jsx';
 
+/*
+ * Toasts sit under the top bar on the right, stack downward, and use the same
+ * tokens as every other surface so Catppuccin Mocha does not fall back to the
+ * plain Sonner colours.
+ */
 function Toaster(props) {
   const { theme } = useTheme();
   return (
     <Sonner
       theme={theme === 'light' ? 'light' : 'dark'}
       className="toaster group"
-      position="bottom-right"
+      position="top-right"
+      offset={{ top: 'calc(var(--topbar-height) + 12px)', right: '12px' }}
+      gap={8}
+      visibleToasts={4}
+      expand
+      closeButton
       toastOptions={{
+        unstyled: true,
         classNames: {
           toast:
-            'group toast group-[.toaster]:bg-card group-[.toaster]:text-card-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg group-[.toaster]:rounded-lg',
-          description: 'group-[.toast]:text-muted-foreground',
+            'group relative flex w-[340px] items-start gap-2.5 rounded-lg border border-border bg-popover py-3 pl-3.5 pr-9 text-popover-foreground shadow-lg',
+          title: 'text-sm font-medium leading-snug',
+          description: 'mt-0.5 text-xs text-muted-foreground',
+          icon: 'mt-0.5 shrink-0 text-muted-foreground',
+          content: 'min-w-0 flex-1',
+          closeButton:
+            'absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+          success: '[&_[data-icon]]:text-[var(--success)]',
+          error: '[&_[data-icon]]:text-[var(--destructive)]',
+          info: '[&_[data-icon]]:text-[var(--info)]',
+          warning: '[&_[data-icon]]:text-[var(--warning)]',
           actionButton:
-            'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:rounded-md',
+            'ml-auto shrink-0 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground',
           cancelButton:
-            'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground group-[.toast]:rounded-md',
+            'ml-auto shrink-0 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground',
         },
       }}
       {...props}

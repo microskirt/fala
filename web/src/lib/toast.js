@@ -9,6 +9,7 @@ export const toast = {
   success: (message) => sonner.success(message),
   error: (message) => sonner.error(message),
   info: (message) => sonner.info(message),
+  warning: (message) => sonner.warning(message),
   message: (message) => sonner(message),
   dismiss: (id) => sonner.dismiss(id),
 };

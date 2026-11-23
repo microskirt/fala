@@ -78,6 +78,20 @@ function withClientId(href) {
   return url.toString();
 }
 
+/*
+ * SoundCloud sometimes answers with an HTML challenge page or an empty body
+ * instead of JSON. Reading the body as text first turns that into a clear
+ * error instead of a bare "Failed to parse JSON" surfacing to the user.
+ */
+function parseJsonBody(text) {
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ScError(502, 'SoundCloud sent a response Fala could not read. Try again in a moment.');
+  }
+}
+
 async function rawGet(href, { refresh = true, token = null } = {}) {
   const url = withClientId(href);
   const headers = { 'User-Agent': UA, Accept: 'application/json' };
@@ -87,14 +101,15 @@ async function rawGet(href, { refresh = true, token = null } = {}) {
     const next = await refreshClientId();
     if (next && next !== clientId) return rawGet(href, { refresh: false });
   }
+  const text = await res.text();
   if (!res.ok) {
     let body = null;
     try {
-      body = await res.json();
+      body = text ? JSON.parse(text) : null;
     } catch {}
     throw new ScError(res.status, body?.errors?.[0] || body?.error, body);
   }
-  return res.json();
+  return parseJsonBody(text);
 }
 
 export async function apiGet(href, { ttl = 60_000, token = null } = {}) {
@@ -431,7 +446,18 @@ export async function systemPlaylist(id, { trackLimit, token = null } = {}) {
 
 export async function playlist(id, { token = null } = {}) {
   const data = await apiGet(`/playlists/${id}`, { ttl: 120_000, token });
-  return slimPlaylist(data);
+  const slim = slimPlaylist(data);
+  /*
+   * SoundCloud hydrates only the first handful of tracks inline and leaves the
+   * rest as bare stubs with just an id. Those render as "Unknown" rows with no
+   * artwork and a 0:00 length, so fetch the full objects for them.
+   */
+  const raw = data.tracks || [];
+  const incomplete = raw.some((t) => t && t.id && !t.title);
+  if (!incomplete) return slim;
+  const ids = raw.map((t) => (t && t.id != null ? t.id : null)).filter((v) => v != null);
+  const hydrated = await tracksByIds(ids);
+  return hydrated.length ? { ...slim, tracks: hydrated } : slim;
 }
 
 export async function tracksByIds(ids) {

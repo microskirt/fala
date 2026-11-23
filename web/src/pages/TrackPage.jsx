@@ -11,7 +11,6 @@ import {
   BadgeCheck,
   Calendar,
   Tag,
-  Music2,
   ChevronDown,
   Trash2,
   ListMusic,
@@ -30,7 +29,7 @@ import {
   AddToQueueButton,
 } from '@/components/Controls.jsx';
 import { TrackCard, TrackStatLine } from '@/components/Cards.jsx';
-import { Page, CardGrid, Eyebrow } from '@/components/layout/Page.jsx';
+import { Page, CardGrid } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
@@ -523,10 +522,17 @@ export function TrackPage() {
   const reposted = isReposted(track);
   const contextList =
     queue.length && active ? queue : [track, ...related.filter((r) => r.kind === 'track')];
+  /*
+   * SoundCloud repeats the genre inside tag_list, so drop it there: the main
+   * tag is rendered first and on its own, never twice.
+   */
+  const mainTag = (track.genre || '').trim();
+  const mainKey = mainTag.toLowerCase();
   const tags = (track.tag_list || '')
     .split(/\s+/)
     .map((t) => t.replace(/^"|"$/g, ''))
     .filter(Boolean)
+    .filter((t) => t.toLowerCase() !== mainKey)
     .slice(0, 12);
 
   return (
@@ -543,12 +549,11 @@ export function TrackPage() {
         </div>
 
         <div className="min-w-0">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <Eyebrow className="mb-0">
-              <Music2 size={14} /> {track.genre || 'Track'}
-            </Eyebrow>
-            {track.policy === 'BLOCK' ? <Badge variant="destructive">Unavailable</Badge> : null}
-          </div>
+          {track.policy === 'BLOCK' ? (
+            <div className="mb-2">
+              <Badge variant="destructive">Unavailable</Badge>
+            </div>
+          ) : null}
 
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {track.title}
@@ -723,8 +728,16 @@ export function TrackPage() {
             </div>
           ) : null}
 
-          {tags.length > 0 ? (
+          {mainTag || tags.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-1.5">
+              {mainTag ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md border border-white px-2 py-0.5 text-xs text-white"
+                  title="Main tag"
+                >
+                  <Tag size={14} /> {mainTag}
+                </span>
+              ) : null}
               {tags.map((tag) => (
                 <span
                   key={tag}

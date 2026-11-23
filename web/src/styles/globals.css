@@ -53,6 +53,8 @@
   --radius: 0.625rem;
   /* Shared by the player bar and the queue panel that docks above it. */
   --player-height: 56px;
+  /* Toasts spawn below this, never over the top bar. */
+  --topbar-height: 56px;
   --chart-1: #ff5500;
   --chart-2: #60a5fa;
   --chart-3: #4ade80;

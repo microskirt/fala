@@ -1,15 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from '@tanstack/react-router';
 import { Sidebar } from '@/components/layout/Sidebar.jsx';
 import { Topbar } from '@/components/layout/Topbar.jsx';
 import { Player } from '@/components/player/Player.jsx';
 import { QueuePanel } from '@/components/player/QueuePanel.jsx';
+import { usePlayer } from '@/context/PlayerContext.jsx';
+
+/* The tab follows the player: the app name when idle, the song title when not. */
+function TabTitle() {
+  const { current } = usePlayer();
+
+  useEffect(() => {
+    document.title = current?.title || 'Fala';
+  }, [current?.title]);
+
+  return null;
+}
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-background">
+      <TabTitle />
       <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
 
       {sidebarOpen ? (
