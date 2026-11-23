@@ -9,6 +9,7 @@ import { ProfilePage } from './pages/ProfilePage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { ActivityPage } from './pages/ActivityPage.jsx';
 import { NotFoundPage } from './pages/NotFoundPage.jsx';
+import { UserFollowersPage, UserFollowingPage } from './pages/UserListPages.jsx';
 import {
   TrackLikersPage,
   TrackRepostersPage,
@@ -91,6 +92,20 @@ const artistRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/artist/$id',
   component: ProfilePage,
+});
+
+// The follower counts on a profile open their own lists, like the counts
+// under a song do.
+const artistFollowersRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/artist/$id/followers',
+  component: UserFollowersPage,
+});
+
+const artistFollowingRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/artist/$id/following',
+  component: UserFollowingPage,
 });
 
 /*
@@ -177,6 +192,8 @@ const routeTree = rootRoute.addChildren([
     trackAlbumsRoute,
     playlistRoute,
     artistRoute,
+    artistFollowersRoute,
+    artistFollowingRoute,
     settingsRoute,
     activityRoute,
     likesRoute,

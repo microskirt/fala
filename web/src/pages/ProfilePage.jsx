@@ -18,9 +18,9 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
 import { Avatar, Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx';
-import { TrackCard, PlaylistCard, ArtistRow } from '@/components/Cards.jsx';
+import { TrackCard, PlaylistCard } from '@/components/Cards.jsx';
 import { FollowButton } from '@/components/Controls.jsx';
-import { Page, CardGrid, PersonGrid, LoadMore } from '@/components/layout/Page.jsx';
+import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Modal } from '@/components/Modal.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -39,22 +39,22 @@ const TABS = [
   { id: 'likes', label: 'Likes', icon: Heart },
 ];
 
-function Stat({ value, label, onClick }) {
+function Stat({ value, label, to, params }) {
   const inner = (
     <>
       <strong className="font-semibold text-foreground tabular-nums">{formatCount(value)}</strong>{' '}
       {label}
     </>
   );
-  if (!onClick) return <span className="text-xs text-muted-foreground">{inner}</span>;
+  if (!to) return <span className="text-xs text-muted-foreground">{inner}</span>;
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <Link
+      to={to}
+      params={params}
       className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
       {inner}
-    </button>
+    </Link>
   );
 }
 
@@ -253,18 +253,6 @@ export function ProfilePage() {
       );
     }
 
-    if (tab === 'followers' || tab === 'followings') {
-      return (
-        <PersonGrid>
-          {tabData.collection.map((entry, i) => {
-            const person = entry.user || entry;
-            if (!person) return null;
-            return <ArtistRow key={`${person.id}-${i}`} user={person} subtitle={person.description} />;
-          })}
-        </PersonGrid>
-      );
-    }
-
     if (tab === 'playlists' || tab === 'albums') {
       return (
         <CardGrid>
@@ -389,12 +377,14 @@ export function ProfilePage() {
             <Stat
               value={profile.followers_count}
               label="followers"
-              onClick={() => setTab('followers')}
+              to="/artist/$id/followers"
+              params={{ id: String(profile.id) }}
             />
             <Stat
               value={profile.followings_count}
               label="following"
-              onClick={() => setTab('followings')}
+              to="/artist/$id/following"
+              params={{ id: String(profile.id) }}
             />
           </div>
 
