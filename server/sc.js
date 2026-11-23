@@ -1011,9 +1011,11 @@ export async function related(id, { limit = 12 } = {}) {
   return (data.collection || []).map(slimTrack).filter(Boolean);
 }
 
-export async function reposters(id, { limit = 12 } = {}) {
-  const data = await apiGet(`/tracks/${id}/reposters?limit=${limit}`, { ttl: 300_000 });
-  return (data.collection || []).map(slimUser).filter(Boolean);
+export async function reposters(id, { limit = 12, next } = {}) {
+  const data = next
+    ? await apiGet(next)
+    : await apiGet(`/tracks/${id}/reposters?limit=${limit}`, { ttl: 300_000 });
+  return mapCollection(data, slimUser);
 }
 
 export async function likers(id, { limit = 50, next } = {}) {

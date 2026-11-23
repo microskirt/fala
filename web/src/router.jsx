@@ -11,6 +11,7 @@ import { ActivityPage } from './pages/ActivityPage.jsx';
 import { NotFoundPage } from './pages/NotFoundPage.jsx';
 import {
   TrackLikersPage,
+  TrackRepostersPage,
   TrackPlaylistsPage,
   TrackAlbumsPage,
 } from './pages/TrackListPages.jsx';
@@ -60,6 +61,12 @@ const trackLikersRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/track/$id/likes',
   component: TrackLikersPage,
+});
+
+const trackRepostersRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/track/$id/reposts',
+  component: TrackRepostersPage,
 });
 
 const trackPlaylistsRoute = createRoute({
@@ -165,6 +172,7 @@ const routeTree = rootRoute.addChildren([
     searchRoute,
     trackRoute,
     trackLikersRoute,
+    trackRepostersRoute,
     trackPlaylistsRoute,
     trackAlbumsRoute,
     playlistRoute,

@@ -1,5 +1,5 @@
 import { useParams, Link } from '@tanstack/react-router';
-import { Heart, ListMusic, Disc3 } from 'lucide-react';
+import { Heart, ListMusic, Disc3, Repeat2 } from 'lucide-react';
 import { formatCount } from '@/api.js';
 import { usePagedList } from '@/lib/usePagedList.js';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
@@ -131,6 +131,20 @@ export function TrackLikersPage() {
       emptyBody="Be the first one to give it a heart."
       mode="people"
       icon={Heart}
+    />
+  );
+}
+
+export function TrackRepostersPage() {
+  return (
+    <CollectionPage
+      endpoint={(id) => `/api/tracks/${id}/reposters`}
+      title="Reposted by"
+      description="Everyone who shared this track to their own page"
+      emptyTitle="Nobody has reposted this track yet"
+      emptyBody="It has not been passed on so far."
+      mode="people"
+      icon={Repeat2}
     />
   );
 }

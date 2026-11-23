@@ -457,9 +457,12 @@ route('GET', '/api/tracks/:id/related', async (ctx) => {
 });
 
 route('GET', '/api/tracks/:id/reposters', async (ctx) => {
-  const remote = await sc.reposters(ctx.params.id, { limit: 12 }).catch(() => []);
+  const data = await sc.reposters(ctx.params.id, {
+    limit: pageLimit(ctx.query, 50),
+    next: ctx.query.get('next'),
+  });
   const flags = await flagsFor(ctx.token);
-  return { collection: remote.map((u) => decorateUser(u, flags)) };
+  return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
 });
 
 route('GET', '/api/tracks/:id/likers', async (ctx) => {
