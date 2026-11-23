@@ -811,7 +811,7 @@ export function invalidateToken(token) {
 
 /* ------------------------------- library reads ------------------------------ */
 
-export async function myLikes(token, { limit = 50, next } = {}) {
+export async function myLikes(token, { limit = 200, next } = {}) {
   const id = await meId(token);
   const data = next
     ? await apiGet(next, { token })
@@ -822,7 +822,7 @@ export async function myLikes(token, { limit = 50, next } = {}) {
   );
 }
 
-export async function myReposts(token, { limit = 50, next } = {}) {
+export async function myReposts(token, { limit = 200, next } = {}) {
   const id = await meId(token);
   const data = next
     ? await apiGet(next, { token })
@@ -874,7 +874,7 @@ export async function myCounts(token, { maxPages = 16, pageSize = 200 } = {}) {
   return { likes, following, playlists };
 }
 
-export async function myPlaylists(token, { limit = 50, next } = {}) {
+export async function myPlaylists(token, { limit = 200, next } = {}) {
   const id = await meId(token);
   const data = next
     ? await apiGet(next, { token })
@@ -882,7 +882,7 @@ export async function myPlaylists(token, { limit = 50, next } = {}) {
   return mapCollection(data, slimPlaylist);
 }
 
-export async function myFollowing(token, { limit = 50, next } = {}) {
+export async function myFollowing(token, { limit = 200, next } = {}) {
   const id = await meId(token);
   const data = next
     ? await apiGet(next, { token })
@@ -890,7 +890,7 @@ export async function myFollowing(token, { limit = 50, next } = {}) {
   return mapCollection(data, slimUser);
 }
 
-export async function myHistory(token, { limit = 50 } = {}) {
+export async function myHistory(token, { limit = 200 } = {}) {
   const data = await apiGet(`/me/play-history/tracks?limit=${limit}`, { token });
   return {
     collection: (data.collection || [])
@@ -900,7 +900,7 @@ export async function myHistory(token, { limit = 50 } = {}) {
   };
 }
 
-export async function myStream(token, { limit = 20 } = {}) {
+export async function myStream(token, { limit = 50 } = {}) {
   const data = await apiGet(`/stream?limit=${limit}`, { token });
   return {
     collection: (data.collection || []).map(mapActivityItem).filter(Boolean),

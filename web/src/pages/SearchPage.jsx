@@ -49,7 +49,7 @@ export function SearchPage() {
     (async () => {
       try {
         const res = await api.get(
-          `/api/search?q=${encodeURIComponent(q)}&filter=${filter}&limit=30`
+          `/api/search?q=${encodeURIComponent(q)}&filter=${filter}&limit=100`
         );
         if (!cancelled) setData(res);
       } catch (err) {

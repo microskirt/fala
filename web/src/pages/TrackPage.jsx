@@ -21,7 +21,12 @@ import { useLibrary } from '@/context/LibraryContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
 import { Artwork, Avatar, Skeleton, ErrorState } from '@/components/Media.jsx';
-import { LikeButton, FollowButton, AddToPlaylistButton } from '@/components/Controls.jsx';
+import {
+  LikeButton,
+  FollowButton,
+  AddToPlaylistButton,
+  AddToQueueButton,
+} from '@/components/Controls.jsx';
 import { TrackCard, TrackStatLine } from '@/components/Cards.jsx';
 import { Page, CardGrid, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -231,11 +236,11 @@ export function TrackPage() {
         }
 
         api
-          .get(`/api/tracks/${id}/related?limit=12`)
+          .get(`/api/tracks/${id}/related?limit=24`)
           .then((r) => !cancelled && setRelated(r.collection || []))
           .catch(() => {});
 
-        const c = await api.get(`/api/tracks/${id}/comments?limit=30`);
+        const c = await api.get(`/api/tracks/${id}/comments?limit=100`);
         if (!cancelled) {
           setComments(c.collection || []);
           setNextComments(c.next_href || null);
@@ -376,6 +381,8 @@ export function TrackPage() {
             <Button variant={reposted ? 'secondary' : 'ghost'} onClick={() => toggleRepost(track)}>
               <Repeat2 size={16} /> {reposted ? 'Reposted' : 'Repost'}
             </Button>
+
+            <AddToQueueButton track={track} size={18} />
 
             <AddToPlaylistButton track={track} size={18} />
 

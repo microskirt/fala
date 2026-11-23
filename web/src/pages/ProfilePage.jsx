@@ -104,7 +104,7 @@ export function ProfilePage() {
     setTabLoading(true);
     try {
       const res = await api.get(
-        `/api/users/${encodeURIComponent(profile.id)}/tab?tab=${which}&limit=30`
+        `/api/users/${encodeURIComponent(profile.id)}/tab?tab=${which}&limit=100`
       );
       setTabData(res);
     } catch (err) {

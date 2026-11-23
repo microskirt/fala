@@ -38,6 +38,20 @@ function json(res, status, body) {
   res.end(payload);
 }
 
+/*
+ * SoundCloud pages its lists, so `limit` is only a page size: how many rows to
+ * fetch in one go. There is no reason to clamp it to 50, that just hides the
+ * rest of a library behind extra round trips. The ceiling only exists to stop
+ * a caller asking for something absurd.
+ */
+const MAX_PAGE = 500;
+
+function pageLimit(query, fallback) {
+  const raw = Number(query.get('limit'));
+  const n = Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
+  return Math.min(MAX_PAGE, n);
+}
+
 function readBody(req, limit = 1_000_000) {
   return new Promise((resolve, reject) => {
     let size = 0;
@@ -200,7 +214,7 @@ route('DELETE', '/api/captcha', async (ctx) => {
 route('GET', '/api/me/likes', async (ctx) => {
   const token = requireToken(ctx);
   const data = await sc.myLikes(token, {
-    limit: Math.min(50, Number(ctx.query.get('limit') || 50)),
+    limit: pageLimit(ctx.query, 50),
     next: ctx.query.get('next'),
   });
   const flags = await flagsFor(token);
@@ -210,7 +224,7 @@ route('GET', '/api/me/likes', async (ctx) => {
 route('GET', '/api/me/reposts', async (ctx) => {
   const token = requireToken(ctx);
   const data = await sc.myReposts(token, {
-    limit: Math.min(50, Number(ctx.query.get('limit') || 50)),
+    limit: pageLimit(ctx.query, 50),
     next: ctx.query.get('next'),
   });
   return data;
@@ -224,7 +238,7 @@ route('GET', '/api/me/counts', async (ctx) => {
 route('GET', '/api/me/playlists', async (ctx) => {
   const token = requireToken(ctx);
   return sc.myPlaylists(token, {
-    limit: Math.min(50, Number(ctx.query.get('limit') || 50)),
+    limit: pageLimit(ctx.query, 50),
     next: ctx.query.get('next'),
   });
 });
@@ -232,7 +246,7 @@ route('GET', '/api/me/playlists', async (ctx) => {
 route('GET', '/api/me/following', async (ctx) => {
   const token = requireToken(ctx);
   const data = await sc.myFollowing(token, {
-    limit: Math.min(50, Number(ctx.query.get('limit') || 50)),
+    limit: pageLimit(ctx.query, 50),
     next: ctx.query.get('next'),
   });
   const flags = await flagsFor(token);
@@ -241,12 +255,12 @@ route('GET', '/api/me/following', async (ctx) => {
 
 route('GET', '/api/me/history', async (ctx) => {
   const token = requireToken(ctx);
-  return sc.myHistory(token, { limit: Math.min(50, Number(ctx.query.get('limit') || 50)) });
+  return sc.myHistory(token, { limit: pageLimit(ctx.query, 50) });
 });
 
 route('GET', '/api/me/stream', async (ctx) => {
   const token = requireToken(ctx);
-  return sc.myStream(token, { limit: Math.min(50, Number(ctx.query.get('limit') || 20)) });
+  return sc.myStream(token, { limit: pageLimit(ctx.query, 20) });
 });
 
 /* -------------------------------- search ---------------------------------- */
@@ -255,7 +269,7 @@ route('GET', '/api/search', async (ctx) => {
   const q = ctx.query.get('q') || '';
   const filter = ctx.query.get('filter') || 'all';
   const next = ctx.query.get('next');
-  const limit = Math.min(50, Number(ctx.query.get('limit') || 20));
+  const limit = pageLimit(ctx.query, 20);
   if (!q.trim() && !next) return { collection: [], next_href: null };
   const data = await sc.search({ q, filter, limit, next });
   const flags = await flagsFor(ctx.token);
@@ -289,7 +303,7 @@ route('GET', '/api/genres', async () => ({ collection: await sc.genres() }));
 
 route('GET', '/api/charts', async (ctx) => {
   const next = ctx.query.get('next');
-  const limit = Math.min(50, Number(ctx.query.get('limit') || 20));
+  const limit = pageLimit(ctx.query, 20);
   const data = await sc.charts({ limit, next });
   const flags = await flagsFor(ctx.token);
   return { ...data, collection: decorateItems(data.collection, flags) };
@@ -324,7 +338,7 @@ route('GET', '/api/tracks/:id/waveform', async (ctx) => {
 
 route('GET', '/api/tracks/:id/comments', async (ctx) => {
   const next = ctx.query.get('next');
-  const limit = Math.min(50, Number(ctx.query.get('limit') || 30));
+  const limit = pageLimit(ctx.query, 30);
   return sc.comments(ctx.params.id, { limit, next });
 });
 
@@ -376,7 +390,7 @@ route('GET', '/api/users/:id', async (ctx) => {
 route('GET', '/api/users/:id/tab', async (ctx) => {
   const tab = ctx.query.get('tab') || 'tracks';
   const next = ctx.query.get('next');
-  const limit = Math.min(50, Number(ctx.query.get('limit') || 24));
+  const limit = pageLimit(ctx.query, 24);
   const data = await sc.userTab(ctx.params.id, tab, { limit, next, token: ctx.token || null });
   const flags = await flagsFor(ctx.token);
   return { ...data, collection: decorateItems(data.collection, flags) };

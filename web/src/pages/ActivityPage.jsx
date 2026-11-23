@@ -4,7 +4,7 @@ import { Activity } from 'lucide-react';
 import { api, timeAgo } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { Avatar, Artwork, EmptyState, ErrorState } from '@/components/Media.jsx';
-import { PlayButton } from '@/components/Controls.jsx';
+import { PlayButton, AddToQueueButton, AddToPlaylistButton } from '@/components/Controls.jsx';
 import { Page, PageHeader, TrackList, TrackListSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 
@@ -27,7 +27,7 @@ export function ActivityPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/api/me/stream?limit=40');
+      const res = await api.get('/api/me/stream?limit=100');
       setItems(res.collection || []);
     } catch (err) {
       setError(err.message || 'Could not load your activity');
@@ -118,7 +118,9 @@ export function ActivityPage() {
                     <span className="opacity-60"> · {timeAgo(item.created_at)}</span>
                   </div>
                 </div>
-                <div className="shrink-0">
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <AddToQueueButton track={track} size={16} />
+                  <AddToPlaylistButton track={track} size={16} />
                   <PlayButton track={track} context={tracks} size="sm" />
                 </div>
               </div>

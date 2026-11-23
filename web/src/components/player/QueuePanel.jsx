@@ -1,5 +1,6 @@
 import { X, Trash2, ListMusic } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext.jsx';
+import { AddToPlaylistButton } from '@/components/Controls.jsx';
 import { Artwork } from '@/components/Media.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { ScrollArea } from '@/components/ui/scroll-area.jsx';
@@ -69,6 +70,7 @@ export function QueuePanel() {
                     </span>
                   </span>
                 </button>
+                <AddToPlaylistButton track={t} size={14} className="opacity-0 group-hover:opacity-100" />
                 <Button
                   variant="ghost"
                   size="icon-sm"

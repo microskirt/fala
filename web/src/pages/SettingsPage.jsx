@@ -204,7 +204,7 @@ const THEMES = [
     id: 'mocha',
     name: 'Catppuccin Mocha',
     icon: Cat,
-    swatch: { bg: '#1e1e2e', elev: '#313244', text: '#cdd6f4', accent: '#fab387', border: '#45475a' },
+    swatch: { bg: '#1e1e2e', elev: '#313244', text: '#cdd6f4', accent: '#cba6f7', border: '#45475a' },
   },
 ];
 

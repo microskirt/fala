@@ -232,6 +232,27 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
   );
 }
 
+export function AddToQueueButton({ track, size = 18, className }) {
+  const { addToQueue } = usePlayer();
+  const toast = useToast();
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className={className}
+      aria-label="Add to queue"
+      title="Add to queue"
+      onClick={() => {
+        addToQueue(track);
+        toast.success('Added to queue');
+      }}
+    >
+      <ListPlus size={size} />
+    </Button>
+  );
+}
+
 export function QueueMenuButton({ track, size = 18 }) {
   const { addToQueue, playNextInQueue } = usePlayer();
   const toast = useToast();

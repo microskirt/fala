@@ -6,7 +6,12 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { TrackCard, PlaylistCard, ArtistCard, SectionScroller } from '@/components/Cards.jsx';
 import { Artwork, Avatar, ErrorState, EmptyState } from '@/components/Media.jsx';
-import { PlayButton, LikeButton } from '@/components/Controls.jsx';
+import {
+  PlayButton,
+  LikeButton,
+  AddToQueueButton,
+  AddToPlaylistButton,
+} from '@/components/Controls.jsx';
 import { Page, PageHeader, Section, CardGridSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 
@@ -97,6 +102,8 @@ function FeedItem({ item }) {
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
               <LikeButton track={track} size={16} />
+              <AddToQueueButton track={track} size={16} />
+              <AddToPlaylistButton track={track} size={16} />
               <PlayButton track={track} size="sm" />
             </div>
           </div>

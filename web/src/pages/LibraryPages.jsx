@@ -182,7 +182,7 @@ export function HistoryPage() {
     <Page>
       <PageHeader
         title="Listening history"
-        description="The last 50 tracks you played on this account"
+        description="The tracks you played most recently on this account"
         actions={
           items.length > 0 ? (
             <Button onClick={() => playQueue(items, 0)}>

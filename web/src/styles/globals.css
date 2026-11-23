@@ -115,7 +115,7 @@
   --popover: #313244;
   --popover-foreground: #cdd6f4;
 
-  --primary: #fab387;
+  --primary: #cba6f7;
   --primary-foreground: #1e1e2e;
 
   --secondary: #313244;
@@ -136,18 +136,18 @@
 
   --border: #3b3b52;
   --input: #45475a;
-  --ring: #fab387;
+  --ring: #cba6f7;
 
   --sidebar: #181825;
   --sidebar-foreground: #bac2de;
   --sidebar-accent: #313244;
   --sidebar-border: #313244;
 
-  --chart-1: #fab387;
+  --chart-1: #cba6f7;
   --chart-2: #89b4fa;
   --chart-3: #a6e3a1;
   --chart-4: #f9e2af;
-  --chart-5: #cba6f7;
+  --chart-5: #b4befe;
 }
 
 @theme inline {

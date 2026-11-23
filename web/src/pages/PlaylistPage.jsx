@@ -19,7 +19,13 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
 import { Artwork, Avatar, Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx';
-import { LikeButton, AddToPlaylistButton, QueueMenuButton, PlayButton } from '@/components/Controls.jsx';
+import {
+  LikeButton,
+  AddToPlaylistButton,
+  AddToQueueButton,
+  QueueMenuButton,
+  PlayButton,
+} from '@/components/Controls.jsx';
 import { Modal, ConfirmDialog } from '@/components/Modal.jsx';
 import { Page, TrackList, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -64,6 +70,7 @@ function PlaylistTrackRow({ track, index, context, editable, onRemove }) {
       </div>
       <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
         <LikeButton track={track} size={16} />
+        <AddToQueueButton track={track} size={16} />
         <AddToPlaylistButton track={track} size={16} />
         <QueueMenuButton track={track} size={16} />
         {editable ? (
