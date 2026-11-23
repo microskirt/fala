@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { SearchX, Music2, Users, ListMusic, Disc3, Loader2, Sparkles } from 'lucide-react';
+import { SearchX, Music2, Users, ListMusic, Disc3, Sparkles } from 'lucide-react';
 import { api, formatCount } from '@/api.js';
 import { TrackCard, PlaylistCard, ArtistRow } from '@/components/Cards.jsx';
 import { EmptyState } from '@/components/Media.jsx';
@@ -10,7 +10,9 @@ import {
   CardGrid,
   PersonGrid,
   CardGridSkeleton,
+  LoadMore,
 } from '@/components/layout/Page.jsx';
+import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils.js';
 
@@ -78,6 +80,12 @@ export function SearchPage() {
       setLoadingMore(false);
     }
   };
+
+  const sentinel = useAutoLoad({
+    hasMore: !!data.next_href,
+    loading: loadingMore,
+    onLoad: loadMore,
+  });
 
   const setFilter = (next) => {
     navigate({
@@ -214,14 +222,7 @@ export function SearchPage() {
         </CardGrid>
       )}
 
-      {data.next_href ? (
-        <div className="mt-8 flex justify-center">
-          <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
-            {loadingMore ? <Loader2 size={16} className="animate-spin" /> : null}
-            {loadingMore ? 'Loading…' : 'Load more'}
-          </Button>
-        </div>
-      ) : null}
+      <LoadMore sentinelRef={sentinel} loading={loadingMore} />
     </Page>
   );
 }

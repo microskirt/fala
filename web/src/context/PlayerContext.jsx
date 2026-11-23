@@ -7,12 +7,19 @@ import {
   useCallback,
   useMemo,
 } from 'react';
-import { api } from '../api.js';
+import { api, artwork } from '../api.js';
 import { KEYS, readKey, writeKey } from '../lib/storage.js';
 import { usePrefs } from '../prefs.js';
 import { useToast } from './ToastContext.jsx';
 
 const PlayerContext = createContext(null);
+
+/*
+ * The playhead moves every frame, and the player bar and the song waveform are
+ * the only things that care. Keeping it in its own context means a moving
+ * progress line never re-renders a page full of comments and cards.
+ */
+const PlayerTimeContext = createContext(0);
 
 function readStoredVolume() {
   const raw = readKey(KEYS.volume);
@@ -21,6 +28,16 @@ function readStoredVolume() {
     if (Number.isFinite(v) && v >= 0 && v <= 1) return v;
   }
   return 0.85;
+}
+
+const FALLBACK_ART = '/icon-512.png';
+
+function sessionArtwork(track) {
+  const direct = track?.artwork_url ? artwork(track.artwork_url, 't500x500') : null;
+  const avatar = track?.user?.avatar_url ? artwork(track.user.avatar_url, 't300x300') : null;
+  const src = direct || avatar || FALLBACK_ART;
+  const type = /\.png(\?|$)/i.test(src) || src === FALLBACK_ART ? 'image/png' : 'image/jpeg';
+  return [{ src: new URL(src, window.location.origin).href, sizes: '512x512', type }];
 }
 
 export function PlayerProvider({ children }) {
@@ -58,14 +75,34 @@ export function PlayerProvider({ children }) {
     writeKey(KEYS.volume, String(volume));
   }, [volume, muted]);
 
+  /*
+   * Drop whatever is loaded. Used when the song changes and when the queue is
+   * emptied: the old stream must stop the instant the choice changes, not when
+   * the next one happens to be ready.
+   */
+  const detach = useCallback(() => {
+    const audio = audioRef.current;
+    if (hlsRef.current) {
+      try {
+        hlsRef.current.destroy();
+      } catch {}
+      hlsRef.current = null;
+    }
+    if (!audio) return;
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.removeAttribute('src');
+      audio.load();
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     if (!current) {
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
+      detach();
       setCurrentTime(0);
       setDuration(0);
       return;
@@ -73,6 +110,10 @@ export function PlayerProvider({ children }) {
 
     const loadId = ++loadIdRef.current;
     let cancelled = false;
+
+    // Before any request goes out: silence the previous track and put the
+    // playhead back at zero, so the bar and the audio agree immediately.
+    detach();
     setPlaybackError(null);
     setBuffering(true);
     setCurrentTime(0);
@@ -84,11 +125,6 @@ export function PlayerProvider({ children }) {
           `/api/tracks/${current.id}/stream?quality=${encodeURIComponent(quality)}`
         );
         if (cancelled || loadId !== loadIdRef.current) return;
-
-        if (hlsRef.current) {
-          hlsRef.current.destroy();
-          hlsRef.current = null;
-        }
 
         const src = info.url;
         const looksHls =
@@ -175,7 +211,6 @@ export function PlayerProvider({ children }) {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onTime = () => setCurrentTime(audio.currentTime * 1000);
     const onDuration = () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) setDuration(audio.duration * 1000);
     };
@@ -186,6 +221,7 @@ export function PlayerProvider({ children }) {
     };
     const onCanPlay = () => setBuffering(false);
     const onEnded = () => handleEnded();
+    const syncTime = () => setCurrentTime((audio.currentTime || 0) * 1000);
     const onError = () => {
       if (!audio.currentSrc) return;
       setBuffering(false);
@@ -193,7 +229,6 @@ export function PlayerProvider({ children }) {
       setPlaying(false);
     };
 
-    audio.addEventListener('timeupdate', onTime);
     audio.addEventListener('durationchange', onDuration);
     audio.addEventListener('loadedmetadata', onDuration);
     audio.addEventListener('waiting', onWaiting);
@@ -201,8 +236,8 @@ export function PlayerProvider({ children }) {
     audio.addEventListener('canplay', onCanPlay);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
+    audio.addEventListener('seeked', syncTime);
     return () => {
-      audio.removeEventListener('timeupdate', onTime);
       audio.removeEventListener('durationchange', onDuration);
       audio.removeEventListener('loadedmetadata', onDuration);
       audio.removeEventListener('waiting', onWaiting);
@@ -210,8 +245,27 @@ export function PlayerProvider({ children }) {
       audio.removeEventListener('canplay', onCanPlay);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
+      audio.removeEventListener('seeked', syncTime);
     };
   }, [handleEnded]);
+
+  /*
+   * `timeupdate` only fires about four times a second, which is why the bar used
+   * to jump in visible steps. Read the element every frame instead; React skips
+   * the render while the value is unchanged, so a paused track costs nothing.
+   */
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const audio = audioRef.current;
+      if (audio) setCurrentTime((audio.currentTime || 0) * 1000);
+      raf = requestAnimationFrame(tick);
+    };
+    if (typeof requestAnimationFrame === 'function') raf = requestAnimationFrame(tick);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
 
   const playQueue = useCallback((tracks, startIndex = 0) => {
     const list = (tracks || []).filter((t) => t && t.id);
@@ -288,6 +342,7 @@ export function PlayerProvider({ children }) {
     const audio = audioRef.current;
     if (audio && audio.currentTime > 4) {
       audio.currentTime = 0;
+      setCurrentTime(0);
       return;
     }
     setIndex((cur) => {
@@ -392,12 +447,10 @@ export function PlayerProvider({ children }) {
         title: current.title || 'Unknown track',
         artist: current.user?.username || 'Unknown artist',
         album: 'Fala',
-        artwork: current.artwork_url
-          ? [{ src: current.artwork_url, sizes: '500x500', type: 'image/jpeg' }]
-          : [],
+        artwork: sessionArtwork(current),
       });
     } catch {}
-  }, [current?.id, current?.title, current?.artwork_url, current?.user?.username]);
+  }, [current?.id, current?.title, current?.artwork_url, current?.user?.username, current?.user?.avatar_url]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
@@ -427,7 +480,6 @@ export function PlayerProvider({ children }) {
       current,
       playing,
       buffering,
-      currentTime,
       duration,
       volume,
       muted,
@@ -455,17 +507,21 @@ export function PlayerProvider({ children }) {
       audioRef,
     }),
     [
-      queue, index, current, playing, buffering, currentTime, duration, volume, muted,
+      queue, index, current, playing, buffering, duration, volume, muted,
       shuffle, repeat, queueOpen, playbackError, playTrack, playQueue, togglePlay, pause,
       next, prev, seek, setVolume, toggleMute, addToQueue, playNextInQueue, removeFromQueue,
       clearQueue, isCurrent,
     ]
   );
 
+  const time = useMemo(() => ({ currentTime, duration }), [currentTime, duration]);
+
   return (
     <PlayerContext.Provider value={value}>
-      {children}
-      <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" />
+      <PlayerTimeContext.Provider value={time}>
+        {children}
+        <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" />
+      </PlayerTimeContext.Provider>
     </PlayerContext.Provider>
   );
 }
@@ -474,4 +530,8 @@ export function usePlayer() {
   const ctx = useContext(PlayerContext);
   if (!ctx) throw new Error('usePlayer must be used inside PlayerProvider');
   return ctx;
+}
+
+export function usePlayerTime() {
+  return useContext(PlayerTimeContext);
 }

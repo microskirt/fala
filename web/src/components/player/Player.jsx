@@ -13,18 +13,20 @@ import {
   VolumeX,
   ListMusic,
   Loader2,
+  Heart,
+  UserPlus,
+  Check,
 } from 'lucide-react';
-import { usePlayer } from '@/context/PlayerContext.jsx';
+import { usePlayer, usePlayerTime } from '@/context/PlayerContext.jsx';
+import { useLibrary } from '@/context/LibraryContext.jsx';
+import { useAuth } from '@/context/AuthContext.jsx';
 import { Artwork } from '@/components/Media.jsx';
 import { formatDuration } from '@/api.js';
 import { Slider } from '@/components/ui/slider.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils.js';
 
-/*
- * A thin seek line rather than a full slider row. SoundCloud keeps its bottom
- * bar short, so the scrubber lives above the controls instead of inside them.
- */
+/* A thin line between the two timestamps, the way SoundCloud draws it. */
 function SeekLine({ value, max, onSeek }) {
   const ref = useRef(null);
   const dragging = useRef(false);
@@ -34,6 +36,7 @@ function SeekLine({ value, max, onSeek }) {
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    if (!rect.width) return;
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
     onSeek(ratio * max);
   };
@@ -41,7 +44,7 @@ function SeekLine({ value, max, onSeek }) {
   return (
     <div
       ref={ref}
-      className="group relative h-1.5 w-full cursor-pointer bg-muted"
+      className="group relative h-1 w-full cursor-pointer rounded-full bg-muted"
       onPointerDown={(e) => {
         dragging.current = true;
         e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -61,7 +64,7 @@ function SeekLine({ value, max, onSeek }) {
       aria-valuenow={Math.round(value)}
       tabIndex={0}
     >
-      <div className="absolute inset-y-0 left-0 bg-primary" style={{ width: `${pct}%` }} />
+      <div className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: `${pct}%` }} />
       <div
         className="absolute top-1/2 size-2.5 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity group-hover:opacity-100"
         style={{ left: `calc(${pct}% - 5px)` }}
@@ -109,13 +112,66 @@ function VolumeControl({ volume, muted, icon: Icon, onToggleMute, onVolume }) {
   );
 }
 
+function LikeIndicator({ track }) {
+  const { isLiked, toggleLike, isBusy } = useLibrary();
+  const { user } = useAuth();
+  const liked = isLiked(track);
+  const busy = isBusy('like:' + track?.id);
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className={cn(liked && 'text-rose-500 hover:text-rose-500')}
+      onClick={() => toggleLike(track)}
+      aria-pressed={liked}
+      aria-label={liked ? 'Unlike this track' : 'Like this track'}
+      title={user ? (liked ? 'Unlike' : 'Like') : 'Sign in to like'}
+    >
+      <Heart
+        size={16}
+        fill={liked ? 'currentColor' : 'none'}
+        className={busy ? 'animate-pulse' : ''}
+      />
+    </Button>
+  );
+}
+
+function FollowIndicator({ user }) {
+  const { isFollowing, toggleFollow, isBusy } = useLibrary();
+  const { user: me } = useAuth();
+  if (!user) return null;
+  if (me && String(me.id) === String(user.id)) return null;
+  const following = isFollowing(user);
+  const busy = isBusy('follow:' + user.id);
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className={cn(following && 'text-primary hover:text-primary')}
+      onClick={() => toggleFollow(user)}
+      aria-pressed={following}
+      aria-label={following ? `Unfollow ${user.username}` : `Follow ${user.username}`}
+      title={following ? 'Following' : 'Follow'}
+      disabled={busy}
+    >
+      {busy ? (
+        <Loader2 size={16} className="animate-spin" />
+      ) : following ? (
+        <Check size={16} />
+      ) : (
+        <UserPlus size={16} />
+      )}
+    </Button>
+  );
+}
+
 export function Player() {
   const {
     current,
     playing,
     buffering,
-    currentTime,
-    duration,
     volume,
     muted,
     shuffle,
@@ -132,6 +188,7 @@ export function Player() {
     setRepeat,
     setQueueOpen,
   } = usePlayer();
+  const { currentTime, duration } = usePlayerTime();
 
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const total = duration || current?.duration || 0;
@@ -152,31 +209,18 @@ export function Player() {
 
   return (
     <div className="shrink-0 border-t border-border bg-card/90 backdrop-blur">
-      <SeekLine value={currentTime} max={total} onSeek={seek} />
-
-      <div className="flex h-(--player-height) items-center gap-2 px-2.5 sm:gap-3 lg:px-4">
-        {/* Transport, kept left so nothing stacks vertically. */}
+      <div className="flex h-(--player-height) items-center gap-1.5 px-2 sm:gap-3 sm:px-3 lg:px-4">
+        {/* 1. Transport */}
         <div className="flex shrink-0 items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className={cn('hidden sm:inline-flex', shuffle && toggled)}
-            onClick={() => setShuffle((s) => !s)}
-            aria-pressed={shuffle}
-            aria-label="Shuffle"
-            title="Shuffle"
-          >
-            <Shuffle size={15} />
-          </Button>
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={prev}
             disabled={!current}
-            aria-label="Previous"
+            aria-label="Previous track"
             title="Previous"
           >
-            <SkipBack size={15} fill="currentColor" />
+            <SkipBack size={16} fill="currentColor" />
           </Button>
           <Button
             size="icon"
@@ -199,73 +243,110 @@ export function Player() {
             size="icon-sm"
             onClick={next}
             disabled={!current}
-            aria-label="Next"
+            aria-label="Next track"
             title="Next"
           >
-            <SkipForward size={15} fill="currentColor" />
+            <SkipForward size={16} fill="currentColor" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className={cn('hidden sm:inline-flex', repeat !== 'off' && toggled)}
-            onClick={() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off'))}
-            aria-pressed={repeat !== 'off'}
-            aria-label={`Repeat: ${repeat}`}
-            title={repeat === 'off' ? 'Repeat off' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
-          >
-            {repeat === 'one' ? <Repeat1 size={15} /> : <Repeat size={15} />}
-          </Button>
-          <span className="ml-1.5 hidden shrink-0 text-xs tabular-nums text-muted-foreground md:inline">
-            {formatDuration(currentTime)} / {formatDuration(total)}
+        </div>
+
+        {/* 2. Shuffle */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={cn('hidden shrink-0 sm:inline-flex', shuffle && toggled)}
+          onClick={() => setShuffle((s) => !s)}
+          aria-pressed={shuffle}
+          aria-label="Shuffle"
+          title="Shuffle"
+        >
+          <Shuffle size={15} />
+        </Button>
+
+        {/* 3. Loop */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={cn('hidden shrink-0 sm:inline-flex', repeat !== 'off' && toggled)}
+          onClick={() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off'))}
+          aria-pressed={repeat !== 'off'}
+          aria-label={`Repeat: ${repeat}`}
+          title={repeat === 'off' ? 'Repeat off' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
+        >
+          {repeat === 'one' ? <Repeat1 size={15} /> : <Repeat size={15} />}
+        </Button>
+
+        {/* 4. Elapsed, line, total */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+            {formatDuration(currentTime)}
+          </span>
+          <div className="min-w-[60px] flex-1">
+            <SeekLine value={currentTime} max={total} onSeek={seek} />
+          </div>
+          <span className="w-9 shrink-0 text-xs tabular-nums text-muted-foreground">
+            {formatDuration(total)}
           </span>
         </div>
 
-        {/* Now playing */}
-        <div className="flex min-w-0 flex-1 items-center gap-2.5 border-l border-border pl-2.5 sm:pl-3">
+        {/* 5. Now playing: two lines, never taller than the thumbnail */}
+        <div className="flex w-[190px] shrink-0 items-center gap-2 overflow-hidden lg:w-[260px]">
           {current ? (
             <>
-              <Link to="/track/$id" params={{ id: String(current.id) }} className="shrink-0">
-                <Artwork src={current.artwork_url} alt={current.title} size={36} rounded={4} />
+              <Link
+                to="/track/$id"
+                params={{ id: String(current.id) }}
+                className="shrink-0"
+                title={current.title}
+              >
+                <Artwork
+                  src={current.artwork_url}
+                  fallback={current.user?.avatar_url}
+                  alt={current.title}
+                  size={40}
+                  rounded={4}
+                />
               </Link>
-              <div className="min-w-0 leading-tight">
-                <Link
-                  to="/track/$id"
-                  params={{ id: String(current.id) }}
-                  className="block truncate text-sm font-semibold hover:underline"
-                  title={current.title}
-                >
-                  {current.title}
-                </Link>
+              <div className="flex h-10 min-w-0 flex-col justify-center leading-tight">
                 {current.user ? (
                   <Link
                     to="/artist/$id"
                     params={{ id: String(current.user.id) }}
-                    className="block truncate text-xs text-muted-foreground hover:text-foreground"
+                    className="truncate text-xs text-muted-foreground hover:text-foreground"
                   >
                     {current.user.username}
                   </Link>
                 ) : null}
+                <Link
+                  to="/track/$id"
+                  params={{ id: String(current.id) }}
+                  className="truncate text-sm font-semibold hover:underline"
+                  title={current.title}
+                >
+                  {current.title}
+                </Link>
               </div>
             </>
           ) : (
-            <div className="leading-tight">
-              <div className="text-sm font-medium text-muted-foreground">Nothing playing</div>
-              <div className="hidden text-xs text-muted-foreground/70 sm:block">
-                Pick a track to get started
-              </div>
+            <div className="leading-tight text-muted-foreground">
+              <div className="text-xs">Nothing playing</div>
+              <div className="text-sm font-medium">Pick a track</div>
             </div>
           )}
-          {playbackError ? (
-            <div className="ml-auto shrink-0 text-xs text-destructive">{playbackError}</div>
-          ) : null}
         </div>
 
-        {/* Right controls */}
-        <div className="flex shrink-0 items-center gap-1">
+        {/* 6 and 7. Like, follow */}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {current ? <LikeIndicator track={current} /> : null}
+          {current?.user ? <FollowIndicator user={current.user} /> : null}
+        </div>
+
+        {/* Extras SoundCloud keeps on the far right */}
+        <div className="flex shrink-0 items-center gap-0.5 border-l border-border pl-1.5">
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn(queueOpen && toggled)}
+            className={cn('hidden sm:inline-flex', queueOpen && toggled)}
             onClick={() => setQueueOpen((v) => !v)}
             aria-pressed={queueOpen}
             aria-label="Queue"
@@ -284,6 +365,12 @@ export function Player() {
           </div>
         </div>
       </div>
+
+      {playbackError ? (
+        <div className="border-t border-border/60 px-3 py-1 text-xs text-destructive">
+          {playbackError}
+        </div>
+      ) : null}
     </div>
   );
 }

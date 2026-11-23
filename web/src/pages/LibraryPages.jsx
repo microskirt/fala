@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import {
   Heart,
@@ -10,7 +10,6 @@ import {
   Plus,
   Loader2,
 } from 'lucide-react';
-import { api } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
@@ -26,38 +25,15 @@ import {
   CardGridSkeleton,
   TrackListSkeleton,
   PersonGridSkeleton,
+  LoadMore,
 } from '@/components/layout/Page.jsx';
+import { usePagedList } from '@/lib/usePagedList.js';
+import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
-
-function useList(endpoint, deps = []) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get(endpoint);
-      setItems(res.collection || []);
-    } catch (err) {
-      setError(err.message || 'Could not load');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-
-  return { items, loading, error, reload: load, setItems };
-}
 
 function SignInPrompt({ icon, title, children }) {
   return (
@@ -89,9 +65,13 @@ function TrackCollectionPage({
   const { isAuthed } = useAuth();
   const { playQueue } = usePlayer();
   const { counts } = useLibrary();
-  const { items, loading, error, reload } = useList(endpoint, [isAuthed]);
-  // A single page only holds so many rows, so the header count comes from the
-  // account totals instead of however many happened to load.
+  const { items, loading, loadingMore, error, reload, next, loadMore } = usePagedList(
+    endpoint,
+    { limit: 100 }
+  );
+  const sentinel = useAutoLoad({ hasMore: !!next, loading: loadingMore, onLoad: loadMore });
+  // The header count comes from the account totals, not from however many rows
+  // happened to load.
   const total = countKey ? counts?.[countKey] || items.length : items.length;
 
   if (!isAuthed) {
@@ -127,11 +107,14 @@ function TrackCollectionPage({
           {emptyBody}
         </EmptyState>
       ) : (
-        <CardGrid>
-          {items.map((t) => (
-            <TrackCard key={t.id} track={t} context={items} />
-          ))}
-        </CardGrid>
+        <>
+          <CardGrid>
+            {items.map((t) => (
+              <TrackCard key={t.id} track={t} context={items} />
+            ))}
+          </CardGrid>
+          <LoadMore sentinelRef={sentinel} loading={loadingMore} />
+        </>
       )}
     </Page>
   );
@@ -171,7 +154,11 @@ export function RepostsPage() {
 export function HistoryPage() {
   const { isAuthed } = useAuth();
   const { playQueue } = usePlayer();
-  const { items, loading, error, reload } = useList('/api/me/history', [isAuthed]);
+  const { items, loading, loadingMore, error, reload, next, loadMore } = usePagedList(
+    '/api/me/history',
+    { limit: 100 }
+  );
+  const sentinel = useAutoLoad({ hasMore: !!next, loading: loadingMore, onLoad: loadMore });
 
   if (!isAuthed) {
     return (
@@ -206,11 +193,14 @@ export function HistoryPage() {
           Tracks you listen to will show up here.
         </EmptyState>
       ) : (
-        <TrackList>
-          {items.map((t, i) => (
-            <TrackRow key={`${t.id}-${i}`} track={t} index={i} context={items} />
-          ))}
-        </TrackList>
+        <>
+          <TrackList>
+            {items.map((t, i) => (
+              <TrackRow key={`${t.id}-${i}`} track={t} index={i} context={items} />
+            ))}
+          </TrackList>
+          <LoadMore sentinelRef={sentinel} loading={loadingMore} />
+        </>
       )}
     </Page>
   );
@@ -218,7 +208,14 @@ export function HistoryPage() {
 
 export function FollowingPage() {
   const { isAuthed } = useAuth();
-  const { items, loading, error, reload } = useList('/api/me/following', [isAuthed]);
+  const { counts } = useLibrary();
+  const { items, loading, loadingMore, error, reload, next, loadMore } = usePagedList(
+    '/api/me/following',
+    { limit: 100 }
+  );
+  const sentinel = useAutoLoad({ hasMore: !!next, loading: loadingMore, onLoad: loadMore });
+  // The account total is authoritative; the loaded rows are only a page.
+  const total = counts?.following || items.length;
 
   if (!isAuthed) {
     return (
@@ -235,7 +232,7 @@ export function FollowingPage() {
     <Page>
       <PageHeader
         title="Following"
-        description={`${items.length} account${items.length === 1 ? '' : 's'} you follow`}
+        description={`${total} account${total === 1 ? '' : 's'} you follow`}
       />
       {loading ? (
         <PersonGridSkeleton />
@@ -246,11 +243,14 @@ export function FollowingPage() {
           Find artists you like and follow them. Their activity shows up on your home page.
         </EmptyState>
       ) : (
-        <PersonGrid>
-          {items.map((person) => (
-            <ArtistRow key={person.id} user={person} subtitle={person.description} />
-          ))}
-        </PersonGrid>
+        <>
+          <PersonGrid>
+            {items.map((person) => (
+              <ArtistRow key={person.id} user={person} subtitle={person.description} />
+            ))}
+          </PersonGrid>
+          <LoadMore sentinelRef={sentinel} loading={loadingMore} />
+        </>
       )}
     </Page>
   );

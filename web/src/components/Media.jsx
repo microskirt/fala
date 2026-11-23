@@ -6,9 +6,26 @@ import { Skeleton as SkeletonPrimitive } from '@/components/ui/skeleton.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils.js';
 
-export function Artwork({ src, alt = '', size = 200, rounded = 8, kind = 'track', className, style }) {
+/*
+ * Plenty of uploads carry no artwork at all. SoundCloud falls back to the
+ * uploader's avatar for those, so `fallback` takes a user avatar and is tried
+ * after the real image fails or when there is none.
+ */
+export function Artwork({
+  src,
+  fallback,
+  alt = '',
+  size = 200,
+  rounded = 8,
+  kind = 'track',
+  className,
+  style,
+}) {
   const [failed, setFailed] = useState(false);
-  const url = src ? (kind === 'user' ? avatarUrl(src, 't300x300') : artUrl(src, 't500x500')) : null;
+  const [fallbackFailed, setFallbackFailed] = useState(false);
+  const primary = src ? (kind === 'user' ? avatarUrl(src, 't300x300') : artUrl(src, 't500x500')) : null;
+  const url = !primary || failed ? null : primary;
+  const backup = fallback && !fallbackFailed ? avatarUrl(fallback, 't300x300') : null;
   const Icon = kind === 'user' ? UserIcon : kind === 'playlist' ? ListMusic : Music2;
 
   return (
@@ -19,12 +36,21 @@ export function Artwork({ src, alt = '', size = 200, rounded = 8, kind = 'track'
       )}
       style={{ width: size, height: size, borderRadius: rounded, ...style }}
     >
-      {url && !failed ? (
+      {url ? (
         <img
           src={url}
           alt={alt}
           loading="lazy"
           onError={() => setFailed(true)}
+          draggable={false}
+          className="size-full object-cover"
+        />
+      ) : backup ? (
+        <img
+          src={backup}
+          alt={alt}
+          loading="lazy"
+          onError={() => setFallbackFailed(true)}
           draggable={false}
           className="size-full object-cover"
         />

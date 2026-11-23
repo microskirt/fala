@@ -33,6 +33,7 @@ import { Page, PageHeader } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
 import { cn } from '@/lib/utils.js';
+import { placeLabel } from '@/lib/places.js';
 
 const SECTIONS = [
   { id: 'account', label: 'Account', icon: User },
@@ -312,13 +313,12 @@ export function SettingsPage() {
                     <div className="text-xs text-muted-foreground">@{user.permalink}</div>
                   </div>
                 </div>
-                {user.city ? (
+                {placeLabel(user.city, user.country_code) ? (
                   <Row
                     title="Location"
                     description={
                       <span className="inline-flex items-center gap-1">
-                        <MapPin size={14} /> {user.city}
-                        {user.country_code ? `, ${user.country_code}` : ''}
+                        <MapPin size={14} /> {placeLabel(user.city, user.country_code)}
                       </span>
                     }
                   />

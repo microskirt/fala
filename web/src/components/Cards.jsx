@@ -28,7 +28,13 @@ export function TrackCard({ track, context, showStats = true }) {
     <div className="group min-w-0">
       <div className="relative overflow-hidden rounded-lg">
         <Link to="/track/$id" params={{ id: String(track.id) }} aria-label={track.title}>
-          <Artwork src={track.artwork_url} alt={track.title} size="100%" rounded={0} />
+          <Artwork
+            src={track.artwork_url}
+            fallback={track.user?.avatar_url}
+            alt={track.title}
+            size="100%"
+            rounded={0}
+          />
         </Link>
         {/* The overlay is click-through so the artwork link underneath still works. */}
         <div className="pointer-events-none absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
@@ -96,7 +102,13 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
       ) : null}
       {showArt ? (
         <Link to={to} params={params} className="shrink-0">
-          <Artwork src={track.artwork_url} alt={track.title} size={44} rounded={6} />
+          <Artwork
+            src={track.artwork_url}
+            fallback={track.user?.avatar_url}
+            alt={track.title}
+            size={44}
+            rounded={6}
+          />
         </Link>
       ) : null}
       <div className="min-w-0 flex-1">

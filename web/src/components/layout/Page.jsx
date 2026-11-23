@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils.js';
 import { Skeleton } from '@/components/ui/skeleton.jsx';
 
@@ -94,6 +95,22 @@ export function PersonGrid({ children, className }) {
 
 export function TrackList({ children, className }) {
   return <div className={cn('flex flex-col gap-0.5', className)}>{children}</div>;
+}
+
+/*
+ * The bottom of every paged list. The element it renders is the sentinel the
+ * scroll observer watches, so the wheel doubles as the trigger target.
+ */
+export function LoadMore({ sentinelRef, loading, done, doneLabel }) {
+  return (
+    <div ref={sentinelRef} className="flex h-16 items-center justify-center text-muted-foreground">
+      {loading ? (
+        <Loader2 size={20} className="animate-spin" aria-label="Loading more" />
+      ) : done && doneLabel ? (
+        <span className="text-xs">{doneLabel}</span>
+      ) : null}
+    </div>
+  );
 }
 
 export function CardGridSkeleton({ count = 12 }) {

@@ -10,6 +10,11 @@ import { SettingsPage } from './pages/SettingsPage.jsx';
 import { ActivityPage } from './pages/ActivityPage.jsx';
 import { NotFoundPage } from './pages/NotFoundPage.jsx';
 import {
+  TrackLikersPage,
+  TrackPlaylistsPage,
+  TrackAlbumsPage,
+} from './pages/TrackListPages.jsx';
+import {
   LikesPage,
   RepostsPage,
   FollowingPage,
@@ -48,6 +53,25 @@ const trackRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/track/$id',
   component: TrackPage,
+});
+
+// The counts under a song open these instead of a modal.
+const trackLikersRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/track/$id/likes',
+  component: TrackLikersPage,
+});
+
+const trackPlaylistsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/track/$id/playlists',
+  component: TrackPlaylistsPage,
+});
+
+const trackAlbumsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/track/$id/albums',
+  component: TrackAlbumsPage,
 });
 
 const playlistRoute = createRoute({
@@ -117,6 +141,9 @@ const routeTree = rootRoute.addChildren([
     homeRoute,
     searchRoute,
     trackRoute,
+    trackLikersRoute,
+    trackPlaylistsRoute,
+    trackAlbumsRoute,
     playlistRoute,
     artistRoute,
     settingsRoute,

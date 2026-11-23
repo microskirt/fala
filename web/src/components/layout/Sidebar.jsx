@@ -2,7 +2,6 @@ import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
 import {
   Home,
   Search,
-  Radio,
   Heart,
   ListMusic,
   Repeat2,
@@ -18,6 +17,7 @@ import {
 import { useAuth } from '@/context/AuthContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { Avatar } from '@/components/Media.jsx';
+import { BrandMark } from '@/components/Brand.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import {
   DropdownMenu,
@@ -76,9 +76,7 @@ export function Sidebar({ open, onNavigate }) {
       )}
     >
       <Link to="/" onClick={onNavigate} className="flex items-center gap-2.5 px-5 py-4">
-        <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-          <Radio size={16} strokeWidth={2.4} />
-        </span>
+        <BrandMark size={32} className="shrink-0 rounded-lg" />
         <span className="leading-tight">
           <span className="block text-sm font-semibold tracking-tight">Fala</span>
           <span className="block text-xs text-muted-foreground">A working SoundCloud</span>
@@ -109,8 +107,20 @@ export function Sidebar({ open, onNavigate }) {
                 count={counts.playlists || null}
                 onClick={onNavigate}
               />
-              <NavLink to="/reposts" icon={Repeat2} label="Reposts" onClick={onNavigate} />
-              <NavLink to="/following" icon={Users} label="Following" onClick={onNavigate} />
+              <NavLink
+                to="/reposts"
+                icon={Repeat2}
+                label="Reposts"
+                count={counts.reposts || null}
+                onClick={onNavigate}
+              />
+              <NavLink
+                to="/following"
+                icon={Users}
+                label="Following"
+                count={counts.following || null}
+                onClick={onNavigate}
+              />
               <NavLink to="/history" icon={History} label="History" onClick={onNavigate} />
               <NavLink to="/activity" icon={Bell} label="Activity" onClick={onNavigate} />
             </>

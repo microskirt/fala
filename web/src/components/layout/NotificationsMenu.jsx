@@ -13,14 +13,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx';
 
+/*
+ * The feed's own types, in SoundCloud's words. `affiliation` is a follow, and
+ * `mention` is the type a reply to your comment arrives as.
+ */
 const COPY = {
-  'track-like': { verb: 'liked your track', icon: Heart },
-  'track-repost': { verb: 'reposted your track', icon: Repeat2 },
-  'playlist-like': { verb: 'liked your playlist', icon: ListMusic },
-  'playlist-repost': { verb: 'reposted your playlist', icon: ListMusic },
-  comment: { verb: 'commented on your track', icon: MessageSquare },
-  'comment-like': { verb: 'liked your comment', icon: Heart },
-  affiliation: { verb: 'added you as a collaborator', icon: UserPlus },
+  'track-like': { verb: 'liked', icon: Heart },
+  'track-repost': { verb: 'reposted', icon: Repeat2 },
+  'playlist-like': { verb: 'liked', icon: ListMusic },
+  'playlist-repost': { verb: 'reposted', icon: ListMusic },
+  comment: { verb: 'commented on', icon: MessageSquare },
+  mention: { verb: 'replied to your comment on', icon: MessageSquare },
+  affiliation: { verb: 'followed you', icon: UserPlus },
   follow: { verb: 'followed you', icon: UserPlus },
 };
 
@@ -130,6 +134,15 @@ export function NotificationsMenu() {
               const meta = COPY[n.type] || { verb: 'sent you an update', icon: Bell };
               const Icon = meta.icon;
               const track = n.track;
+              const playlist = n.playlist;
+              const target = track || playlist;
+              const isFollow = n.type === 'affiliation' || n.type === 'follow';
+
+              /*
+               * The song belongs inside the sentence, not under it: name, verb,
+               * then the title in quotes with its thumbnail right there. A
+               * follow has no object at all, so it stays a single line.
+               */
               return (
                 <div
                   key={n.id}
@@ -143,36 +156,66 @@ export function NotificationsMenu() {
                     <Avatar src={n.user?.avatar_url} name={n.user?.username} size={32} />
                   </Link>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm leading-snug">
+                    <div className="text-sm leading-snug text-muted-foreground">
                       <Link
                         to="/artist/$id"
                         params={{ id: String(n.user?.id) }}
-                        className="font-semibold hover:underline"
+                        className="font-semibold text-foreground hover:underline"
                       >
                         {n.user?.username || 'Someone'}
                       </Link>{' '}
-                      <span className="text-muted-foreground">{meta.verb}</span>
+                      {meta.verb}
+                      {target && !isFollow ? (
+                        <>
+                          {' '}
+                          <Link
+                            to={track ? '/track/$id' : '/playlist/$id'}
+                            params={{
+                              id: track ? String(track.id) : `sc:${playlist.id}`,
+                            }}
+                            className="font-medium text-foreground hover:underline"
+                          >
+                            {track ? track.title : playlist.title}
+                          </Link>
+                        </>
+                      ) : null}
                     </div>
+
                     {n.comment?.body ? (
-                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                        {n.comment.body}
-                      </p>
-                    ) : null}
-                    {track ? (
-                      <Link
-                        to="/track/$id"
-                        params={{ id: String(track.id) }}
-                        className="mt-1 flex items-center gap-2"
-                      >
-                        <Artwork src={track.artwork_url} alt={track.title} size={32} rounded={4} />
-                        <span className="min-w-0 truncate text-xs font-medium hover:underline">
-                          {track.title}
-                        </span>
-                      </Link>
-                    ) : null}
-                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                      <Icon size={12} /> {timeAgo(n.created_at)}
-                    </div>
+                      <div className="mt-1.5 flex items-start gap-2">
+                        {target ? (
+                          <Link
+                            to={track ? '/track/$id' : '/playlist/$id'}
+                            params={{
+                              id: track ? String(track.id) : `sc:${playlist.id}`,
+                            }}
+                            className="shrink-0"
+                            aria-label={track ? track.title : playlist.title}
+                          >
+                            <Artwork
+                              src={target.artwork_url}
+                              fallback={track?.user?.avatar_url}
+                              alt={track ? track.title : playlist.title}
+                              size={34}
+                              rounded={4}
+                              kind={track ? 'track' : 'playlist'}
+                            />
+                          </Link>
+                        ) : null}
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-xs leading-snug text-foreground/90">
+                            {n.comment.body}
+                          </p>
+                          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Icon size={11} /> {timeAgo(n.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Icon size={11} /> {timeAgo(n.created_at)}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

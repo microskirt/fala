@@ -13,18 +13,20 @@ import {
   Play,
   MessageSquare,
 } from 'lucide-react';
-import { api, formatCount, formatDate } from '@/api.js';
+import { api, artwork, formatCount, formatDate } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
 import { Avatar, Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx';
 import { TrackCard, PlaylistCard, ArtistRow } from '@/components/Cards.jsx';
 import { FollowButton } from '@/components/Controls.jsx';
-import { Page, CardGrid, PersonGrid } from '@/components/layout/Page.jsx';
+import { Page, CardGrid, PersonGrid, LoadMore } from '@/components/layout/Page.jsx';
+import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Modal } from '@/components/Modal.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { cn } from '@/lib/utils.js';
+import { placeLabel } from '@/lib/places.js';
 
 const TABS = [
   { id: 'tracks', label: 'Tracks', icon: Music2 },
@@ -67,6 +69,7 @@ export function ProfilePage() {
   const [tabLoading, setTabLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const toast = useToast();
@@ -142,6 +145,12 @@ export function ProfilePage() {
     if (profile && tab) loadTab(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, tab]);
+
+  const tabSentinel = useAutoLoad({
+    hasMore: !!tabData.next_href,
+    loading: loadingMore,
+    onLoad: () => loadTab(tab, tabData.next_href),
+  });
 
   if (loading) {
     return (
@@ -258,12 +267,21 @@ export function ProfilePage() {
         />
         <div className="px-5 pb-6">
           <div className="-mt-14 flex flex-wrap items-end gap-4">
-            <Avatar
-              src={profile.avatar_url}
-              name={profile.username}
-              size={116}
-              className="ring-4 ring-card"
-            />
+            <button
+              type="button"
+              onClick={() => profile.avatar_url && setPhotoOpen(true)}
+              disabled={!profile.avatar_url}
+              aria-label={profile.avatar_url ? `Open ${profile.username}'s picture` : undefined}
+              className={cn(
+                'group relative rounded-full ring-4 ring-card transition-shadow',
+                profile.avatar_url ? 'cursor-zoom-in hover:ring-primary/60' : 'cursor-default'
+              )}
+            >
+              <Avatar src={profile.avatar_url} name={profile.username} size={116} />
+              {profile.avatar_url ? (
+                <span className="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover:bg-black/20" />
+              ) : null}
+            </button>
             <div className="min-w-0 flex-1 pb-1">
               <h1 className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
                 {profile.username}
@@ -320,12 +338,11 @@ export function ProfilePage() {
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {profile.city ? (
+            {placeLabel(profile.city, profile.country_code) ? (
               <span className="inline-flex items-center gap-1.5">
-                <MapPin size={14} /> {profile.city}
+                <MapPin size={14} /> {placeLabel(profile.city, profile.country_code)}
               </span>
             ) : null}
-            {profile.country_code ? <span>{profile.country_code}</span> : null}
             {profile.created_at ? (
               <span className="inline-flex items-center gap-1.5">
                 <Calendar size={14} /> Joined {formatDate(profile.created_at)}
@@ -381,18 +398,17 @@ export function ProfilePage() {
         />
       </Modal>
 
-      {tabData.next_href ? (
-        <div className="mt-6 flex justify-center">
-          <Button
-            variant="outline"
-            onClick={() => loadTab(tab, tabData.next_href)}
-            disabled={loadingMore}
-          >
-            {loadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
-            {loadingMore ? 'Loading…' : 'Load more'}
-          </Button>
-        </div>
-      ) : null}
+      <LoadMore sentinelRef={tabSentinel} loading={loadingMore} />
+
+      <Modal open={photoOpen} onClose={() => setPhotoOpen(false)} wide>
+        {profile.avatar_url ? (
+          <img
+            src={artwork(profile.avatar_url, 'original')}
+            alt={profile.username}
+            className="mx-auto max-h-[70vh] w-auto rounded-lg object-contain"
+          />
+        ) : null}
+      </Modal>
     </Page>
   );
 }
