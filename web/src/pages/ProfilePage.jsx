@@ -7,13 +7,10 @@ import {
   ListMusic,
   Heart,
   Repeat2,
-  Users,
   BadgeCheck,
-  Pencil,
   Settings2,
   Loader2,
   Play,
-  UserPlus,
 } from 'lucide-react';
 import { api, formatCount, formatDate } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -32,16 +29,24 @@ const TABS = [
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
   { id: 'reposts', label: 'Reposts', icon: Repeat2 },
   { id: 'likes', label: 'Likes', icon: Heart },
-  { id: 'followers', label: 'Followers', icon: Users },
-  { id: 'followings', label: 'Following', icon: UserPlus },
 ];
 
-function Stat({ value, label }) {
-  return (
-    <span className="text-xs text-muted-foreground">
+function Stat({ value, label, onClick }) {
+  const inner = (
+    <>
       <strong className="font-semibold text-foreground tabular-nums">{formatCount(value)}</strong>{' '}
       {label}
-    </span>
+    </>
+  );
+  if (!onClick) return <span className="text-xs text-muted-foreground">{inner}</span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground hover:[&_strong]:underline"
+    >
+      {inner}
+    </button>
   );
 }
 
@@ -244,22 +249,11 @@ export function ProfilePage() {
             </div>
             <div className="flex items-center gap-2 pb-1">
               {isOwn ? (
-                <>
-                  <Button variant="outline" asChild>
-                    <a
-                      href="https://soundcloud.com/settings/profile"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Pencil size={16} /> Edit on SoundCloud
-                    </a>
-                  </Button>
-                  <Button variant="ghost" asChild>
-                    <Link to="/settings">
-                      <Settings2 size={16} /> Settings
-                    </Link>
-                  </Button>
-                </>
+                <Button variant="ghost" asChild>
+                  <Link to="/settings">
+                    <Settings2 size={16} /> Settings
+                  </Link>
+                </Button>
               ) : (
                 <>
                   <FollowButton target={profile} />
@@ -278,8 +272,16 @@ export function ProfilePage() {
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5">
             <Stat value={profile.track_count} label="tracks" />
             <Stat value={profile.playlist_count} label="playlists" />
-            <Stat value={profile.followers_count} label="followers" />
-            <Stat value={profile.followings_count} label="following" />
+            <Stat
+              value={profile.followers_count}
+              label="followers"
+              onClick={() => setTab('followers')}
+            />
+            <Stat
+              value={profile.followings_count}
+              label="following"
+              onClick={() => setTab('followings')}
+            />
           </div>
 
           {profile.description ? (

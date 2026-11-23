@@ -3,7 +3,6 @@ import { AppShell } from './components/layout/AppShell.jsx';
 import { AuthPage } from './pages/AuthPage.jsx';
 import { HomePage } from './pages/HomePage.jsx';
 import { SearchPage } from './pages/SearchPage.jsx';
-import { DiscoverPage } from './pages/DiscoverPage.jsx';
 import { TrackPage } from './pages/TrackPage.jsx';
 import { PlaylistPage } from './pages/PlaylistPage.jsx';
 import { ProfilePage } from './pages/ProfilePage.jsx';
@@ -44,12 +43,6 @@ const searchRoute = createRoute({
   path: '/search',
   validateSearch: (s) => ({ q: str(s.q), filter: str(s.filter, 'all') }),
   component: SearchPage,
-});
-
-const discoverRoute = createRoute({
-  getParentRoute: () => shellRoute,
-  path: '/discover',
-  component: DiscoverPage,
 });
 
 const trackRoute = createRoute({
@@ -130,7 +123,6 @@ const routeTree = rootRoute.addChildren([
   shellRoute.addChildren([
     homeRoute,
     searchRoute,
-    discoverRoute,
     trackRoute,
     playlistRoute,
     artistRoute,

@@ -216,6 +216,11 @@ route('GET', '/api/me/reposts', async (ctx) => {
   return data;
 });
 
+route('GET', '/api/me/counts', async (ctx) => {
+  const token = requireToken(ctx);
+  return sc.myCounts(token);
+});
+
 route('GET', '/api/me/playlists', async (ctx) => {
   const token = requireToken(ctx);
   return sc.myPlaylists(token, {
@@ -272,7 +277,8 @@ route('GET', '/api/next', async (ctx) => {
 /* ---------------------------------- home ---------------------------------- */
 
 route('GET', '/api/home', async (ctx) => {
-  const sections = await sc.home();
+  // mixed-selections is personalised only when the token is present.
+  const sections = await sc.home({ token: ctx.token || null });
   const flags = await flagsFor(ctx.token);
   return {
     sections: sections.map((s) => ({ ...s, items: decorateItems(s.items, flags) })),

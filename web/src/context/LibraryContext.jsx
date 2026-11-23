@@ -85,18 +85,21 @@ export function LibraryProvider({ children }) {
       setCounts({ likes: 0, playlists: 0, following: 0 });
       return;
     }
+    // The list endpoints carry no totals, so real counts come from the counts
+    // endpoint. The playlist list itself only feeds the add-to-playlist menu.
     try {
-      const [pl, likes, following] = await Promise.all([
-        api.get('/api/me/playlists').catch(() => ({ collection: [] })),
-        api.get('/api/me/likes').catch(() => ({ collection: [] })),
-        api.get('/api/me/following').catch(() => ({ collection: [] })),
+      const [pl, counts] = await Promise.all([
+        api.get('/api/me/playlists?limit=200').catch(() => ({ collection: [] })),
+        api.get('/api/me/counts').catch(() => null),
       ]);
       setPlaylists(pl.collection || []);
-      setCounts({
-        likes: likes.total_results ?? (likes.collection || []).length,
-        playlists: (pl.collection || []).length,
-        following: following.total_results ?? (following.collection || []).length,
-      });
+      if (counts) {
+        setCounts({
+          likes: counts.likes ?? 0,
+          playlists: counts.playlists ?? 0,
+          following: counts.following ?? 0,
+        });
+      }
     } catch {}
   }, [user]);
 

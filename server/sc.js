@@ -251,6 +251,10 @@ export function slimUser(u) {
     permalink: u.permalink,
     permalink_url: u.permalink_url || `https://soundcloud.com/${u.permalink}`,
     avatar_url: u.avatar_url,
+    banner_url:
+      u.visuals && u.visuals.enabled !== false && u.visuals.visuals?.length
+        ? u.visuals.visuals[0].visual_url
+        : null,
     description: u.description || '',
     city: u.city || '',
     country_code: u.country_code || '',
@@ -324,7 +328,11 @@ export function slimPlaylist(p) {
     title: p.title,
     description: p.description || '',
     permalink_url: p.permalink_url,
-    artwork_url: p.artwork_url || p.calculated_artwork_url || null,
+    artwork_url:
+      p.artwork_url ||
+      p.calculated_artwork_url ||
+      (Array.isArray(p.tracks) ? p.tracks.find((t) => t?.artwork_url)?.artwork_url : null) ||
+      null,
     duration: p.duration ?? 0,
     track_count: p.track_count ?? p.tracks?.length ?? 0,
     likes_count: p.likes_count ?? 0,
@@ -398,8 +406,10 @@ export async function charts({ limit = 20, next } = {}) {
   };
 }
 
-export async function mixedSelections() {
-  const data = await apiGet('/mixed-selections', { ttl: 600_000 });
+export async function mixedSelections({ token = null } = {}) {
+  // With a token SoundCloud returns the personalised shelves ("Mixed for you",
+  // "Made for you", "More of what you like"). Without it, generic editorial.
+  const data = await apiGet('/mixed-selections', { ttl: 600_000, token });
   return data.collection || [];
 }
 
@@ -477,7 +487,9 @@ export async function userTab(id, tab, { limit = 24, next, token = null } = {}) 
 function mapUserTabItem(tab, item) {
   if (!item) return null;
   if (tab === 'followers' || tab === 'followings') return slimUser(item);
-  if (tab === 'reposts') return slimTrack(item.track || (item.kind === 'track' ? item : null));
+  if (tab === 'reposts' || tab === 'likes') {
+    return slimTrack(item.track || (item.kind === 'track' ? item : null));
+  }
   if (item.kind === 'track') return slimTrack(item);
   if (item.kind === 'playlist') return slimPlaylist(item);
   if (item.kind === 'comment') return item;
@@ -617,14 +629,25 @@ export async function proxyHref(href) {
 
 /* ------------------------------- home feed ------------------------------- */
 
-export async function home() {
+export async function home({ token = null } = {}) {
   const sections = [];
   let selections = [];
   try {
-    selections = await mixedSelections();
+    selections = await mixedSelections({ token });
   } catch {}
 
+  // Editorial and promo shelves that SoundCloud serves to everyone. A signed-in
+  // listener asked for their own activity, so these are dropped for them.
+  const GENERIC = [
+    'trending-by-genre-playlists',
+    'personalised-curated-global',
+    'promo-campaign',
+    'artist-stations-global',
+  ];
+
   for (const sel of selections) {
+    const urn = String(sel.urn || '');
+    if (token && GENERIC.some((g) => urn.includes(g))) continue;
     const items = sel.items?.collection || [];
     if (!items.length) continue;
     const mapped = items
@@ -646,10 +669,13 @@ export async function home() {
     }
   }
 
-  // Trending-by-genre system playlists (hydrated)
-  const trending = selections
-    .flatMap((s) => s.items?.collection || [])
-    .filter((i) => i.kind === 'system-playlist' && i.permalink?.startsWith('trending-by-genre:'));
+  // Trending-by-genre system playlists (hydrated). Signed-in listeners get
+  // their own shelves instead of the generic genre stations.
+  const trending = token
+    ? []
+    : selections
+        .flatMap((s) => s.items?.collection || [])
+        .filter((i) => i.kind === 'system-playlist' && i.permalink?.startsWith('trending-by-genre:'));
   if (trending.length) {
     const genreSections = [];
     await Promise.all(
@@ -672,18 +698,22 @@ export async function home() {
     sections.push(...genreSections);
   }
 
-  try {
-    const ch = await charts({ limit: 20 });
-    if (ch.collection.length) {
-      sections.unshift({
-        id: 'charts',
-        title: 'Trending right now',
-        subtitle: 'The hottest tracks on SoundCloud',
-        items: ch.collection,
-        kind: 'tracks',
-      });
-    }
-  } catch {}
+  // Generic charts are the anonymous fallback. Signed-in listeners get their
+  // own mixes, so the global chart shelf would just be noise.
+  if (!token) {
+    try {
+      const ch = await charts({ limit: 20 });
+      if (ch.collection.length) {
+        sections.unshift({
+          id: 'charts',
+          title: 'Trending right now',
+          subtitle: 'The hottest tracks on SoundCloud',
+          items: ch.collection,
+          kind: 'tracks',
+        });
+      }
+    } catch {}
+  }
 
   return sections;
 }
@@ -786,7 +816,10 @@ export async function myLikes(token, { limit = 50, next } = {}) {
   const data = next
     ? await apiGet(next, { token })
     : await apiGet(`/users/${id}/track_likes?limit=${limit}`, { token });
-  return mapCollection(data, slimTrack);
+  // Likes arrive as { kind: 'like', track: {...} } wrappers, not bare tracks.
+  return mapCollection(data, (item) =>
+    slimTrack(item?.track || (item?.kind === 'track' ? item : null))
+  );
 }
 
 export async function myReposts(token, { limit = 50, next } = {}) {
@@ -800,6 +833,45 @@ export async function myReposts(token, { limit = 50, next } = {}) {
     if (item.kind === 'track') return slimTrack(item);
     return null;
   });
+}
+
+// The list endpoints never report a total, so counts come from the account
+// object when it carries one. Some accounts report 0 there, so fall back to
+// walking the pages. Bounded so a huge library cannot stall the sidebar.
+export async function myCounts(token, { maxPages = 16, pageSize = 200 } = {}) {
+  const id = await meId(token);
+  const walk = async (first) => {
+    let href = first;
+    let total = 0;
+    let pages = 0;
+    while (href && pages < maxPages) {
+      const data = await apiGet(href, { token });
+      total += (data.collection || []).length;
+      href = data.next_href ? stripClientId(data.next_href) : null;
+      pages += 1;
+    }
+    return total;
+  };
+  // The account object carries authoritative totals for most accounts, but
+  // reports 0 for some. Walk the pages only when a total is missing or 0.
+  const account = await me(token).catch(() => null);
+  const reported = {
+    likes: account?.likes_count ?? 0,
+    following: account?.followings_count ?? 0,
+    playlists: account?.playlist_count ?? 0,
+  };
+  const [likes, following, playlists] = await Promise.all([
+    reported.likes > 0
+      ? reported.likes
+      : walk(`/users/${id}/track_likes?limit=${pageSize}`).catch(() => 0),
+    reported.following > 0
+      ? reported.following
+      : walk(`/users/${id}/followings?limit=${pageSize}`).catch(() => 0),
+    reported.playlists > 0
+      ? reported.playlists
+      : walk(`/users/${id}/playlists?limit=${pageSize}`).catch(() => 0),
+  ]);
+  return { likes, following, playlists };
 }
 
 export async function myPlaylists(token, { limit = 50, next } = {}) {

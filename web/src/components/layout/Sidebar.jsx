@@ -13,11 +13,20 @@ import {
   LogIn,
   History,
   LogOut,
+  ChevronUp,
+  User,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { Avatar } from '@/components/Media.jsx';
 import { Button } from '@/components/ui/button.jsx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu.jsx';
 import { cn } from '@/lib/utils.js';
 
 function NavLink({ to, icon: Icon, label, count, onClick }) {
@@ -81,7 +90,6 @@ export function Sidebar({ open, onNavigate }) {
         <div className="flex flex-col gap-0.5">
           <NavLink to="/" icon={Home} label="Home" onClick={onNavigate} />
           <NavLink to="/search" icon={Search} label="Search" onClick={onNavigate} />
-          <NavLink to="/discover" icon={Radio} label="Discover" onClick={onNavigate} />
         </div>
 
         <NavHeading>Your library</NavHeading>
@@ -106,47 +114,52 @@ export function Sidebar({ open, onNavigate }) {
               <NavLink to="/reposts" icon={Repeat2} label="Reposts" onClick={onNavigate} />
               <NavLink to="/following" icon={Users} label="Following" onClick={onNavigate} />
               <NavLink to="/history" icon={History} label="History" onClick={onNavigate} />
+              <NavLink to="/activity" icon={Bell} label="Activity" onClick={onNavigate} />
             </>
           ) : null}
-        </div>
-
-        <NavHeading>Account</NavHeading>
-        <div className="flex flex-col gap-0.5">
-          {isAuthed ? (
-            <NavLink to="/activity" icon={Bell} label="Activity" onClick={onNavigate} />
-          ) : null}
-          <NavLink to="/settings" icon={Settings} label="Settings" onClick={onNavigate} />
         </div>
       </nav>
 
       <div className="border-t border-sidebar-border p-3">
         {isAuthed && user ? (
-          <div className="flex flex-col gap-2">
-            <Link
-              to="/artist/$id"
-              params={{ id: String(user.id) }}
-              onClick={onNavigate}
-              className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-sidebar-accent/60"
-            >
-              <Avatar src={user.avatar_url} name={user.username} size={32} />
-              <div className="min-w-0 leading-tight">
-                <div className="truncate text-sm font-semibold">{user.username}</div>
-                <div className="truncate text-xs text-muted-foreground">@{user.permalink}</div>
-              </div>
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-muted-foreground"
-              onClick={async () => {
-                await logout();
-                onNavigate?.();
-                navigate({ to: '/' });
-              }}
-            >
-              <LogOut size={16} /> Sign out
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-sidebar-accent/60 data-[state=open]:bg-sidebar-accent/60"
+                aria-label="Account menu"
+              >
+                <Avatar src={user.avatar_url} name={user.username} size={32} />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-sm font-semibold">{user.username}</div>
+                  <div className="truncate text-xs text-muted-foreground">@{user.permalink}</div>
+                </div>
+                <ChevronUp size={14} className="shrink-0 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-[224px]">
+              <DropdownMenuItem asChild>
+                <Link to="/artist/$id" params={{ id: String(user.id) }} onClick={onNavigate}>
+                  <User size={16} /> Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/settings" onClick={onNavigate}>
+                  <Settings size={16} /> Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={async () => {
+                  await logout();
+                  onNavigate?.();
+                  navigate({ to: '/' });
+                }}
+              >
+                <LogOut size={16} /> Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <Button
             className="w-full"

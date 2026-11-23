@@ -4,7 +4,7 @@ import { Play, RefreshCw, Radio } from 'lucide-react';
 import { api, timeAgo } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
-import { TrackCard, PlaylistCard, SectionScroller } from '@/components/Cards.jsx';
+import { TrackCard, PlaylistCard, ArtistCard, SectionScroller } from '@/components/Cards.jsx';
 import { Artwork, Avatar, ErrorState, EmptyState } from '@/components/Media.jsx';
 import { PlayButton, LikeButton } from '@/components/Controls.jsx';
 import { Page, PageHeader, Section, CardGridSkeleton } from '@/components/layout/Page.jsx';
@@ -134,7 +134,11 @@ export function HomePage() {
     <Page>
       <PageHeader
         title={`${greeting()}${isAuthed && user ? `, ${user.username}` : ''}`}
-        description="What is moving on SoundCloud right now, streamed through Fala."
+        description={
+          isAuthed
+            ? 'Mixes, stations and tracks picked from what you listen to.'
+            : 'Mixes and tracks picked for you by SoundCloud.'
+        }
       />
 
       {loading ? (
@@ -158,7 +162,7 @@ export function HomePage() {
             </Button>
           }
         >
-          Try refreshing, or explore the Discover page for trending music.
+          Try refreshing in a moment.
         </EmptyState>
       ) : (
         sections.map((section) => {
@@ -180,6 +184,8 @@ export function HomePage() {
           }
 
           const tracks = section.items.filter((i) => i.kind === 'track');
+          const isPlaylistish = (kind) =>
+            kind === 'playlist' || kind === 'system-playlist' || kind === 'album';
 
           return (
             <SectionScroller
@@ -194,11 +200,13 @@ export function HomePage() {
                 ) : null
               }
             >
-              {section.items.map((item) =>
+              {section.items.map((item, i) =>
                 item.kind === 'track' ? (
-                  <TrackCard key={item.id} track={item} context={tracks} />
-                ) : item.kind === 'playlist' ? (
-                  <PlaylistCard key={item.id} playlist={item} />
+                  <TrackCard key={`t-${item.id}-${i}`} track={item} context={tracks} />
+                ) : isPlaylistish(item.kind) ? (
+                  <PlaylistCard key={`p-${item.id}-${i}`} playlist={item} />
+                ) : item.kind === 'user' ? (
+                  <ArtistCard key={`u-${item.id}-${i}`} user={item} />
                 ) : null
               )}
             </SectionScroller>
