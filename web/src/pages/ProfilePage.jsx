@@ -27,6 +27,8 @@ import { Button } from '@/components/ui/button.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { cn } from '@/lib/utils.js';
 import { placeLabel } from '@/lib/places.js';
+import { ClampedText } from '@/components/ClampedText.jsx';
+import { resolveUserParam } from '@/lib/scRoute.js';
 
 const TABS = [
   { id: 'tracks', label: 'Tracks', icon: Music2 },
@@ -57,7 +59,14 @@ function Stat({ value, label, onClick }) {
 }
 
 export function ProfilePage() {
-  const { id } = useParams({ from: '/shell/artist/$id' });
+  /*
+   * The artist page answers on both /artist/:id and the SoundCloud shaped
+   * /:artist. A slug address carries a permalink, so it is resolved to an id
+   * before the profile is fetched.
+   */
+  const params = useParams({ strict: false });
+  const [id, setId] = useState(params.id ? String(params.id) : null);
+  const [resolveError, setResolveError] = useState(null);
   const { user: me } = useAuth();
   const { playQueue } = usePlayer();
 
@@ -90,7 +99,43 @@ export function ProfilePage() {
     }
   };
 
+  // A slug address has to become an id before the profile can be fetched.
   useEffect(() => {
+    let cancelled = false;
+    if (params.id) {
+      setId(String(params.id));
+      setResolveError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setId(null);
+    setLoading(true);
+    (async () => {
+      try {
+        const resolved = await resolveUserParam({ artist: params.artist });
+        if (cancelled) return;
+        if (!resolved) {
+          setResolveError('Profile not found');
+          setLoading(false);
+          return;
+        }
+        setResolveError(null);
+        setId(resolved);
+      } catch (err) {
+        if (!cancelled) {
+          setResolveError(err.message || 'Profile not found');
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, params.artist]);
+
+  useEffect(() => {
+    if (!id) return undefined;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -167,11 +212,11 @@ export function ProfilePage() {
     );
   }
 
-  if (error || !profile) {
+  if (error || resolveError || !profile) {
     return (
       <Page>
         <ErrorState
-          message={error || 'Profile not found'}
+          message={error || resolveError || 'Profile not found'}
           onRetry={() => window.location.reload()}
         />
       </Page>
@@ -254,8 +299,12 @@ export function ProfilePage() {
   return (
     <Page>
       <div className="overflow-hidden rounded-xl border bg-card">
+        {/*
+         * The picture sits on the banner, the way SoundCloud shows it, instead
+         * of straddling the edge between the banner and the text below.
+         */}
         <div
-          className="h-44 w-full bg-muted"
+          className="relative h-56 w-full bg-muted sm:h-64"
           style={
             profile.banner_url
               ? { backgroundImage: `url(${profile.banner_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -264,32 +313,33 @@ export function ProfilePage() {
                     'linear-gradient(120deg, color-mix(in srgb, var(--primary) 28%, var(--card)), var(--card))',
                 }
           }
-        />
-        <div className="px-5 pb-6">
-          <div className="-mt-14 flex flex-wrap items-end gap-4">
-            <button
-              type="button"
-              onClick={() => profile.avatar_url && setPhotoOpen(true)}
-              disabled={!profile.avatar_url}
-              aria-label={profile.avatar_url ? `Open ${profile.username}'s picture` : undefined}
-              className={cn(
-                'group relative rounded-full ring-4 ring-card transition-shadow',
-                profile.avatar_url ? 'cursor-zoom-in hover:ring-primary/60' : 'cursor-default'
-              )}
-            >
-              <Avatar src={profile.avatar_url} name={profile.username} size={116} />
-              {profile.avatar_url ? (
-                <span className="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover:bg-black/20" />
-              ) : null}
-            </button>
-            <div className="min-w-0 flex-1 pb-1">
+        >
+          <button
+            type="button"
+            onClick={() => profile.avatar_url && setPhotoOpen(true)}
+            disabled={!profile.avatar_url}
+            aria-label={profile.avatar_url ? `Open ${profile.username}'s picture` : undefined}
+            className={cn(
+              'group absolute bottom-4 left-4 rounded-full ring-4 ring-card transition-shadow sm:bottom-5 sm:left-5',
+              profile.avatar_url ? 'cursor-zoom-in hover:ring-primary/60' : 'cursor-default'
+            )}
+          >
+            <Avatar src={profile.avatar_url} name={profile.username} size={148} />
+            {profile.avatar_url ? (
+              <span className="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover:bg-black/20" />
+            ) : null}
+          </button>
+        </div>
+        <div className="px-5 pb-6 pt-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
               <h1 className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
                 {profile.username}
                 {profile.verified ? <BadgeCheck size={18} className="text-primary" /> : null}
               </h1>
               <div className="text-sm text-muted-foreground">@{profile.permalink}</div>
             </div>
-            <div className="flex items-center gap-2 pb-1">
+            <div className="flex items-center gap-2">
               {isOwn ? (
                 <Button variant="ghost" asChild>
                   <Link to="/settings">
@@ -332,9 +382,9 @@ export function ProfilePage() {
           </div>
 
           {profile.description ? (
-            <p className="mt-3 max-w-3xl text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              {profile.description}
-            </p>
+            <div className="mt-3 max-w-3xl">
+              <ClampedText text={profile.description} lines={4} />
+            </div>
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -400,13 +450,19 @@ export function ProfilePage() {
 
       <LoadMore sentinelRef={tabSentinel} loading={loadingMore} />
 
+      {/*
+       * The picture leaves room at the top for the close button, so the button
+       * never sits on top of the image.
+       */}
       <Modal open={photoOpen} onClose={() => setPhotoOpen(false)} wide>
         {profile.avatar_url ? (
-          <img
-            src={artwork(profile.avatar_url, 'original')}
-            alt={profile.username}
-            className="mx-auto max-h-[70vh] w-auto rounded-lg object-contain"
-          />
+          <div className="pt-4">
+            <img
+              src={artwork(profile.avatar_url, 'original')}
+              alt={profile.username}
+              className="mx-auto max-h-[62vh] w-auto rounded-lg object-contain"
+            />
+          </div>
         ) : null}
       </Modal>
     </Page>

@@ -44,10 +44,15 @@ function DialogContent({ className, children, showCloseButton = true, ...props }
         {...props}
       >
         {children}
+        {/*
+         * A boxed close button, matching the clear button in the search field:
+         * the whole square is the target and it lights up on hover, instead of
+         * a bare glyph floating in the corner.
+         */}
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="ring-offset-background focus-visible:ring-ring absolute top-4 right-4 rounded-md opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none"
+            className="ring-offset-background focus-visible:ring-ring absolute top-3 right-3 grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none"
           >
             <X className="size-4" />
             <span className="sr-only">Close</span>

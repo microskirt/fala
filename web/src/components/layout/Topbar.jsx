@@ -118,9 +118,14 @@ export function Topbar({ onToggleSidebar }) {
             size={16}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
+          {/*
+           * A plain text input, not type="search": the search type makes the
+           * browser draw its own clear button next to ours, which reads as a
+           * second, slightly different looking control.
+           */}
           <Input
             ref={inputRef}
-            type="search"
+            type="text"
             placeholder="Search tracks, artists and playlists"
             className="h-9 pl-9 pr-9"
             value={term}
