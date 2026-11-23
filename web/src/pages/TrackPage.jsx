@@ -452,27 +452,74 @@ function playlistRow(p, onClose) {
  */
 function AlsoLiked({ people }) {
   const [open, setOpen] = useState(false);
+  const rowRef = useRef(null);
+  const [rowWidth, setRowWidth] = useState(0);
+
+  /*
+   * The stack fills whatever room the card has, so the width is measured rather
+   * than assumed. A resize observer keeps it right when the sidebar changes
+   * width or the window is resized.
+   */
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return undefined;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) setRowWidth(entry.contentRect.width);
+    });
+    observer.observe(el);
+    setRowWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+
   if (!people || people.length === 0) return null;
 
-  const shown = people.slice(0, 3);
-  const rest = people.length - shown.length;
+  /*
+   * 26px pictures overlap by 8px, so the row is 8px wider than a bare face and
+   * every extra one adds 18px. The slack at the end keeps the last picture off
+   * the border; when not everyone fits, one slot goes to the "..." chip so the
+   * row still stops short of the edge.
+   */
+  const FACE = 26;
+  const STEP = 18;
+  const OVERLAP = 8;
+  const SLACK = 8;
+  const fit = rowWidth
+    ? Math.max(1, Math.floor((rowWidth - SLACK - OVERLAP) / STEP))
+    : 3;
+  const crowded = people.length > fit;
+  const faces = crowded ? people.slice(0, Math.max(1, fit - 1)) : people;
+
+  // The sentence stays short no matter how many faces fit above it.
+  const named = people.slice(0, 3);
+  const rest = people.length - named.length;
 
   return (
-    <div className="flex flex-wrap items-center gap-2.5 rounded-xl border bg-card px-3 py-2.5">
-      <div className="flex -space-x-2">
-        {shown.map((u) => (
+    <div className="rounded-xl border bg-card px-3 py-2.5">
+      <div ref={rowRef} className="flex items-center -space-x-2 pb-2">
+        {faces.map((u) => (
           <Link
             key={u.id}
             {...userLink(u)}
-            className="relative rounded-full ring-2 ring-background"
+            className="relative shrink-0 rounded-full ring-2 ring-background"
             title={u.username}
           >
-            <Avatar src={u.avatar_url} name={u.username} size={26} />
+            <Avatar src={u.avatar_url} name={u.username} size={FACE} />
           </Link>
         ))}
+        {crowded ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="relative z-10 flex shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground ring-2 ring-background transition-colors hover:bg-accent hover:text-foreground"
+            style={{ width: FACE, height: FACE }}
+            title={`${people.length} people you follow liked this`}
+          >
+            ...
+          </button>
+        ) : null}
       </div>
       <p className="min-w-0 text-sm text-muted-foreground">
-        {shown.map((u, i) => (
+        {named.map((u, i) => (
           <span key={u.id}>
             <Link
               {...userLink(u)}
@@ -480,7 +527,7 @@ function AlsoLiked({ people }) {
             >
               {u.username}
             </Link>
-            {i < shown.length - 1 ? ', ' : ''}
+            {i < named.length - 1 ? ', ' : ''}
           </span>
         ))}
         {rest > 0 ? (
