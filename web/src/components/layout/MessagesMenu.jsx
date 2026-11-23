@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx';
+import { cn } from '@/lib/utils.js';
 
 // The other person in a conversation, since the list includes both sides.
 function otherUser(conversation, meId) {
@@ -104,7 +105,7 @@ export function MessagesMenu() {
           <MessageSquare size={18} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[380px] p-0">
+      <DropdownMenuContent align="end" className="w-[min(380px,calc(100vw-1rem))] overflow-x-hidden p-0">
         <div className="flex items-center justify-between px-3 py-2.5">
           {active ? (
             <button
@@ -124,8 +125,8 @@ export function MessagesMenu() {
         <DropdownMenuSeparator className="my-0" />
 
         {active ? (
-          <div className="flex max-h-[420px] flex-col">
-            <div className="min-h-[140px] flex-1 overflow-y-auto p-3">
+          <div className="flex min-w-0 max-h-[420px] flex-col">
+            <div className="scrollbar-thin min-h-[140px] min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3">
               {loadingThread ? (
                 <div className="flex items-center justify-center py-8 text-muted-foreground">
                   <Loader2 size={16} className="animate-spin" />
@@ -140,16 +141,18 @@ export function MessagesMenu() {
                   return (
                     <div
                       key={m.id}
-                      className={mine ? 'mb-2 flex justify-end' : 'mb-2 flex justify-start'}
+                      className={cn(
+                        'mb-2 flex min-w-0',
+                        mine ? 'justify-end' : 'justify-start'
+                      )}
                     >
                       <div
-                        className={
-                          mine
-                            ? 'max-w-[80%] rounded-lg bg-primary px-2.5 py-1.5 text-sm text-primary-foreground'
-                            : 'max-w-[80%] rounded-lg bg-muted px-2.5 py-1.5 text-sm'
-                        }
+                        className={cn(
+                          'max-w-[80%] min-w-0 rounded-lg px-2.5 py-1.5 text-sm break-words [overflow-wrap:anywhere]',
+                          mine ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                        )}
                       >
-                        {m.content}
+                        <span className="whitespace-pre-wrap">{m.content}</span>
                         {m.created_at ? (
                           <div className="mt-0.5 text-[10px] opacity-70">{timeAgo(m.created_at)}</div>
                         ) : null}
@@ -159,9 +162,9 @@ export function MessagesMenu() {
                 })
               )}
             </div>
-            <form className="flex items-center gap-1.5 border-t p-2" onSubmit={send}>
+            <form className="flex min-w-0 items-center gap-1.5 border-t p-2" onSubmit={send}>
               <Input
-                className="h-8 text-sm"
+                className="h-8 min-w-0 flex-1 text-sm"
                 placeholder="Write a message"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
@@ -182,19 +185,19 @@ export function MessagesMenu() {
             No conversations yet. Open an artist page to start one.
           </p>
         ) : (
-          <div className="max-h-[380px] overflow-y-auto">
+          <div className="scrollbar-thin max-h-[380px] overflow-y-auto overflow-x-hidden">
             {conversations.map((c) => {
               const other = otherUser(c, user?.id);
               return (
                 <button
                   key={c.id}
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-accent/60"
+                  className="flex w-full min-w-0 items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-accent/60"
                   onClick={() => openThread(c)}
                 >
                   <Avatar src={other?.avatar_url} name={other?.username} size={34} />
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate text-sm font-semibold">
                         {other?.username || 'Conversation'}
                       </span>
