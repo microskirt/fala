@@ -96,11 +96,8 @@ function VolumeControl({ volume, muted, icon: Icon, onToggleMute, onVolume }) {
       </Button>
 
       <div className="pointer-events-none absolute bottom-full left-1/2 z-50 -translate-x-1/2 pb-1.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-        <div className="flex flex-col items-center gap-1.5 rounded-lg border bg-popover px-3 py-2.5 shadow-lg">
-          <span className="text-[10px] leading-none tabular-nums text-muted-foreground">
-            {shown}
-          </span>
-          <div className="flex h-32 w-7 items-center justify-center">
+        <div className="flex flex-col items-center rounded-lg border bg-popover px-2 py-2 shadow-lg">
+          <div className="flex h-32 w-6 items-center justify-center">
             <Slider
               orientation="vertical"
               className="h-full"
