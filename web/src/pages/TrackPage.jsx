@@ -1039,12 +1039,6 @@ export function TrackPage() {
               }}
             />
           ) : null}
-
-          {track.label_name ? (
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>Label: {track.label_name}</span>
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -1066,7 +1060,7 @@ export function TrackPage() {
             <h2 className="mb-4 text-lg font-semibold tracking-tight">Details</h2>
 
             {mainTag || tags.length > 0 ? (
-              <div className="mb-4 flex flex-wrap gap-1.5">
+              <div className="mb-3 flex flex-wrap gap-1.5">
                 {mainTag ? (
                   <span
                     className="rounded-md border border-white px-2 py-0.5 text-xs text-white"
@@ -1086,6 +1080,20 @@ export function TrackPage() {
               </div>
             ) : null}
 
+            {/*
+             * The label and the license are small print, so they share one
+             * line right under the tags instead of taking a row each.
+             */}
+            {track.label_name || track.license ? (
+              <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                {track.label_name ? <span>Label: {track.label_name}</span> : null}
+                {track.label_name && track.license ? <span aria-hidden="true">-</span> : null}
+                {track.license ? (
+                  <span>License: {track.license.replace(/-/g, ' ')}</span>
+                ) : null}
+              </div>
+            ) : null}
+
             {track.description ? (
               <ClampedText text={track.description} lines={5} />
             ) : (
@@ -1093,12 +1101,6 @@ export function TrackPage() {
                 No description was written for this song.
               </p>
             )}
-
-            {track.license ? (
-              <p className="mt-4 text-xs text-muted-foreground">
-                License: {track.license.replace(/-/g, ' ')}
-              </p>
-            ) : null}
           </section>
 
           <section className="mt-12">
