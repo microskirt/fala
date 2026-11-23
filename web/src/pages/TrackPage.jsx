@@ -50,7 +50,7 @@ function Waveform({ samples, progress, onSeek, height = 96 }) {
 
   return (
     <div
-      className="flex w-full cursor-pointer items-center gap-px"
+      className="group relative flex w-full cursor-pointer items-center gap-[2px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
       ref={ref}
       style={{ height }}
       onPointerDown={(e) => {
@@ -65,6 +65,10 @@ function Waveform({ samples, progress, onSeek, height = 96 }) {
         dragging.current = false;
         e.currentTarget.releasePointerCapture?.(e.pointerId);
       }}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') onSeek?.(Math.max(0, progress - 0.01));
+        if (e.key === 'ArrowRight') onSeek?.(Math.min(1, progress + 0.01));
+      }}
       role="slider"
       aria-label="Seek within track"
       aria-valuemin={0}
@@ -74,13 +78,14 @@ function Waveform({ samples, progress, onSeek, height = 96 }) {
     >
       {samples.map((s, i) => {
         const played = i / samples.length <= progress;
-        const h = Math.max(6, Math.round((s / 255) * height));
+        // A small floor keeps quiet passages visible as a thin baseline.
+        const h = Math.max(3, Math.round((s / 255) * height));
         return (
           <span
             key={i}
             className={cn(
-              'block w-full rounded-full transition-colors',
-              played ? 'bg-primary' : 'bg-muted-foreground/35'
+              'block w-full rounded-[1px] transition-colors',
+              played ? 'bg-primary' : 'bg-muted-foreground/30 group-hover:bg-muted-foreground/45'
             )}
             style={{ height: h }}
             aria-hidden="true"

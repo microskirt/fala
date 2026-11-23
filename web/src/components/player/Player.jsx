@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from '@tanstack/react-router';
 import {
   Play,
@@ -12,16 +12,63 @@ import {
   Volume1,
   VolumeX,
   ListMusic,
-  Heart,
   Loader2,
 } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext.jsx';
-import { useLibrary } from '@/context/LibraryContext.jsx';
 import { Artwork } from '@/components/Media.jsx';
 import { formatDuration } from '@/api.js';
 import { Slider } from '@/components/ui/slider.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils.js';
+
+/*
+ * A thin seek line rather than a full slider row. SoundCloud keeps its bottom
+ * bar short, so the scrubber lives above the controls instead of inside them.
+ */
+function SeekLine({ value, max, onSeek }) {
+  const ref = useRef(null);
+  const dragging = useRef(false);
+  const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
+
+  const commit = (clientX) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    onSeek(ratio * max);
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="group relative h-1.5 w-full cursor-pointer bg-muted"
+      onPointerDown={(e) => {
+        dragging.current = true;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        commit(e.clientX);
+      }}
+      onPointerMove={(e) => {
+        if (dragging.current) commit(e.clientX);
+      }}
+      onPointerUp={(e) => {
+        dragging.current = false;
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+      }}
+      role="slider"
+      aria-label="Seek"
+      aria-valuemin={0}
+      aria-valuemax={Math.round(max)}
+      aria-valuenow={Math.round(value)}
+      tabIndex={0}
+    >
+      <div className="absolute inset-y-0 left-0 bg-primary" style={{ width: `${pct}%` }} />
+      <div
+        className="absolute top-1/2 size-2.5 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity group-hover:opacity-100"
+        style={{ left: `calc(${pct}% - 5px)` }}
+      />
+    </div>
+  );
+}
 
 export function Player() {
   const {
@@ -46,10 +93,8 @@ export function Player() {
     setRepeat,
     setQueueOpen,
   } = usePlayer();
-  const { isLiked, toggleLike } = useLibrary();
 
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
-  const liked = current ? isLiked(current) : false;
   const total = duration || current?.duration || 0;
 
   useEffect(() => {
@@ -64,15 +109,84 @@ export function Player() {
     return () => document.removeEventListener('keydown', onKey);
   }, [togglePlay]);
 
+  const toggled = 'bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary';
+
   return (
-    <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur">
-      <div className="grid h-(--player-height) grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 sm:grid-cols-[minmax(0,1fr)_minmax(240px,2fr)_minmax(0,1fr)] lg:px-4">
+    <div className="shrink-0 border-t border-border bg-card/90 backdrop-blur">
+      <SeekLine value={currentTime} max={total} onSeek={seek} />
+
+      <div className="flex h-(--player-height) items-center gap-2 px-2.5 sm:gap-3 lg:px-4">
+        {/* Transport, kept left so nothing stacks vertically. */}
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={cn('hidden sm:inline-flex', shuffle && toggled)}
+            onClick={() => setShuffle((s) => !s)}
+            aria-pressed={shuffle}
+            aria-label="Shuffle"
+            title="Shuffle"
+          >
+            <Shuffle size={15} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={prev}
+            disabled={!current}
+            aria-label="Previous"
+            title="Previous"
+          >
+            <SkipBack size={15} fill="currentColor" />
+          </Button>
+          <Button
+            size="icon"
+            className="rounded-full"
+            onClick={togglePlay}
+            disabled={!current}
+            aria-label={playing ? 'Pause' : 'Play'}
+            title={playing ? 'Pause' : 'Play'}
+          >
+            {buffering && !playing ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : playing ? (
+              <Pause size={15} fill="currentColor" />
+            ) : (
+              <Play size={15} fill="currentColor" className="ml-0.5" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={next}
+            disabled={!current}
+            aria-label="Next"
+            title="Next"
+          >
+            <SkipForward size={15} fill="currentColor" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={cn('hidden sm:inline-flex', repeat !== 'off' && toggled)}
+            onClick={() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off'))}
+            aria-pressed={repeat !== 'off'}
+            aria-label={`Repeat: ${repeat}`}
+            title={repeat === 'off' ? 'Repeat off' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
+          >
+            {repeat === 'one' ? <Repeat1 size={15} /> : <Repeat size={15} />}
+          </Button>
+          <span className="ml-1.5 hidden shrink-0 text-xs tabular-nums text-muted-foreground md:inline">
+            {formatDuration(currentTime)} / {formatDuration(total)}
+          </span>
+        </div>
+
         {/* Now playing */}
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 border-l border-border pl-2.5 sm:pl-3">
           {current ? (
             <>
               <Link to="/track/$id" params={{ id: String(current.id) }} className="shrink-0">
-                <Artwork src={current.artwork_url} alt={current.title} size={48} rounded={6} />
+                <Artwork src={current.artwork_url} alt={current.title} size={36} rounded={4} />
               </Link>
               <div className="min-w-0 leading-tight">
                 <Link
@@ -93,103 +207,39 @@ export function Player() {
                   </Link>
                 ) : null}
               </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={cn('ml-1 hidden shrink-0 sm:inline-flex', liked && 'text-rose-500')}
-                onClick={() => toggleLike(current)}
-                aria-label={liked ? 'Unlike' : 'Like'}
-              >
-                <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
-              </Button>
             </>
           ) : (
             <div className="leading-tight">
               <div className="text-sm font-medium text-muted-foreground">Nothing playing</div>
-              <div className="text-xs text-muted-foreground/70">Pick a track to get started</div>
+              <div className="hidden text-xs text-muted-foreground/70 sm:block">
+                Pick a track to get started
+              </div>
             </div>
           )}
-        </div>
-
-        {/* Transport */}
-        <div className="hidden flex-col items-center gap-1 sm:flex">
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className={cn(shuffle && 'text-primary')}
-              onClick={() => setShuffle((s) => !s)}
-              aria-pressed={shuffle}
-              aria-label="Shuffle"
-            >
-              <Shuffle size={16} />
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={prev} disabled={!current} aria-label="Previous">
-              <SkipBack size={16} fill="currentColor" />
-            </Button>
-            <Button
-              size="icon"
-              className="rounded-full"
-              onClick={togglePlay}
-              disabled={!current}
-              aria-label={playing ? 'Pause' : 'Play'}
-            >
-              {buffering && !playing ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : playing ? (
-                <Pause size={16} fill="currentColor" />
-              ) : (
-                <Play size={16} fill="currentColor" className="ml-0.5" />
-              )}
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={next} disabled={!current} aria-label="Next">
-              <SkipForward size={16} fill="currentColor" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className={cn(repeat !== 'off' && 'text-primary')}
-              onClick={() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off'))}
-              aria-label={`Repeat: ${repeat}`}
-            >
-              {repeat === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
-            </Button>
-          </div>
-
-          <div className="flex w-full items-center gap-2 text-xs tabular-nums text-muted-foreground">
-            <span className="w-9 text-right">{formatDuration(currentTime)}</span>
-            <Slider
-              value={[total > 0 ? (currentTime / total) * 100 : 0]}
-              max={100}
-              step={0.1}
-              onValueChange={([v]) => seek((v / 100) * total)}
-              aria-label="Seek"
-            />
-            <span className="w-9">{formatDuration(total)}</span>
-          </div>
           {playbackError ? (
-            <div className="text-xs text-destructive">{playbackError}</div>
+            <div className="ml-auto shrink-0 text-xs text-destructive">{playbackError}</div>
           ) : null}
         </div>
 
         {/* Right controls */}
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn(queueOpen && 'text-primary')}
+            className={cn(queueOpen && toggled)}
             onClick={() => setQueueOpen((v) => !v)}
             aria-pressed={queueOpen}
             aria-label="Queue"
+            title="Queue"
           >
-            <ListMusic size={16} />
+            <ListMusic size={15} />
           </Button>
           <div className="hidden items-center gap-1.5 md:flex">
-            <Button variant="ghost" size="icon-sm" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
-              <VolumeIcon size={16} />
+            <Button variant="ghost" size="icon-sm" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'}>
+              <VolumeIcon size={15} />
             </Button>
             <Slider
-              className="w-24"
+              className="w-20"
               value={[muted ? 0 : volume * 100]}
               max={100}
               step={1}
@@ -197,15 +247,6 @@ export function Player() {
               aria-label="Volume"
             />
           </div>
-          <Button
-            size="icon"
-            className="rounded-full sm:hidden"
-            onClick={togglePlay}
-            disabled={!current}
-            aria-label={playing ? 'Pause' : 'Play'}
-          >
-            {playing ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-          </Button>
         </div>
       </div>
     </div>

@@ -418,8 +418,10 @@ export async function chartSelections() {
   return data.collection || [];
 }
 
-export async function systemPlaylist(id, { trackLimit } = {}) {
-  const data = await apiGet(`/system-playlists/${id}`, { ttl: 300_000 });
+// Personalised system playlists (mixes, made for you, more of what you like)
+// only resolve for the owning account, so the caller's token has to go along.
+export async function systemPlaylist(id, { trackLimit, token = null } = {}) {
+  const data = await apiGet(`/system-playlists/${id}`, { ttl: 300_000, token });
   let ids = (data.tracks || []).map((t) => t.id).filter(Boolean);
   const total = ids.length;
   if (trackLimit) ids = ids.slice(0, trackLimit);
@@ -695,7 +697,8 @@ export async function waveform(url) {
   if (!res.ok) return null;
   const data = await res.json();
   const samples = data.samples || [];
-  const step = Math.max(1, Math.floor(samples.length / 200));
+  // More bars than a coarse 200 keeps the shape readable at SoundCloud's width.
+  const step = Math.max(1, Math.floor(samples.length / 280));
   const out = [];
   for (let i = 0; i < samples.length; i += step) out.push(samples[i]);
   return { width: data.width, height: data.height, samples: out };
@@ -766,7 +769,7 @@ export async function home({ token = null } = {}) {
     await Promise.all(
       trending.slice(0, 8).map(async (sp) => {
         try {
-          const pl = await systemPlaylist(sp.id, { trackLimit: 12 });
+          const pl = await systemPlaylist(sp.id, { trackLimit: 12, token });
           if (pl.tracks?.length) {
             genreSections.push({
               id: 'genre:' + sp.id,

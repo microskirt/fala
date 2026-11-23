@@ -358,7 +358,7 @@ route('GET', '/api/charts', async (ctx) => {
 });
 
 route('GET', '/api/system-playlists/:id', async (ctx) => {
-  const pl = await sc.systemPlaylist(ctx.params.id);
+  const pl = await sc.systemPlaylist(ctx.params.id, { token: ctx.token || null });
   const flags = await flagsFor(ctx.token);
   return { ...pl, tracks: (pl.tracks || []).map((t) => decorateTrack(t, flags)) };
 });
@@ -481,7 +481,7 @@ route('GET', '/api/resolve', async (ctx) => {
 route('GET', '/api/playlists/:id', async (ctx) => {
   let id = ctx.params.id;
   if (id.startsWith('system:')) {
-    const pl = await sc.systemPlaylist(decodeURIComponent(id.slice(7)));
+    const pl = await sc.systemPlaylist(decodeURIComponent(id.slice(7)), { token: ctx.token || null });
     const flags = await flagsFor(ctx.token);
     return { ...pl, tracks: (pl.tracks || []).map((t) => decorateTrack(t, flags)) };
   }
