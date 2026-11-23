@@ -33,8 +33,9 @@ import { Input } from '@/components/ui/input.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
+import { trackLink, userLink, resolvePlaylistParam } from '@/lib/scRoute.js';
 
-function PlaylistTrackRow({ track, index, context, editable, onRemove }) {
+function PlaylistTrackRow({ track, index, context }) {
   return (
     <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
       <div className="relative grid w-7 shrink-0 place-items-center text-xs text-muted-foreground">
@@ -43,13 +44,12 @@ function PlaylistTrackRow({ track, index, context, editable, onRemove }) {
           <PlayButton track={track} context={context} size="sm" />
         </span>
       </div>
-      <Link to="/track/$id" params={{ id: String(track.id) }} className="shrink-0">
+      <Link {...trackLink(track)} className="shrink-0">
         <Artwork src={track.artwork_url} alt={track.title} size={48} rounded={6} />
       </Link>
       <div className="min-w-0 flex-1">
         <Link
-          to="/track/$id"
-          params={{ id: String(track.id) }}
+          {...trackLink(track)}
           className="block truncate text-sm font-medium hover:underline"
         >
           {track.title}
@@ -57,8 +57,7 @@ function PlaylistTrackRow({ track, index, context, editable, onRemove }) {
         <div className="truncate text-xs text-muted-foreground">
           {track.user ? (
             <Link
-              to="/artist/$id"
-              params={{ id: String(track.user.id) }}
+              {...userLink(track.user)}
               className="hover:text-foreground"
             >
               {track.user.username}
@@ -73,17 +72,6 @@ function PlaylistTrackRow({ track, index, context, editable, onRemove }) {
         <AddToQueueButton track={track} size={16} />
         <AddToPlaylistButton track={track} size={16} />
         <QueueMenuButton track={track} size={16} />
-        {editable ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onRemove(track)}
-            aria-label="Remove from playlist"
-            title="Remove from playlist"
-          >
-            <Trash2 size={14} />
-          </Button>
-        ) : null}
       </div>
       <span className="w-11 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
         {formatDuration(track.duration)}
@@ -93,11 +81,17 @@ function PlaylistTrackRow({ track, index, context, editable, onRemove }) {
 }
 
 export function PlaylistPage() {
-  const { id } = useParams({ from: '/shell/playlist/$id' });
+  /*
+   * A playlist answers on /playlist/:id and on the SoundCloud shaped
+   * /:artist/sets/:playlist. The slug form carries words, so it is resolved to
+   * a numeric id before the playlist is fetched.
+   */
+  const params = useParams({ strict: false });
+  const id = params.id ? String(params.id) : null;
   const navigate = useNavigate();
   const { user } = useAuth();
   const { playQueue, addToQueue } = usePlayer();
-  const { updatePlaylist, deletePlaylist, removeTrackFromPlaylist } = useLibrary();
+  const { updatePlaylist, deletePlaylist } = useLibrary();
   const toast = useToast();
 
   const [playlist, setPlaylist] = useState(null);
@@ -112,8 +106,17 @@ export function PlaylistPage() {
     setLoading(true);
     setError(null);
     try {
+      // A slug address has to become a numeric id before the playlist is read.
+      let idStr = id;
+      if (!idStr) {
+        const resolved = await resolvePlaylistParam({
+          artist: params.artist,
+          playlist: params.playlist,
+        });
+        if (!resolved) throw new Error('Playlist not found');
+        idStr = `sc:${resolved}`;
+      }
       // ids come as `system:<id>`, `sc:<id>` or a bare playlist id.
-      const idStr = String(id);
       let path;
       if (idStr.startsWith('system:')) {
         path = `/api/playlists/system:${encodeURIComponent(idStr.slice(7))}`;
@@ -139,7 +142,7 @@ export function PlaylistPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, params.artist, params.playlist]);
 
   if (loading) {
     return (
@@ -165,7 +168,15 @@ export function PlaylistPage() {
   }
 
   const tracks = (playlist.tracks || []).filter((t) => t && t.kind === 'track');
-  const owner = playlist.user;
+  /*
+   * Recommendation mixes come from SoundCloud itself and have no person behind
+   * them. The owner line is dropped for those, and so is the "Based on ..."
+   * description, because the title already says what the mix is about.
+   */
+  const isSystem =
+    playlist.kind === 'system-playlist' || String(playlist.id).startsWith('system:');
+  const owner = isSystem ? null : playlist.user;
+  const description = /^based on\b/i.test(playlist.description || '') ? '' : playlist.description;
   const canEdit = user && owner && String(user.id) === String(owner.id);
 
   const save = async () => {
@@ -188,11 +199,6 @@ export function PlaylistPage() {
     const ok = await deletePlaylist(playlist.id);
     setBusy(false);
     if (ok) navigate({ to: '/playlists' });
-  };
-
-  const removeTrack = async (track) => {
-    const pl = await removeTrackFromPlaylist(playlist.id, track.id);
-    if (pl) setPlaylist((prev) => ({ ...prev, tracks: pl.tracks, track_count: pl.track_count }));
   };
 
   return (
@@ -226,21 +232,20 @@ export function PlaylistPage() {
             {playlist.title}
           </h1>
 
-          {playlist.description ? (
+          {description ? (
             <p className="mt-2.5 max-w-2xl text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              {playlist.description}
+              {description}
             </p>
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {owner ? (
               <>
-                <Link to="/artist/$id" params={{ id: String(owner.id) }}>
+                <Link {...userLink(owner)}>
                   <Avatar src={owner.avatar_url} name={owner.username} size={22} />
                 </Link>
                 <Link
-                  to="/artist/$id"
-                  params={{ id: String(owner.id) }}
+                  {...userLink(owner)}
                   className="font-medium text-foreground hover:underline"
                 >
                   {owner.username}
@@ -306,8 +311,6 @@ export function PlaylistPage() {
                 track={track}
                 index={i}
                 context={tracks}
-                editable={canEdit}
-                onRemove={removeTrack}
               />
             ))}
           </TrackList>
