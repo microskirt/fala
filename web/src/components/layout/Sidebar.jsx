@@ -150,7 +150,12 @@ export function Sidebar({ open, onNavigate }) {
                 </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-[224px]">
+            {/*
+             * The trigger is the full width of the sidebar footer, but the menu
+             * itself is narrower than that strip, so it is centred on the
+             * button instead of hugging the left border of the sidebar.
+             */}
+            <DropdownMenuContent side="top" align="center" className="w-[224px]">
               <DropdownMenuItem asChild>
                 <Link {...userLink(user)} onClick={onNavigate}>
                   <User size={16} /> Profile
