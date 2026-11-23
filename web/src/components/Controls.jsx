@@ -271,6 +271,7 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
               >
                 <Artwork
                   src={pl.artwork_url}
+                  fallback={pl.user?.avatar_url}
                   alt={pl.title}
                   size={40}
                   rounded={6}

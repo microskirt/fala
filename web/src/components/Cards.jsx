@@ -148,8 +148,14 @@ export function PlaylistCard({ playlist }) {
   return (
     <div className="group min-w-0">
       <Link {...playlistLink(playlist)} className="relative block overflow-hidden rounded-lg" aria-label={playlist.title}>
+        {/*
+         * A playlist can have no cover of its own. SoundCloud shows the owner's
+         * avatar in that case, so pass it as the fallback rather than leaving
+         * an empty tile with a music note.
+         */}
         <Artwork
           src={playlist.artwork_url}
+          fallback={playlist.user?.avatar_url}
           alt={playlist.title}
           size="100%"
           rounded={0}

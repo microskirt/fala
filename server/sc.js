@@ -1150,6 +1150,57 @@ export async function proxyHref(href) {
 
 /* ------------------------------- home feed ------------------------------- */
 
+/*
+ * Playlists inside the home shelves arrive without a `tracks` array, so the
+ * borrow-the-first-track-cover fallback in slimPlaylist has nothing to read and
+ * the card renders with no image. The standalone playlist endpoint does carry
+ * the tracks, so the cover is fetched for the handful of playlists per shelf
+ * that need one. Cached, because the home feed is requested on every visit.
+ */
+const coverCache = new Map();
+
+async function playlistCover(entry, token) {
+  const id = Number(entry?.id);
+  if (!Number.isFinite(id)) return null;
+  /*
+   * A private playlist only resolves for its owner, so the cache is keyed by
+   * the token as well. Otherwise one listener's cover could be served to
+   * another, and a private one would leak through the shared entry.
+   */
+  const key = `${token || ''}:${id}`;
+  const hit = coverCache.get(key);
+  if (hit && hit.exp > Date.now()) return hit.url;
+  let url = null;
+  try {
+    const data = await apiGet(`/playlists/${id}`, { ttl: 120_000, token });
+    const tracks = Array.isArray(data.tracks) ? data.tracks : [];
+    url =
+      data.artwork_url ||
+      data.calculated_artwork_url ||
+      tracks.find((t) => t && t.artwork_url)?.artwork_url ||
+      null;
+  } catch {}
+  coverCache.set(key, { url, exp: Date.now() + 300_000 });
+  if (coverCache.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of coverCache) if (v.exp < now) coverCache.delete(k);
+  }
+  return url;
+}
+
+// Fills in the missing covers for one shelf, in parallel and only where needed.
+async function addMissingCovers(entries, token) {
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (!entry || entry.artwork_url) return;
+      if (entry.kind !== 'playlist' && entry.kind !== 'album') return;
+      const cover = await playlistCover(entry, token);
+      if (cover) entry.artwork_url = cover;
+    })
+  );
+  return entries;
+}
+
 export async function home({ token = null } = {}) {
   const sections = [];
   let selections = [];
@@ -1196,6 +1247,9 @@ export async function home({ token = null } = {}) {
         return true;
       });
     if (mapped.length) {
+      // Playlists here arrive without their tracks, so a card with no cover of
+      // its own has to borrow one from the playlist itself.
+      await addMissingCovers(mapped, token);
       sections.push({
         id: sel.urn || sel.title,
         title: sel.title,

@@ -58,6 +58,7 @@ function FeedItem({ item }) {
             <Link {...playlistLink(playlist)} className="shrink-0">
               <Artwork
                 src={playlist.artwork_url}
+                fallback={playlist.user?.avatar_url}
                 alt={playlist.title}
                 size={46}
                 rounded={6}

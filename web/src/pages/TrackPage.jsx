@@ -421,7 +421,14 @@ function playlistRow(p, onClose) {
       className="flex items-center gap-2.5 rounded-md px-1.5 py-2 transition-colors hover:bg-accent/60"
       onClick={onClose}
     >
-      <Artwork src={p.artwork_url} alt={p.title} size={38} rounded={4} kind="playlist" />
+      <Artwork
+        src={p.artwork_url}
+        fallback={p.user?.avatar_url}
+        alt={p.title}
+        size={38}
+        rounded={4}
+        kind="playlist"
+      />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{p.title}</span>
         <span className="block truncate text-xs text-muted-foreground">

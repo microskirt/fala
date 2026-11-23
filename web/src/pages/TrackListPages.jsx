@@ -46,6 +46,7 @@ function PlaylistTile({ playlist }) {
       <Link {...playlistLink(playlist)} className="block overflow-hidden rounded-lg">
         <Artwork
           src={playlist.artwork_url}
+          fallback={playlist.user?.avatar_url}
           alt={playlist.title}
           size="100%"
           rounded={0}

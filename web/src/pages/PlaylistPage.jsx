@@ -213,6 +213,7 @@ export function PlaylistPage() {
         <div className="mx-auto w-full max-w-[280px] lg:mx-0">
           <Artwork
             src={playlist.artwork_url}
+            fallback={playlist.user?.avatar_url}
             alt={playlist.title}
             size="100%"
             rounded={12}
