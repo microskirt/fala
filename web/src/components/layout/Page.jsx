@@ -34,19 +34,25 @@ export function Eyebrow({ children, className }) {
   );
 }
 
+/*
+ * The title and its buttons share one row, and the description sits under that
+ * row. The buttons used to bottom-align with the whole block, so any page with
+ * a description pushed them below the title. Keeping them in the title's own
+ * row lines their top edges up whatever else the header carries.
+ */
 export function PageHeader({ eyebrow, title, description, actions, className }) {
   return (
-    <div className={cn('mb-6 flex flex-wrap items-end justify-between gap-4', className)}>
-      <div className="min-w-0">
-        {eyebrow ? <Eyebrow className="mb-1.5">{eyebrow}</Eyebrow> : null}
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-        {description ? (
-          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {description}
-          </p>
-        ) : null}
+    <div className={cn('mb-6', className)}>
+      {eyebrow ? <Eyebrow className="mb-1.5">{eyebrow}</Eyebrow> : null}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h1 className="min-w-0 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+      {description ? (
+        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
     </div>
   );
 }
