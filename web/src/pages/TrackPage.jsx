@@ -15,6 +15,9 @@ import {
   Disc3,
   Heart,
   Headphones,
+  MapPin,
+  Users,
+  PlayCircle,
 } from 'lucide-react';
 import { api, formatCount, formatDuration, timeAgo, formatDate, trackPath } from '@/api.js';
 import { usePlayer, usePlayerTime } from '@/context/PlayerContext.jsx';
@@ -28,7 +31,7 @@ import {
   AddToPlaylistButton,
   AddToQueueButton,
 } from '@/components/Controls.jsx';
-import { TrackCard, TrackStatLine } from '@/components/Cards.jsx';
+import { TrackCard } from '@/components/Cards.jsx';
 import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Button } from '@/components/ui/button.jsx';
@@ -433,7 +436,7 @@ function AlsoLiked({ people }) {
   const rest = people.length - shown.length;
 
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2.5 rounded-lg border bg-muted/30 px-3 py-2.5">
+    <div className="flex flex-wrap items-center gap-2.5 rounded-lg border bg-muted/30 px-3 py-2.5">
       <div className="flex -space-x-2">
         {shown.map((u) => (
           <Link
@@ -497,7 +500,7 @@ function AlsoLiked({ people }) {
  */
 const LISTENER_WINDOWS = [
   { id: 'ALL_TIME', label: 'All time' },
-  { id: 'DAYS_7', label: 'Last 7 days' },
+  { id: 'DAYS_7', label: 'First 7 days' },
 ];
 
 function TopListeners({ trackId }) {
@@ -528,7 +531,7 @@ function TopListeners({ trackId }) {
   if (!loading && (!fans || fans.length === 0)) return null;
 
   return (
-    <section className="mt-4 rounded-xl border bg-card px-4 py-3.5">
+    <section className="rounded-xl border bg-card px-4 py-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
           <Headphones size={15} /> Top listeners
@@ -546,7 +549,7 @@ function TopListeners({ trackId }) {
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               )}
             >
-              {w.id === 'DAYS_7' ? `Last ${days} days` : w.label}
+              {w.id === 'DAYS_7' ? `First ${days} days` : w.label}
             </button>
           ))}
         </div>
@@ -591,6 +594,102 @@ function TopListeners({ trackId }) {
           ))}
         </ol>
       )}
+    </section>
+  );
+}
+
+/*
+ * Who made the song, as its own card in the side column. The thumbnail, name,
+ * follower and track counts and the place all come straight from the track's
+ * own user, so nothing extra is fetched. There is deliberately no message
+ * button here: that belongs on the artist page, not on a song.
+ */
+function ArtistCard({ user }) {
+  if (!user) return null;
+  const place = placeLabel(user.city, user.country_code);
+
+  return (
+    <section className="rounded-xl border bg-card p-4">
+      <h2 className="text-sm font-semibold tracking-tight">Artist</h2>
+
+      <div className="mt-3 flex items-center gap-3">
+        <Link {...userLink(user)} className="shrink-0">
+          <Avatar src={user.avatar_url} name={user.username} size={56} />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <Link
+            {...userLink(user)}
+            className="inline-flex max-w-full items-center gap-1 truncate text-sm font-semibold hover:underline"
+            title={user.username}
+          >
+            <span className="truncate">{user.username}</span>
+            {user.verified ? <BadgeCheck size={15} className="shrink-0 text-primary" /> : null}
+          </Link>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Users size={12} /> {formatCount(user.followers_count)} followers
+            </span>
+            <span>
+              {formatCount(user.track_count)} {user.track_count === 1 ? 'track' : 'tracks'}
+            </span>
+          </div>
+          {place ? (
+            <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin size={12} /> {place}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <FollowButton target={user} size="sm" className="w-full" />
+      </div>
+    </section>
+  );
+}
+
+/*
+ * The three numbers a listener cares about. Plays are just a number, while
+ * likes and reposts lead to the people behind them, which is why those two are
+ * links and the play count is not.
+ */
+function TrackStats({ track, id }) {
+  const row = 'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors';
+  return (
+    <section className="rounded-xl border bg-card px-3 py-3">
+      <h2 className="px-2 text-sm font-semibold tracking-tight">Stats</h2>
+      <div className="mt-2 space-y-0.5">
+        <div className={cn(row, 'text-muted-foreground')}>
+          <span className="inline-flex items-center gap-1.5">
+            <PlayCircle size={14} /> Plays
+          </span>
+          <span className="font-semibold tabular-nums text-foreground">
+            {formatCount(track.playback_count)}
+          </span>
+        </div>
+        <Link
+          to="/track/$id/likes"
+          params={{ id: String(id) }}
+          className={cn(row, 'text-muted-foreground hover:bg-accent hover:text-foreground')}
+          title="See who liked this track"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Heart size={14} /> Likes
+          </span>
+          <span className="font-semibold tabular-nums">{formatCount(track.likes_count)}</span>
+        </Link>
+        <Link
+          to="/track/$id/reposts"
+          params={{ id: String(id) }}
+          className={cn(row, 'text-muted-foreground hover:bg-accent hover:text-foreground')}
+          title="See who reposted this track"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Repeat2 size={14} /> Reposts
+          </span>
+          <span className="font-semibold tabular-nums">{formatCount(track.reposts_count)}</span>
+        </Link>
+      </div>
     </section>
   );
 }
@@ -829,22 +928,6 @@ export function TrackPage() {
             {track.title}
           </h1>
 
-          {track.user ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2.5">
-              <Link {...userLink(track.user)}>
-                <Avatar src={track.user.avatar_url} name={track.user.username} size={30} />
-              </Link>
-              <Link
-                {...userLink(track.user)}
-                className="inline-flex items-center gap-1 text-sm font-semibold hover:underline"
-              >
-                {track.user.username}
-                {track.user.verified ? <BadgeCheck size={16} className="text-primary" /> : null}
-              </Link>
-              <FollowButton target={track.user} size="sm" />
-            </div>
-          ) : null}
-
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -860,20 +943,6 @@ export function TrackPage() {
             </button>
 
             <LikeButton track={track} size={18} />
-
-            {/*
-             * The heart toggles the like. The count next to it is its own
-             * button, because clicking a number should show who is behind it
-             * rather than like the track a second time.
-             */}
-            <Link
-              to="/track/$id/likes"
-              params={{ id: String(id) }}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="See who liked this track"
-            >
-              {formatCount(track.likes_count)} {track.likes_count === 1 ? 'like' : 'likes'}
-            </Link>
 
             {counts?.playlists?.total > 0 ? (
               <Link
@@ -926,12 +995,6 @@ export function TrackPage() {
             />
           ) : null}
 
-          <div className="mt-5">
-            <TrackStatLine track={track} />
-          </div>
-
-          {isAuthed ? <TopListeners trackId={track.id} /> : null}
-
           {mainTag || tags.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-1.5">
               {mainTag ? (
@@ -962,62 +1025,77 @@ export function TrackPage() {
             {track.label_name ? <span>Label: {track.label_name}</span> : null}
             {track.license ? <span>{track.license.replace(/-/g, ' ')}</span> : null}
           </div>
-
-          <AlsoLiked people={alsoLiked} />
         </div>
       </div>
 
-      {track.description ? (
-        <section className="mt-12">
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">Description</h2>
-          <ClampedText text={track.description} lines={5} />
-        </section>
-      ) : null}
-
-      <section className="mt-12">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-            Comments
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
-              {commentTotal}
-            </span>
-          </h2>
-          <TimestampToggle
-            active={active}
-            value={commentTimestamp}
-            onChange={setCommentTimestamp}
-          />
-        </div>
-
-        <CommentForm
-          track={track}
-          timestampMs={commentTimestamp}
-          onPosted={(c) => {
-            setComments((prev) => [c, ...prev]);
-            setCommentTotal((n) => n + 1);
-            setCommentTimestamp(null);
-          }}
-        />
-
-        <div className="mt-4">
-          {comments.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No comments yet. Be the first to say something.
-            </p>
+      {/*
+       * Below the player the page splits: the words run down the left, and the
+       * facts about the song and its artist sit in a narrower column on the
+       * right. The comments lose a little width to make room for it, which is
+       * the whole point of the split.
+       */}
+      <div className="mt-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <div className="min-w-0">
+          {track.description ? (
+            <section>
+              <h2 className="mb-4 text-lg font-semibold tracking-tight">Description</h2>
+              <ClampedText text={track.description} lines={5} />
+            </section>
           ) : null}
-          {comments.map((c) => (
-            <CommentItem
-              key={c.id}
-              comment={c}
-              trackId={track.id}
-              onDelete={handleDeleteComment}
-              onReplied={() => setCommentTotal((n) => n + 1)}
+
+          <section className={cn(track.description && 'mt-12')}>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                Comments
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
+                  {commentTotal}
+                </span>
+              </h2>
+              <TimestampToggle
+                active={active}
+                value={commentTimestamp}
+                onChange={setCommentTimestamp}
+              />
+            </div>
+
+            <CommentForm
+              track={track}
+              timestampMs={commentTimestamp}
+              onPosted={(c) => {
+                setComments((prev) => [c, ...prev]);
+                setCommentTotal((n) => n + 1);
+                setCommentTimestamp(null);
+              }}
             />
-          ))}
+
+            <div className="mt-4">
+              {comments.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No comments yet. Be the first to say something.
+                </p>
+              ) : null}
+              {comments.map((c) => (
+                <CommentItem
+                  key={c.id}
+                  comment={c}
+                  trackId={track.id}
+                  onDelete={handleDeleteComment}
+                  onReplied={() => setCommentTotal((n) => n + 1)}
+                />
+              ))}
+            </div>
+
+            <LoadMore sentinelRef={commentsSentinel} loading={loadingComments} />
+          </section>
         </div>
 
-        <LoadMore sentinelRef={commentsSentinel} loading={loadingComments} />
-      </section>
+        <aside className="flex min-w-0 flex-col gap-4">
+          <ArtistCard user={track.user} />
+          <TrackStats track={track} id={id} />
+          <AlsoLiked people={alsoLiked} />
+          {isAuthed ? <TopListeners trackId={track.id} /> : null}
+        </aside>
+      </div>
 
       {related.length > 0 ? (
         <section className="mt-12">
