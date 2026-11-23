@@ -197,7 +197,13 @@ export function QueuePanel() {
                   className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                 >
                   <span className="relative shrink-0">
-                    <Artwork src={t.artwork_url} alt={t.title} size={38} rounded={5} />
+                    <Artwork
+                      src={t.artwork_url}
+                      fallback={t.user?.avatar_url}
+                      alt={t.title}
+                      size={38}
+                      rounded={5}
+                    />
                     <span
                       className={cn(
                         'absolute inset-0 grid place-items-center rounded-[5px] bg-black/45 text-white transition-opacity',

@@ -105,7 +105,13 @@ export function ActivityPage() {
                   <Avatar src={item.user?.avatar_url} name={item.user?.username} size={34} />
                 </Link>
                 <Link {...trackLink(track)} className="shrink-0">
-                  <Artwork src={track.artwork_url} alt={track.title} size={52} rounded={6} />
+                  <Artwork
+                    src={track.artwork_url}
+                    fallback={track.user?.avatar_url}
+                    alt={track.title}
+                    size={52}
+                    rounded={6}
+                  />
                 </Link>
                 <div className="min-w-0 flex-1">
                   <Link

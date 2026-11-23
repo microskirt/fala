@@ -45,7 +45,13 @@ function PlaylistTrackRow({ track, index, context }) {
         </span>
       </div>
       <Link {...trackLink(track)} className="shrink-0">
-        <Artwork src={track.artwork_url} alt={track.title} size={48} rounded={6} />
+        <Artwork
+          src={track.artwork_url}
+          fallback={track.user?.avatar_url}
+          alt={track.title}
+          size={48}
+          rounded={6}
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <Link

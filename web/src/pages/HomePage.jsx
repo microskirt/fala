@@ -79,7 +79,13 @@ function FeedItem({ item }) {
         ) : track ? (
           <div className="mt-2 flex items-center gap-2.5">
             <Link {...trackLink(track)} className="shrink-0">
-              <Artwork src={track.artwork_url} alt={track.title} size={46} rounded={6} />
+              <Artwork
+                src={track.artwork_url}
+                fallback={track.user?.avatar_url}
+                alt={track.title}
+                size={46}
+                rounded={6}
+              />
             </Link>
             <div className="min-w-0 flex-1">
               <Link

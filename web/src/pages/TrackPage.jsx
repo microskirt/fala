@@ -933,8 +933,13 @@ export function TrackPage() {
     <Page>
       <div className="grid gap-8 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <div className="mx-auto w-full max-w-[340px] lg:mx-0">
+          {/*
+           * Some uploads carry no artwork at all, and SoundCloud shows the
+           * artist avatar for those instead of a blank tile.
+           */}
           <Artwork
             src={track.artwork_url}
+            fallback={track.user?.avatar_url}
             alt={track.title}
             size="100%"
             rounded={12}
