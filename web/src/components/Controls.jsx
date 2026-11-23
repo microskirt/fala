@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Play,
   Pause,
@@ -8,6 +8,7 @@ import {
   ListEnd,
   ListStart,
   Plus,
+  Minus,
   UserPlus,
   Check,
   Loader2,
@@ -15,6 +16,9 @@ import {
   Link2,
   MoreHorizontal,
 } from 'lucide-react';
+import { api } from '@/api.js';
+import { Artwork } from '@/components/Media.jsx';
+import { Modal } from '@/components/Modal.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -25,7 +29,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx';
@@ -154,88 +157,175 @@ export function FollowButton({ target, size = 'default', className }) {
   );
 }
 
+/*
+ * The playlist picker is a real window, not a menu that closes on the first
+ * click. A song is often in several lists at once, and each one needs its own
+ * answer: Add where it is missing, Remove where it is already there.
+ */
 export function AddToPlaylistButton({ track, size = 18, className }) {
-  const { playlists, addTrackToPlaylist, createPlaylist } = useLibrary();
+  const { playlists, addTrackToPlaylist, removeTrackFromPlaylist, createPlaylist } = useLibrary();
   const { user } = useAuth();
   const toast = useToast();
+
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState('');
+  // Playlist ids known to hold this song. Filled from the server, then kept in
+  // step locally so the row flips to Remove the moment the write lands.
+  const [contained, setContained] = useState(() => new Set());
+  const [busyId, setBusyId] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const trackId = track?.id;
+
+  useEffect(() => {
+    if (!open || !trackId) return undefined;
+    let cancelled = false;
+    setLoading(true);
+    api
+      .get(`/api/tracks/${trackId}/playlists?limit=200`)
+      .then((res) => {
+        if (cancelled) return;
+        setContained(new Set((res.collection || []).map((p) => String(p.id))));
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, trackId]);
+
+  // A playlist that already lists the song is known to contain it, even when
+  // the collection endpoint leaves it out (private lists, for one).
+  const has = (pl) =>
+    contained.has(String(pl.id)) ||
+    (Array.isArray(pl.tracks) && pl.tracks.some((t) => String(t?.id) === String(trackId)));
+
+  const openPicker = () => {
+    if (!user) {
+      toast.error('Sign in to use playlists');
+      return;
+    }
+    setOpen(true);
+  };
+
+  const toggle = async (pl) => {
+    const inside = has(pl);
+    setBusyId(pl.id);
+    const result = inside
+      ? await removeTrackFromPlaylist(pl.id, trackId)
+      : await addTrackToPlaylist(pl.id, track);
+    setBusyId(null);
+    if (!result) return;
+    setContained((prev) => {
+      const next = new Set(prev);
+      if (inside) next.delete(String(pl.id));
+      else next.add(String(pl.id));
+      return next;
+    });
+  };
 
   const handleCreate = async () => {
     if (!title.trim()) return;
     const pl = await createPlaylist({ title: title.trim() });
-    if (pl) {
-      await addTrackToPlaylist(pl.id, track);
-      setTitle('');
-      setCreating(false);
-      setOpen(false);
-    }
+    if (!pl) return;
+    const added = await addTrackToPlaylist(pl.id, track);
+    if (added) setContained((prev) => new Set(prev).add(String(pl.id)));
+    setTitle('');
+    setCreating(false);
   };
 
   return (
-    <DropdownMenu
-      open={open}
-      onOpenChange={(next) => {
-        if (next && !user) {
-          toast.error('Sign in to use playlists');
-          return;
-        }
-        setOpen(next);
-      }}
-    >
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className={className}
-          aria-label="Add to playlist"
-          title="Add to playlist"
-        >
-          <ListPlus size={size} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel>Add to playlist</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {playlists.length === 0 && !creating ? (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">No playlists yet</div>
-        ) : null}
-        {playlists.map((pl) => (
-          <DropdownMenuItem
-            key={pl.id}
-            onClick={async () => {
-              await addTrackToPlaylist(pl.id, track);
-              setOpen(false);
-            }}
-          >
-            <ListPlus size={16} />
-            <span className="truncate">{pl.title}</span>
-            <span className="ml-auto text-xs text-muted-foreground">{pl.track_count}</span>
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        {creating ? (
-          <div className="flex items-center gap-1.5 p-1">
-            <Input
-              className="h-8 text-xs"
-              placeholder="Playlist name"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              autoFocus
-            />
-            <Button size="sm" onClick={handleCreate}>
-              Create
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className={className}
+        onClick={openPicker}
+        aria-label="Add to playlist"
+        title="Add to playlist"
+      >
+        <ListPlus size={size} />
+      </Button>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Add to playlist"
+        description={track?.title ? `Choose where ${track.title} belongs.` : undefined}
+      >
+        <div className="max-h-[22rem] space-y-1 overflow-y-auto pr-1">
+          {playlists.length === 0 && !loading ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              You have no playlists yet.
+            </p>
+          ) : null}
+
+          {playlists.map((pl) => {
+            const inside = has(pl);
+            const busy = String(busyId) === String(pl.id);
+            return (
+              <div
+                key={pl.id}
+                className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50"
+              >
+                <Artwork
+                  src={pl.artwork_url}
+                  alt={pl.title}
+                  size={40}
+                  rounded={6}
+                  kind="playlist"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{pl.title}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {pl.track_count ?? pl.tracks?.length ?? 0} tracks
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={inside ? 'outline' : 'secondary'}
+                  className="w-[5.5rem] shrink-0"
+                  disabled={busy}
+                  onClick={() => toggle(pl)}
+                >
+                  {busy ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : inside ? (
+                    <Minus size={14} />
+                  ) : (
+                    <Plus size={14} />
+                  )}
+                  {inside ? 'Remove' : 'Add'}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 border-t pt-3">
+          {creating ? (
+            <div className="flex items-center gap-1.5">
+              <Input
+                className="h-8 text-xs"
+                placeholder="Playlist name"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                autoFocus
+              />
+              <Button size="sm" onClick={handleCreate}>
+                Create
+              </Button>
+            </div>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
+              <Plus size={16} /> New playlist
             </Button>
-          </div>
-        ) : (
-          <DropdownMenuItem onClick={() => setCreating(true)}>
-            <Plus size={16} /> New playlist
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          )}
+        </div>
+      </Modal>
+    </>
   );
 }
 
