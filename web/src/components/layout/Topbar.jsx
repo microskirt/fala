@@ -99,7 +99,7 @@ export function Topbar({ onToggleSidebar }) {
      * Three equal tracks: the outer two match each other in width, so the
      * search column sits dead centre no matter what the side controls hold.
      */
-    <header className="grid h-14 shrink-0 grid-cols-[1fr_minmax(0,28rem)_1fr] items-center gap-3 border-b border-border bg-background/80 px-3 backdrop-blur lg:px-5">
+    <header className="grid h-14 shrink-0 grid-cols-[1fr_minmax(0,40rem)_1fr] items-center gap-3 border-b border-border bg-background/80 px-3 backdrop-blur lg:px-5">
       <div className="flex min-w-0 items-center">
         <Button
           variant="ghost"
