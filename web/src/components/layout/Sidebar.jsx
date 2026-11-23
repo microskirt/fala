@@ -128,13 +128,19 @@ export function Sidebar({ open, onNavigate }) {
         </div>
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
+      {/*
+       * The footer matches the player bar beside it: the same height token plus
+       * the same 1px top border, so the two dividing lines sit on one level.
+       * The whole strip is the account button, which drops the padding that
+       * used to make it taller and gives the hover state the full width.
+       */}
+      <div className="shrink-0 border-t border-sidebar-border">
         {isAuthed && user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-sidebar-accent/60 data-[state=open]:bg-sidebar-accent/60"
+                className="flex h-(--player-height) w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-sidebar-accent/60 data-[state=open]:bg-sidebar-accent/60"
                 aria-label="Account menu"
               >
                 <Avatar src={user.avatar_url} name={user.username} size={32} />
@@ -169,7 +175,7 @@ export function Sidebar({ open, onNavigate }) {
           </DropdownMenu>
         ) : (
           <Button
-            className="w-full"
+            className="h-(--player-height) w-full rounded-none"
             onClick={() => {
               onNavigate?.();
               navigate({ to: '/login' });
