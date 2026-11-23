@@ -453,10 +453,38 @@ export function PlayerProvider({ children }) {
     });
   }, []);
 
+  /*
+   * Clearing means dropping everything that is waiting, not stopping what is
+   * playing right now. The current song stays as the only entry, so the sound
+   * keeps going and the bar does not go blank under the listener.
+   */
   const clearQueue = useCallback(() => {
-    setQueue([]);
-    setIndex(-1);
-    setPlaying(false);
+    setQueue((prev) => {
+      const keep = index >= 0 && index < prev.length ? prev[index] : null;
+      if (!keep) return [];
+      setIndex(0);
+      return [keep];
+    });
+  }, [index]);
+
+  /* Drag and drop in the queue: move one row to another place in the list. */
+  const moveInQueue = useCallback((from, to) => {
+    setQueue((prev) => {
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) {
+        return prev;
+      }
+      const nextQueue = [...prev];
+      const [moved] = nextQueue.splice(from, 1);
+      nextQueue.splice(to, 0, moved);
+      // Follow the playing song so the highlight stays on the right row.
+      setIndex((cur) => {
+        if (cur === from) return to;
+        if (from < cur && to >= cur) return cur - 1;
+        if (from > cur && to <= cur) return cur + 1;
+        return cur;
+      });
+      return nextQueue;
+    });
   }, []);
 
   useEffect(() => {
@@ -524,6 +552,7 @@ export function PlayerProvider({ children }) {
       playNextInQueue,
       removeFromQueue,
       clearQueue,
+      moveInQueue,
       setQueueOpen,
       isCurrent,
       audioRef,
@@ -532,7 +561,7 @@ export function PlayerProvider({ children }) {
       queue, index, current, playing, buffering, duration, volume, muted,
       shuffle, repeat, queueOpen, playTrack, playQueue, togglePlay, pause,
       next, prev, seek, setVolume, toggleMute, addToQueue, playNextInQueue, removeFromQueue,
-      clearQueue, isCurrent,
+      clearQueue, moveInQueue, isCurrent,
     ]
   );
 
