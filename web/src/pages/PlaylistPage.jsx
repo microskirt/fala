@@ -30,7 +30,7 @@ import {
   PlayButton,
 } from '@/components/Controls.jsx';
 import { Modal, ConfirmDialog } from '@/components/Modal.jsx';
-import { linkify } from '@/components/Linkify.jsx';
+import { ClampedText } from '@/components/ClampedText.jsx';
 import { PlaylistArtworkField } from '@/components/PlaylistArtwork.jsx';
 import { Page, TrackList, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -38,7 +38,7 @@ import { Input } from '@/components/ui/input.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
-import { trackLink, userLink, resolvePlaylistParam } from '@/lib/scRoute.js';
+import { trackLink, userLink, resolvePlaylistParam, playlistSubLink } from '@/lib/scRoute.js';
 import { cn } from '@/lib/utils.js';
 
 function PlaylistTrackRow({ track, index, context }) {
@@ -166,9 +166,10 @@ export function PlaylistPage() {
   if (loading) {
     return (
       <Page>
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
-          <Skeleton className="aspect-square w-full rounded-xl" />
-          <div className="flex flex-col gap-3">
+        {/* The cover lands on the right, so the skeleton does too. */}
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
+          <Skeleton className="aspect-square w-full max-w-[280px] rounded-xl lg:order-2 lg:ml-auto" />
+          <div className="flex flex-col gap-3 lg:order-1">
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-8 w-3/5" />
             <Skeleton className="h-3.5 w-1/3" />
@@ -266,9 +267,9 @@ export function PlaylistPage() {
           </h1>
 
           {description ? (
-            <p className="mt-2.5 max-w-2xl text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              {linkify(description)}
-            </p>
+            <div className="mt-2.5 max-w-2xl">
+              <ClampedText text={description} lines={4} />
+            </div>
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -287,12 +288,24 @@ export function PlaylistPage() {
               </>
             ) : null}
             <span>{tracks.length} tracks</span>
-            <>
-              <span className="opacity-40">·</span>
-              <span>
-                {formatCount(likesCount)} {likesCount === 1 ? 'like' : 'likes'}
-              </span>
-            </>
+            {/*
+             * The like count opens the people behind it, the same way the
+             * count under a song does. It only reads as a link on hover, so
+             * the meta row stays quiet at rest. Albums do not carry the like
+             * action, so they do not show its count either.
+             */}
+            {playlist.is_album ? null : (
+              <>
+                <span className="opacity-40">·</span>
+                <Link
+                  {...playlistSubLink(playlist, 'likes')}
+                  className="rounded-sm transition-colors hover:text-foreground hover:underline"
+                  title="See who liked this playlist"
+                >
+                  {formatCount(likesCount)} {likesCount === 1 ? 'like' : 'likes'}
+                </Link>
+              </>
+            )}
             {playlist.duration ? (
               <>
                 <span className="opacity-40">·</span>
@@ -324,19 +337,22 @@ export function PlaylistPage() {
               <ListMusic size={16} /> Add to queue
             </Button>
             {/*
-             * The like sits between the two queue actions and the owner
-             * controls, so the shared actions stay together and the edits keep
-             * their own group at the end.
+             * Albums share this page but not the like action, so the button is
+             * only there for playlists. The like sits between the two queue
+             * actions and the owner controls, so the shared actions stay
+             * together and the edits keep their own group at the end.
              */}
-            <Button
-              variant="outline"
-              onClick={() => togglePlaylistLike(playlist)}
-              aria-pressed={liked}
-              className={cn(liked && 'text-rose-500')}
-              title={user ? (liked ? 'Unlike this playlist' : 'Like this playlist') : 'Sign in to like'}
-            >
-              <Heart size={16} fill={liked ? 'currentColor' : 'none'} /> Like
-            </Button>
+            {playlist.is_album ? null : (
+              <Button
+                variant="outline"
+                onClick={() => togglePlaylistLike(playlist)}
+                aria-pressed={liked}
+                className={cn(liked && 'text-rose-500')}
+                title={user ? (liked ? 'Unlike this playlist' : 'Like this playlist') : 'Sign in to like'}
+              >
+                <Heart size={16} fill={liked ? 'currentColor' : 'none'} /> Like
+              </Button>
+            )}
             {canEdit ? (
               <>
                 <Button variant="outline" onClick={() => setEditing(true)}>
