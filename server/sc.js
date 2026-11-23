@@ -1560,18 +1560,41 @@ export async function deleteComment(token, commentId) {
   return { ok: true };
 }
 
-export async function createPlaylist(token, { title, description, is_private }) {
+/*
+ * A cover travels as `artwork_data`, the same field SoundCloud's own uploader
+ * uses. Three cases matter: undefined leaves the current cover alone, null asks
+ * for it to be removed, and a data URI replaces it.
+ */
+function withArtwork(payload, artwork) {
+  if (artwork === undefined) return payload;
+  return { ...payload, artwork_data: artwork };
+}
+
+export async function createPlaylist(token, { title, description, is_private, artwork }) {
   const id = await meId(token);
-  const payload = {
-    playlist: {
+  const payload = withArtwork(
+    {
       title,
       description: description || '',
       sharing: is_private ? 'private' : 'public',
       tracks: [],
     },
-  };
-  const data = await apiWrite('POST', `/playlists?user_id=${id}`, { token, body: payload });
-  return slimPlaylist(data);
+    artwork
+  );
+  const data = await apiWrite('POST', `/playlists?user_id=${id}`, {
+    token,
+    body: { playlist: payload },
+  });
+  /*
+   * Creation can accept the cover or quietly ignore it. The created record is
+   * the only honest source, so a requested cover that did not land is reported
+   * as dropped rather than being assumed to have worked.
+   */
+  const slim = slimPlaylist(data);
+  // Nothing to remove on a brand new playlist, so a null cover is not a miss.
+  const saved =
+    artwork === undefined || artwork === null ? null : !!(slim && slim.artwork_url);
+  return { ...slim, artworkSaved: saved };
 }
 
 export async function updatePlaylist(token, playlistId, patch) {
@@ -1588,7 +1611,7 @@ export async function updatePlaylist(token, playlistId, patch) {
           ? 'private'
           : 'public',
   };
-  return writePlaylist(token, playlistId, merged, ids);
+  return writePlaylist(token, playlistId, merged, ids, patch.artwork);
 }
 
 export async function deletePlaylist(token, playlistId) {
@@ -1614,32 +1637,48 @@ function playlistTrackIds(tracks) {
  * only the track ids when it just reorders, so that is the fallback for when the
  * full body is rejected.
  */
-async function writePlaylist(token, playlistId, current, ids) {
+async function writePlaylist(token, playlistId, current, ids, artwork) {
   const full = {
-    playlist: {
-      title: current.title,
-      description: current.description || '',
-      sharing: current.sharing || 'public',
-      tracks: ids.map((id) => ({ id })),
-    },
+    playlist: withArtwork(
+      {
+        title: current.title,
+        description: current.description || '',
+        sharing: current.sharing || 'public',
+        tracks: ids.map((id) => ({ id })),
+      },
+      artwork
+    ),
   };
   try {
     const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: full });
-    if (data && data.id) return slimPlaylist(data);
+    if (data && data.id) {
+      const slim = slimPlaylist(data);
+      // SoundCloud answers 200 whether or not it kept the cover, so the saved
+      // record decides. Removing one counts as saved once the cover is gone.
+      let saved = null;
+      if (artwork !== undefined) {
+        saved = artwork === null ? !slim.artwork_url : !!slim.artwork_url;
+      }
+      return { ...slim, artworkSaved: saved };
+    }
   } catch (err) {
     if (err?.code === 'captcha' || err?.status === 401 || err?.status === 403) throw err;
   }
   // Minimal body: the shape SoundCloud's own player sends for track changes.
+  // It carries no cover, so a requested cover is reported as dropped rather
+  // than being quietly lost behind a successful-looking write.
   const minimal = { playlist: { tracks: ids } };
   try {
     const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: minimal });
-    if (data && data.id) return slimPlaylist(data);
+    if (data && data.id) {
+      return { ...slimPlaylist(data), artworkSaved: artwork === undefined ? null : false };
+    }
   } catch (err) {
     if (err?.code === 'captcha' || err?.status === 401 || err?.status === 403) throw err;
   }
   // Neither shape answered with the playlist, so read it back to show the truth.
   const fresh = await apiGet(`/playlists/${playlistId}`, { token });
-  return slimPlaylist(fresh);
+  return { ...slimPlaylist(fresh), artworkSaved: artwork === undefined ? null : false };
 }
 
 export async function addTrackToPlaylist(token, playlistId, trackId) {

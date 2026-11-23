@@ -27,6 +27,7 @@ import {
   PlayButton,
 } from '@/components/Controls.jsx';
 import { Modal, ConfirmDialog } from '@/components/Modal.jsx';
+import { PlaylistArtworkField } from '@/components/PlaylistArtwork.jsx';
 import { Page, TrackList, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
@@ -106,7 +107,13 @@ export function PlaylistPage() {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', is_private: false });
+  // `artwork` is a data URI, null to remove, or undefined to leave alone.
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    is_private: false,
+    artwork: undefined,
+  });
 
   const load = async () => {
     setLoading(true);
@@ -137,6 +144,7 @@ export function PlaylistPage() {
         title: pl.title,
         description: pl.description || '',
         is_private: !!pl.is_private,
+        artwork: undefined,
       });
     } catch (err) {
       setError(err.message || 'Playlist not found');
@@ -191,10 +199,14 @@ export function PlaylistPage() {
       title: form.title.trim() || 'Untitled playlist',
       description: form.description,
       is_private: form.is_private,
+      artwork: form.artwork,
     });
     setBusy(false);
     if (pl) {
       setPlaylist((prev) => ({ ...prev, ...pl }));
+      // The cover is saved now, so the field goes back to "leave it alone"
+      // rather than holding a data URI that would be sent again.
+      setForm((f) => ({ ...f, artwork: undefined }));
       setEditing(false);
       toast.success('Playlist updated');
     }
@@ -340,6 +352,13 @@ export function PlaylistPage() {
         }
       >
         <div className="flex flex-col gap-4">
+          <PlaylistArtworkField
+            artwork={form.artwork}
+            existingUrl={playlist.artwork_url}
+            fallback={playlist.user?.avatar_url}
+            disabled={busy}
+            onChange={(artwork) => setForm((f) => ({ ...f, artwork }))}
+          />
           <div className="flex flex-col gap-2">
             <Label htmlFor="pl-title">Title</Label>
             <Input

@@ -234,7 +234,13 @@ export function LibraryProvider({ children }) {
         const pl = await withCaptcha(() => api.post('/api/playlists', payload));
         setPlaylists((prev) => [pl, ...prev]);
         setCounts((c) => ({ ...c, playlists: c.playlists + 1 }));
-        toast.success('Playlist created on SoundCloud');
+        // SoundCloud can take the playlist but drop the cover, so say which one
+        // happened instead of reporting a plain success either way.
+        if (pl.artworkSaved === false) {
+          toast.error('Playlist created, but the cover did not stick');
+        } else {
+          toast.success('Playlist created on SoundCloud');
+        }
         return pl;
       } catch (err) {
         toast.error(err.message || 'Could not create playlist');
@@ -249,6 +255,11 @@ export function LibraryProvider({ children }) {
       try {
         const pl = await withCaptcha(() => api.patch(`/api/playlists/${id}`, payload));
         setPlaylists((prev) => prev.map((p) => (String(p.id) === String(pl.id) ? pl : p)));
+        // The rest of the edit can land while the cover is refused, and the
+        // page reports its own success, so flag the dropped cover here.
+        if (pl.artworkSaved === false) {
+          toast.error('Saved, but the cover did not stick');
+        }
         return pl;
       } catch (err) {
         toast.error(err.message || 'Could not update playlist');

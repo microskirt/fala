@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { TrackCard, PlaylistCard, ArtistRow, TrackRow } from '@/components/Cards.jsx';
+import { PlaylistArtworkField } from '@/components/PlaylistArtwork.jsx';
 import { ErrorState, EmptyState } from '@/components/Media.jsx';
 import { Modal } from '@/components/Modal.jsx';
 import {
@@ -241,10 +242,16 @@ export function FollowingPage() {
 }
 
 export function PlaylistsPage() {
-  const { isAuthed } = useAuth();
+  const { isAuthed, user } = useAuth();
   const { playlists, createPlaylist } = useLibrary();
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', is_private: false });
+  // `artwork` is a data URI, null to remove, or undefined to leave alone.
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    is_private: false,
+    artwork: undefined,
+  });
   const [busy, setBusy] = useState(false);
 
   if (!isAuthed) {
@@ -265,11 +272,12 @@ export function PlaylistsPage() {
       title: form.title.trim(),
       description: form.description,
       is_private: form.is_private,
+      artwork: form.artwork,
     });
     setBusy(false);
     if (pl) {
       setCreating(false);
-      setForm({ title: '', description: '', is_private: false });
+      setForm({ title: '', description: '', is_private: false, artwork: undefined });
     }
   };
 
@@ -321,6 +329,12 @@ export function PlaylistsPage() {
         }
       >
         <div className="flex flex-col gap-4">
+          <PlaylistArtworkField
+            artwork={form.artwork}
+            fallback={user?.avatar_url}
+            disabled={busy}
+            onChange={(artwork) => setForm((f) => ({ ...f, artwork }))}
+          />
           <div className="flex flex-col gap-2">
             <Label htmlFor="new-pl-title">Title</Label>
             <Input

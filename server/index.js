@@ -148,7 +148,7 @@ function decorateItems(items, flags) {
 /* --------------------------------- routes --------------------------------- */
 
 const routes = [];
-function route(method, pattern, handler) {
+function route(method, pattern, handler, { bodyLimit } = {}) {
   const keys = [];
   const re = new RegExp(
     '^' +
@@ -158,7 +158,7 @@ function route(method, pattern, handler) {
       }) +
       '/?$'
   );
-  routes.push({ method, re, keys, handler });
+  routes.push({ method, re, keys, handler, bodyLimit });
 }
 
 /* -------------------------------- session --------------------------------- */
@@ -580,21 +580,36 @@ route('GET', '/api/playlists/:id', async (ctx) => {
   return { ...pl, tracks: (pl.tracks || []).map((t) => decorateTrack(t, flags)) };
 });
 
-route('POST', '/api/playlists', async (ctx) => {
-  const token = requireToken(ctx);
-  const title = String(ctx.body.title || '').trim();
-  if (!title) throw new HttpError(400, 'Give your playlist a title');
-  return sc.createPlaylist(token, {
-    title,
-    description: ctx.body.description,
-    is_private: !!ctx.body.is_private,
-  });
-});
+// A cover arrives as a data URI, so these two allow a larger body than the
+// megabyte the rest of the API works within.
+const ARTWORK_BODY_LIMIT = 8_000_000;
 
-route('PATCH', '/api/playlists/:id', async (ctx) => {
-  const token = requireToken(ctx);
-  return sc.updatePlaylist(token, ctx.params.id, ctx.body || {});
-});
+route(
+  'POST',
+  '/api/playlists',
+  async (ctx) => {
+    const token = requireToken(ctx);
+    const title = String(ctx.body.title || '').trim();
+    if (!title) throw new HttpError(400, 'Give your playlist a title');
+    return sc.createPlaylist(token, {
+      title,
+      description: ctx.body.description,
+      is_private: !!ctx.body.is_private,
+      artwork: ctx.body.artwork,
+    });
+  },
+  { bodyLimit: ARTWORK_BODY_LIMIT }
+);
+
+route(
+  'PATCH',
+  '/api/playlists/:id',
+  async (ctx) => {
+    const token = requireToken(ctx);
+    return sc.updatePlaylist(token, ctx.params.id, ctx.body || {});
+  },
+  { bodyLimit: ARTWORK_BODY_LIMIT }
+);
 
 route('DELETE', '/api/playlists/:id', async (ctx) => {
   const token = requireToken(ctx);
@@ -709,7 +724,7 @@ async function handle(req, res) {
     r.keys.forEach((k, i) => (ctx.params[k] = decodeURIComponent(m[i + 1])));
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       try {
-        ctx.body = await readBody(req);
+        ctx.body = await readBody(req, r.bodyLimit || 1_000_000);
       } catch (e) {
         if (e instanceof HttpError) throw e;
         throw new HttpError(400, 'Could not read request body');
