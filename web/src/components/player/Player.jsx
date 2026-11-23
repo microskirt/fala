@@ -95,7 +95,14 @@ function VolumeControl({ volume, muted, icon: Icon, onToggleMute, onVolume }) {
         <Icon size={15} />
       </Button>
 
-      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 -translate-x-1/2 pb-1.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+      {/*
+       * Open state follows the pointer, plus keyboard focus only. A plain
+       * focus-within was sticky here: clicking the slider focuses its thumb,
+       * and a mouse click never clears that focus, so the popup stayed open
+       * after the pointer left. focus-visible is true only for keyboard users,
+       * which keeps the slider reachable by tab without pinning the popup open.
+       */}
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 -translate-x-1/2 pb-1.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-has-[:focus-visible]:pointer-events-auto group-has-[:focus-visible]:opacity-100">
         <div className="flex flex-col items-center rounded-lg border bg-popover px-2 py-2 shadow-lg">
           <div className="flex h-32 w-6 items-center justify-center">
             <Slider
