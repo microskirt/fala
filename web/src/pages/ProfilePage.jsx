@@ -300,15 +300,19 @@ export function ProfilePage() {
     <Page>
       <div className="overflow-hidden rounded-xl border bg-card">
         {/*
-         * The header copies SoundCloud's own measurements, because plenty of
-         * artists upload a banner with the picture already cut into it. The
-         * banner is 254px tall, the picture is 200px and sits 28px from the
-         * left edge, vertically centred, and the banner is drawn at full
-         * height anchored to the top left. Any other size or offset pulls the
-         * picture off the spot the uploaded banner expects.
+         * Plenty of artists upload a banner with the picture already cut into
+         * it, so the overlay has to stay on the spot that banner expects.
+         * SoundCloud draws it at 254px tall with a 200px picture 28px from the
+         * left, and the image is scaled by height rather than cropped.
+         *
+         * Those numbers left a strip of empty space on the right: a banner is
+         * about 4.8 times wider than it is tall, so at 254px it only reached
+         * roughly 1210px in a box nearer 1340px. Scaling all three numbers by
+         * the same factor fills the width and keeps the picture aligned, since
+         * the baked-in circle grows with the banner.
          */}
         <div
-          className="relative h-[254px] w-full bg-muted"
+          className="relative h-[280px] w-full bg-muted"
           style={
             profile.banner_url
               ? {
@@ -329,11 +333,11 @@ export function ProfilePage() {
             disabled={!profile.avatar_url}
             aria-label={profile.avatar_url ? `Open ${profile.username}'s picture` : undefined}
             className={cn(
-              'group absolute top-1/2 left-[28px] -translate-y-1/2 rounded-full',
+              'group absolute top-1/2 left-[31px] -translate-y-1/2 rounded-full',
               profile.avatar_url ? 'cursor-zoom-in' : 'cursor-default'
             )}
           >
-            <Avatar src={profile.avatar_url} name={profile.username} size={200} />
+            <Avatar src={profile.avatar_url} name={profile.username} size={220} />
             {profile.avatar_url ? (
               <span className="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover:bg-black/20" />
             ) : null}
