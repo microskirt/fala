@@ -827,44 +827,62 @@ function ArtistCard({ user }) {
 }
 
 /*
- * The three numbers a listener cares about. Plays are just a number, while
- * likes and reposts lead to the people behind them, which is why those two are
- * links and the play count is not.
+ * The song's numbers, laid out the way SoundCloud shows them: a box per figure
+ * with the count on top and the word under it, rather than a list of rows. Likes
+ * and reposts lead to the people behind them, so those two are links; plays and
+ * comments have nowhere to go and stay plain.
  */
-function TrackStats({ track }) {
-  const row = 'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors';
+function StatTile({ label, value, icon: Icon, to, title }) {
+  const body = (
+    <>
+      <span className="text-lg font-semibold leading-none tabular-nums">{value}</span>
+      <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+        {Icon ? <Icon size={12} /> : null}
+        {label}
+      </span>
+    </>
+  );
+
+  const base = 'flex flex-col items-center justify-center rounded-lg border bg-muted/30 px-2 py-2.5 text-center';
+
+  if (!to) return <div className={base}>{body}</div>;
+
   return (
-    <section className="rounded-xl border bg-card px-3 py-3">
-      <h2 className="px-2 text-sm font-semibold tracking-tight">Stats</h2>
-      <div className="mt-2 space-y-0.5">
-        <div className={cn(row, 'text-muted-foreground')}>
-          <span className="inline-flex items-center gap-1.5">
-            <PlayCircle size={14} /> Plays
-          </span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {formatCount(track.playback_count)}
-          </span>
-        </div>
-        <Link
-          {...trackSubLink(track, 'likes')}
-          className={cn(row, 'text-muted-foreground hover:bg-accent hover:text-foreground')}
-          title="See who liked this track"
-        >
-          <span className="inline-flex items-center gap-1.5">
-            <Heart size={14} /> Likes
-          </span>
-          <span className="font-semibold tabular-nums">{formatCount(track.likes_count)}</span>
-        </Link>
-        <Link
-          {...trackSubLink(track, 'reposts')}
-          className={cn(row, 'text-muted-foreground hover:bg-accent hover:text-foreground')}
-          title="See who reposted this track"
-        >
-          <span className="inline-flex items-center gap-1.5">
-            <Repeat2 size={14} /> Reposts
-          </span>
-          <span className="font-semibold tabular-nums">{formatCount(track.reposts_count)}</span>
-        </Link>
+    <Link
+      {...to}
+      title={title}
+      className={cn(base, 'transition-colors hover:border-primary/40 hover:bg-accent')}
+    >
+      {body}
+    </Link>
+  );
+}
+
+function TrackStats({ track, commentCount }) {
+  return (
+    <section className="rounded-xl border bg-card px-4 py-3.5">
+      <h2 className="text-sm font-semibold tracking-tight">Stats</h2>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <StatTile label="Plays" value={formatCount(track.playback_count)} icon={PlayCircle} />
+        <StatTile
+          label="Likes"
+          value={formatCount(track.likes_count)}
+          icon={Heart}
+          to={trackSubLink(track, 'likes')}
+          title="See who liked this song"
+        />
+        <StatTile
+          label="Reposts"
+          value={formatCount(track.reposts_count)}
+          icon={Repeat2}
+          to={trackSubLink(track, 'reposts')}
+          title="See who reposted this song"
+        />
+        <StatTile
+          label="Comments"
+          value={formatCount(commentCount ?? track.comment_count)}
+          icon={MessageSquare}
+        />
       </div>
     </section>
   );
@@ -1375,9 +1393,9 @@ export function TrackPage() {
 
         <aside className="flex min-w-0 flex-col gap-4">
           <ArtistCard user={artist || track.user} />
-          <TrackStats track={track} />
-          <AlsoLiked people={alsoLiked} />
+          <TrackStats track={track} commentCount={commentTotal} />
           {isAuthed ? <TopListeners trackId={track.id} /> : null}
+          <AlsoLiked people={alsoLiked} />
           <TrackCollections counts={counts} track={track} />
         </aside>
       </div>
