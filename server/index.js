@@ -112,6 +112,12 @@ function decorateTrack(track, flags) {
     ...track,
     liked: flags?.likes ? flags.likes.has(String(track.id)) : !!track.liked,
     reposted: flags?.reposts ? flags.reposts.has(String(track.id)) : !!track.reposted,
+    /*
+     * The artist of a track carries the follow state too. Without this the
+     * follow button in the player bar had nothing to read and always offered
+     * to follow, even for someone already followed.
+     */
+    user: track.user ? decorateUser(track.user, flags) : track.user,
   };
 }
 
@@ -227,7 +233,8 @@ route('GET', '/api/me/reposts', async (ctx) => {
     limit: pageLimit(ctx.query, 50),
     next: ctx.query.get('next'),
   });
-  return data;
+  const flags = await flagsFor(token);
+  return { ...data, collection: data.collection.map((t) => decorateTrack(t, flags)) };
 });
 
 route('GET', '/api/me/counts', async (ctx) => {
@@ -255,7 +262,9 @@ route('GET', '/api/me/following', async (ctx) => {
 
 route('GET', '/api/me/history', async (ctx) => {
   const token = requireToken(ctx);
-  return sc.myHistory(token, { limit: pageLimit(ctx.query, 50) });
+  const data = await sc.myHistory(token, { limit: pageLimit(ctx.query, 50) });
+  const flags = await flagsFor(token);
+  return { ...data, collection: data.collection.map((t) => decorateTrack(t, flags)) };
 });
 
 route('GET', '/api/me/stream', async (ctx) => {
