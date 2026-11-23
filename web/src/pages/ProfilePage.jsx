@@ -394,24 +394,29 @@ export function ProfilePage() {
             />
           </div>
 
+          {/*
+           * Where the artist is from reads as part of who they are, so it sits
+           * above the description rather than after it.
+           */}
+          {placeLabel(profile.city, profile.country_code) ? (
+            <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPin size={14} /> {placeLabel(profile.city, profile.country_code)}
+            </div>
+          ) : null}
+
           {profile.description ? (
             <div className="mt-3 max-w-3xl">
               <ClampedText text={profile.description} lines={4} />
             </div>
           ) : null}
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {placeLabel(profile.city, profile.country_code) ? (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin size={14} /> {placeLabel(profile.city, profile.country_code)}
-              </span>
-            ) : null}
-            {profile.created_at ? (
+          {profile.created_at ? (
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <Calendar size={14} /> Joined {formatDate(profile.created_at)}
               </span>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
