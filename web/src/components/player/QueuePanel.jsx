@@ -25,6 +25,8 @@ export function QueuePanel() {
   } = usePlayer();
 
   const panelRef = useRef(null);
+  const listRef = useRef(null);
+  const activeRef = useRef(null);
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
 
@@ -53,6 +55,33 @@ export function QueuePanel() {
       setOverIndex(null);
     }
   }, [queueOpen]);
+
+  /*
+   * Played songs stay in the list, the way SoundCloud keeps them, so skipping
+   * back still works. What moves is the view: whenever the playing song
+   * changes, or the panel opens, the list is scrolled so the current row sits
+   * in the middle. The rows are measured against the scroll box instead of
+   * using offsetTop, because the panel is positioned and would otherwise give
+   * offsets relative to itself.
+   */
+  useEffect(() => {
+    if (!queueOpen) return;
+    const list = listRef.current;
+    const row = activeRef.current;
+    if (!list || !row) return;
+
+    const listRect = list.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    if (!listRect.height || !rowRect.height) return;
+
+    const centred = rowRect.top - listRect.top - (listRect.height - rowRect.height) / 2;
+    const top = Math.max(0, list.scrollTop + centred);
+    if (typeof list.scrollTo === 'function') {
+      list.scrollTo({ top, behavior: 'smooth' });
+    } else {
+      list.scrollTop = top;
+    }
+  }, [queueOpen, index, queue.length]);
 
   if (!queueOpen) return null;
 
@@ -100,7 +129,10 @@ export function QueuePanel() {
         </div>
       </div>
 
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
+      <div
+        ref={listRef}
+        className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5"
+      >
         {queue.length === 0 ? (
           <p className="px-3 py-10 text-center text-sm text-muted-foreground">
             Your queue is empty.
@@ -113,6 +145,7 @@ export function QueuePanel() {
             return (
               <div
                 key={`${t.id}-${i}`}
+                ref={active ? activeRef : null}
                 draggable
                 onDragStart={(e) => {
                   setDragIndex(i);
