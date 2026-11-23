@@ -494,7 +494,7 @@ function AlsoLiked({ people }) {
 
 /*
  * The listener ranking SoundCloud keeps behind its insights page, for this
- * track. It only offers two windows: the last few days and all time. The numbers
+ * track. It only offers two windows: the first week and all time. The numbers
  * come from a signed-in-only endpoint, so the panel stays out of the way when
  * there is no token or no data.
  */
