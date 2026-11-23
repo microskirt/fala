@@ -710,6 +710,61 @@ function TrackStats({ track, id }) {
   );
 }
 
+/*
+ * Which playlists and albums hold this song. These used to sit in the top card
+ * as two loose links, which made them read like actions. They are facts about
+ * the song, so they belong in a box with the rest of them, below Top listeners.
+ */
+function TrackCollections({ counts, id }) {
+  const playlists = counts?.playlists;
+  const albums = counts?.albums;
+  const hasPlaylists = playlists?.total > 0;
+  const hasAlbums = albums?.total > 0;
+  if (!hasPlaylists && !hasAlbums) return null;
+
+  const row =
+    'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground';
+
+  return (
+    <section className="rounded-xl border bg-card px-3 py-3">
+      <h2 className="px-2 text-sm font-semibold tracking-tight">Appears in</h2>
+      <div className="mt-2 space-y-0.5">
+        {hasPlaylists ? (
+          <Link
+            to="/track/$id/playlists"
+            params={{ id: String(id) }}
+            className={row}
+            title="See the playlists this track is in"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <ListMusic size={14} /> Playlists
+            </span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {playlists.complete ? '' : 'More than '}
+              {formatCount(playlists.total)}
+            </span>
+          </Link>
+        ) : null}
+        {hasAlbums ? (
+          <Link
+            to="/track/$id/albums"
+            params={{ id: String(id) }}
+            className={row}
+            title="See the albums this track is in"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Disc3 size={14} /> Albums
+            </span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatCount(albums.total)}
+            </span>
+          </Link>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export function TrackPage() {
   /*
    * The song page answers on both /track/:id and the SoundCloud shaped
@@ -1003,33 +1058,6 @@ export function TrackPage() {
 
             <LikeButton track={track} size={18} />
 
-            {counts?.playlists?.total > 0 ? (
-              <Link
-                to="/track/$id/playlists"
-                params={{ id: String(id) }}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                title="See the playlists this track is in"
-              >
-                <ListMusic size={16} />
-                {counts.playlists.complete ? '' : 'More than '}
-                {formatCount(counts.playlists.total)}{' '}
-                {counts.playlists.total === 1 && counts.playlists.complete ? 'playlist' : 'playlists'}
-              </Link>
-            ) : null}
-
-            {counts?.albums?.total > 0 ? (
-              <Link
-                to="/track/$id/albums"
-                params={{ id: String(id) }}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                title="See the albums this track is in"
-              >
-                <Disc3 size={16} />
-                {formatCount(counts.albums.total)}{' '}
-                {counts.albums.total === 1 ? 'album' : 'albums'}
-              </Link>
-            ) : null}
-
             <RepostControl track={track} />
 
             <AddToQueueButton track={track} size={18} />
@@ -1166,6 +1194,7 @@ export function TrackPage() {
           <TrackStats track={track} id={id} />
           <AlsoLiked people={alsoLiked} />
           {isAuthed ? <TopListeners trackId={track.id} /> : null}
+          <TrackCollections counts={counts} id={id} />
         </aside>
       </div>
 
