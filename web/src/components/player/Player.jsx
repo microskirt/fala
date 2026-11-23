@@ -345,6 +345,7 @@ export function Player() {
             variant="ghost"
             size="icon-sm"
             className={cn('hidden sm:inline-flex', queueOpen && toggled)}
+            data-queue-toggle=""
             onClick={() => setQueueOpen((v) => !v)}
             aria-pressed={queueOpen}
             aria-label="Queue"

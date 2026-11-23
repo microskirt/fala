@@ -38,7 +38,15 @@ export function QueuePanel() {
     };
     const onDown = (e) => {
       const el = panelRef.current;
-      if (el && !el.contains(e.target)) setQueueOpen(false);
+      if (!el || el.contains(e.target)) return;
+      /*
+       * The button in the player bar is a toggle, so a click on it must not be
+       * treated as a click outside. Without this the mousedown closes the
+       * panel and the click then toggles it straight back open, which looks
+       * like the button can never close it.
+       */
+      if (e.target.closest?.('[data-queue-toggle]')) return;
+      setQueueOpen(false);
     };
     document.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onDown);
