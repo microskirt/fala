@@ -621,11 +621,24 @@ export async function notifications(token, { limit = 50, next } = {}) {
 function slimMessage(m) {
   if (!m) return null;
   const content = typeof m.content === 'string' ? m.content : '';
+  /*
+   * SoundCloud identifies the author of a message with `sender_urn`
+   * ("soundcloud:users:123"), not with `sender_id` or `user_id`. Reading the
+   * wrong field made every message look like it came from the other person, so
+   * the thread rendered as one flat list of grey bubbles.
+   */
+  const urn = m.sender_urn || m.user_urn || '';
+  const urnId = urn ? Number(String(urn).split(':').pop()) : null;
   return {
     id: m.id,
     content,
     created_at: m.sent_at || m.created_at || null,
-    sender_id: m.sender_id ?? m.user_id ?? m.user?.id ?? null,
+    sender_id:
+      (Number.isFinite(urnId) && urnId) ||
+      m.sender_id ||
+      m.user_id ||
+      m.user?.id ||
+      null,
     user: m.user ? slimUser(m.user) : null,
   };
 }
@@ -722,20 +735,25 @@ const GRAPH_HOST = 'https://graph.soundcloud.com/graphql';
 
 async function graphql(token, { query, variables }) {
   if (!token) throw new ScError(401, 'Connect your SoundCloud account first');
+  // The gateway sits behind the same bot check as api-v2, so the solved cookie
+  // and the user agent that solved it have to ride along. Without them every
+  // write through here comes back as a captcha challenge.
+  const dd = getDdCookie(token);
   const res = await fetch(GRAPH_HOST, {
     method: 'POST',
     headers: {
-      'User-Agent': UA,
+      'User-Agent': getDdUa(token),
       Authorization: `OAuth ${token}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
       Origin: 'https://soundcloud.com',
       Referer: 'https://soundcloud.com/',
+      ...(dd ? { Cookie: `datadome=${dd}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
   });
   const text = await res.text();
-  if (res.status === 403 && text.includes('captcha-delivery')) {
+  if (text.includes('captcha-delivery')) {
     let parsed = null;
     try {
       parsed = JSON.parse(text);
@@ -797,35 +815,39 @@ function slimGraphUser(u) {
 }
 
 const TOP_FANS_QUERY = `
-query TopFansByWindow($metric: MetricType!, $windowInput: TimeWindowInput!, $trackUrn: String) {
-  topFansByWindow(metric: $metric, windowInput: $windowInput, trackUrn: $trackUrn) {
-    count
-    fan { urn username permalink permalinkUrl avatarUrl followersCount verified }
+query TopFans($trackUrn: ID!) {
+  topFans(input: {trackUrn: $trackUrn}) {
+    firstPeriodDays
+    hasArtistOptedOut
+    allTime { fans { fan { urn username permalink permalinkUrl avatarUrl followersCount verified city country } totalPlays } }
+    firstPeriod { fans { fan { urn username permalink permalinkUrl avatarUrl followersCount verified city country } totalPlays } }
   }
 }`;
 
 /*
- * The listener ranking the insights page shows. It is ranked by plays inside a
- * time window, and the window is limited to the values SoundCloud accepts.
+ * The listener ranking the insights page shows, for one track. SoundCloud only
+ * keeps two windows here: the last `firstPeriodDays` days (seven, at the time of
+ * writing) and all time. The windowed query elsewhere in this file ignores the
+ * track and answers for the signed in account, so it is not used here.
  */
-const LISTENER_WINDOWS = new Set(['DAYS_7', 'DAYS_30', 'ALL_TIME']);
-
-export async function topListeners(token, trackId, { window = 'DAYS_30', limit = 5 } = {}) {
-  const timewindow = LISTENER_WINDOWS.has(window) ? window : 'DAYS_30';
+export async function topListeners(token, trackId, { window = 'ALL_TIME', limit = 5 } = {}) {
   const data = await graphql(token, {
     query: TOP_FANS_QUERY,
-    variables: {
-      metric: 'PLAYS',
-      windowInput: { timewindow },
-      trackUrn: `soundcloud:tracks:${trackId}`,
-    },
+    variables: { trackUrn: `soundcloud:tracks:${trackId}` },
   });
-  const rows = Array.isArray(data.topFansByWindow) ? data.topFansByWindow : [];
+  const block = data.topFans || {};
+  const which = window === 'DAYS_7' ? 'firstPeriod' : 'allTime';
+  const rows = block[which]?.fans || [];
   const fans = rows
     .slice(0, limit)
-    .map((row) => ({ plays: row?.count ?? 0, user: slimGraphUser(row?.fan) }))
+    .map((row) => ({ plays: row?.totalPlays ?? 0, user: slimGraphUser(row?.fan) }))
     .filter((row) => row.user);
-  return { window: timewindow, fans };
+  return {
+    window: which === 'firstPeriod' ? 'DAYS_7' : 'ALL_TIME',
+    days: block.firstPeriodDays || 7,
+    optedOut: !!block.hasArtistOptedOut,
+    fans,
+  };
 }
 
 const COMMENT_REACTIONS = `
@@ -1149,6 +1171,12 @@ export async function home({ token = null } = {}) {
     if (token && GENERIC.some((g) => urn.includes(g))) continue;
     const items = sel.items?.collection || [];
     if (!items.length) continue;
+    /*
+     * SoundCloud repeats the same mix several times in one shelf, and repeats
+     * playlists across shelves. A shelf should show each thing once, so the
+     * first occurrence wins and later duplicates are dropped.
+     */
+    const seen = new Set();
     const mapped = items
       .map((item) => {
         if (item.kind === 'playlist') return slimPlaylist(item);
@@ -1156,7 +1184,13 @@ export async function home({ token = null } = {}) {
         if (item.kind === 'track') return slimTrack(item);
         return null;
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((entry) => {
+        const key = `${entry.kind || 'track'}:${entry.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     if (mapped.length) {
       sections.push({
         id: sel.urn || sel.title,
@@ -1339,40 +1373,36 @@ export async function myReposts(token, { limit = 200, next } = {}) {
 // walking the pages. Bounded so a huge library cannot stall the sidebar.
 export async function myCounts(token, { maxPages = 16, pageSize = 200 } = {}) {
   const id = await meId(token);
-  const walk = async (first) => {
+  /*
+   * Counts have to match what the list pages actually show, so they are walked
+   * with the same mapping the pages use. The account object's own totals drift
+   * from the lists: it counts playlist reposts the repost page drops, and it can
+   * lag behind a playlist created moments ago.
+   */
+  const walk = async (first, mapper) => {
     let href = first;
     let total = 0;
     let pages = 0;
     while (href && pages < maxPages) {
       const data = await apiGet(href, { token });
-      total += (data.collection || []).length;
+      total += (data.collection || []).map(mapper).filter(Boolean).length;
       href = data.next_href ? stripClientId(data.next_href) : null;
       pages += 1;
     }
     return total;
   };
-  // The account object carries authoritative totals for most accounts, but
-  // reports 0 for some. Walk the pages only when a total is missing or 0.
-  const account = await me(token).catch(() => null);
-  const reported = {
-    likes: account?.likes_count ?? 0,
-    following: account?.followings_count ?? 0,
-    playlists: account?.playlist_count ?? 0,
-    reposts: account?.reposts_count ?? 0,
+  const asTrack = (item) => slimTrack(item?.track || (item?.kind === 'track' ? item : null));
+  const asRepost = (item) => {
+    if (!item) return null;
+    if (item.track) return slimTrack(item.track);
+    if (item.kind === 'track') return slimTrack(item);
+    return null;
   };
   const [likes, following, playlists, reposts] = await Promise.all([
-    reported.likes > 0
-      ? reported.likes
-      : walk(`/users/${id}/track_likes?limit=${pageSize}`).catch(() => 0),
-    reported.following > 0
-      ? reported.following
-      : walk(`/users/${id}/followings?limit=${pageSize}`).catch(() => 0),
-    reported.playlists > 0
-      ? reported.playlists
-      : walk(`/users/${id}/playlists?limit=${pageSize}`).catch(() => 0),
-    reported.reposts > 0
-      ? reported.reposts
-      : walk(`/stream/users/${id}/reposts?limit=${pageSize}`).catch(() => 0),
+    walk(`/users/${id}/track_likes?limit=${pageSize}`, asTrack).catch(() => 0),
+    walk(`/users/${id}/followings?limit=${pageSize}`, slimUser).catch(() => 0),
+    walk(`/users/${id}/playlists?limit=${pageSize}`, slimPlaylist).catch(() => 0),
+    walk(`/stream/users/${id}/reposts?limit=${pageSize}`, asRepost).catch(() => 0),
   ]);
   return { likes, following, playlists, reposts };
 }
@@ -1395,12 +1425,22 @@ export async function myFollowing(token, { limit = 200, next } = {}) {
 
 export async function myHistory(token, { limit = 200 } = {}) {
   const data = await apiGet(`/me/play-history/tracks?limit=${limit}`, { token });
-  return {
-    collection: (data.collection || [])
-      .map((entry) => slimTrack(entry.track))
-      .filter(Boolean),
-    next_href: null,
-  };
+  /*
+   * Playing one track three times in a row writes three history rows. The list
+   * is a record of what was listened to, not of how often, so the newest entry
+   * for a track is kept and the repeats are dropped.
+   */
+  const seen = new Set();
+  const collection = (data.collection || [])
+    .map((entry) => slimTrack(entry.track))
+    .filter(Boolean)
+    .filter((track) => {
+      const key = String(track.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  return { collection, next_href: null };
 }
 
 export async function myStream(token, { limit = 50 } = {}) {
