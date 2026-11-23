@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   BadgeCheck,
-  Clock,
 } from 'lucide-react';
 import { Artwork, Avatar } from '@/components/Media.jsx';
 import {
@@ -20,14 +19,15 @@ import {
   QueueMenuButton,
   FollowButton,
 } from '@/components/Controls.jsx';
-import { formatCount, formatDuration, timeAgo } from '@/api.js';
+import { formatCount, formatDuration } from '@/api.js';
+import { trackLink, userLink, playlistLink } from '@/lib/scRoute.js';
 
 export function TrackCard({ track, context, showStats = true }) {
   if (!track) return null;
   return (
     <div className="group min-w-0">
       <div className="relative overflow-hidden rounded-lg">
-        <Link to="/track/$id" params={{ id: String(track.id) }} aria-label={track.title}>
+        <Link {...trackLink(track)} aria-label={track.title}>
           <Artwork
             src={track.artwork_url}
             fallback={track.user?.avatar_url}
@@ -50,16 +50,14 @@ export function TrackCard({ track, context, showStats = true }) {
       <div className="mt-2.5 min-w-0">
         <Link
           className="block truncate text-sm font-semibold hover:underline"
-          to="/track/$id"
-          params={{ id: String(track.id) }}
+          {...trackLink(track)}
         >
           {track.title}
         </Link>
         {track.user ? (
           <Link
             className="block truncate text-xs text-muted-foreground hover:text-foreground"
-            to="/artist/$id"
-            params={{ id: String(track.user.id) }}
+            {...userLink(track.user)}
           >
             {track.user.username}
           </Link>
@@ -117,7 +115,7 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
         </Link>
         <div className="truncate text-xs text-muted-foreground">
           {track.user ? (
-            <Link to="/artist/$id" params={{ id: String(track.user.id) }} className="hover:text-foreground">
+            <Link {...userLink(track.user)} className="hover:text-foreground">
               {track.user.username}
             </Link>
           ) : (
@@ -142,15 +140,14 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
 
 export function PlaylistCard({ playlist }) {
   if (!playlist) return null;
-  const idStr = String(playlist.id);
-  const isSystem = playlist.kind === 'system-playlist' || idStr.startsWith('system:');
-  const id = isSystem ? `system:${idStr.replace(/^system:/, '')}` : `sc:${playlist.id}`;
+  const isSystem =
+    playlist.kind === 'system-playlist' || String(playlist.id).startsWith('system:');
   const owner = playlist.user;
   const trackCount = playlist.track_count ?? playlist.tracks?.length ?? 0;
 
   return (
     <div className="group min-w-0">
-      <Link to="/playlist/$id" params={{ id }} className="relative block overflow-hidden rounded-lg" aria-label={playlist.title}>
+      <Link {...playlistLink(playlist)} className="relative block overflow-hidden rounded-lg" aria-label={playlist.title}>
         <Artwork
           src={playlist.artwork_url}
           alt={playlist.title}
@@ -166,16 +163,18 @@ export function PlaylistCard({ playlist }) {
       </Link>
       <div className="mt-2.5 min-w-0">
         <Link
-          to="/playlist/$id"
-          params={{ id }}
+          {...playlistLink(playlist)}
           className="block truncate text-sm font-semibold hover:underline"
         >
           {playlist.title}
         </Link>
-        {owner ? (
+        {/*
+         * Recommendation mixes are owned by SoundCloud itself. Printing that
+         * under every card says nothing the card does not already say.
+         */}
+        {owner && !isSystem ? (
           <Link
-            to="/artist/$id"
-            params={{ id: String(owner.id) }}
+            {...userLink(owner)}
             className="block truncate text-xs text-muted-foreground hover:text-foreground"
           >
             {owner.username}
@@ -190,12 +189,11 @@ export function ArtistCard({ user }) {
   if (!user) return null;
   return (
     <div className="flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-card/50 px-4 py-6 text-center">
-      <Link to="/artist/$id" params={{ id: String(user.id) }} aria-label={user.username}>
+      <Link {...userLink(user)} aria-label={user.username}>
         <Avatar src={user.avatar_url} name={user.username} size={78} />
       </Link>
       <Link
-        to="/artist/$id"
-        params={{ id: String(user.id) }}
+        {...userLink(user)}
         className="mt-1 max-w-full truncate text-sm font-semibold hover:underline"
       >
         {user.username}
@@ -213,13 +211,12 @@ export function ArtistRow({ user, subtitle }) {
   if (!user) return null;
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card/40 px-3 py-2.5">
-      <Link to="/artist/$id" params={{ id: String(user.id) }} className="shrink-0">
+      <Link {...userLink(user)} className="shrink-0">
         <Avatar src={user.avatar_url} name={user.username} size={46} />
       </Link>
       <div className="min-w-0 flex-1">
         <Link
-          to="/artist/$id"
-          params={{ id: String(user.id) }}
+          {...userLink(user)}
           className="inline-flex items-center gap-1 truncate text-sm font-semibold hover:underline"
         >
           {user.username}
@@ -302,6 +299,10 @@ export function SectionScroller({ title, subtitle, children, action }) {
   );
 }
 
+/*
+ * The line under the player: plays only. Likes and comments have their own
+ * buttons above, so repeating them here just made the row noisy.
+ */
 export function TrackStatLine({ track }) {
   if (!track) return null;
   return (
@@ -309,17 +310,6 @@ export function TrackStatLine({ track }) {
       <span className="inline-flex items-center gap-1.5">
         <PlayCircle size={14} /> {formatCount(track.playback_count)} plays
       </span>
-      <span className="inline-flex items-center gap-1.5">
-        <Heart size={14} /> {formatCount(track.likes_count)} likes
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <MessageSquare size={14} /> {formatCount(track.comment_count)} comments
-      </span>
-      {track.display_date ? (
-        <span className="inline-flex items-center gap-1.5">
-          <Clock size={14} /> {timeAgo(track.display_date)}
-        </span>
-      ) : null}
     </div>
   );
 }

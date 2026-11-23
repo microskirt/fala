@@ -75,9 +75,11 @@ export function CaptchaProvider({ children }) {
       try {
         const data = await api.get('/api/captcha');
         if (!data.blocked || !data.url) {
+          // Nothing to solve: the retry is simply attempted again. Saying
+          // "already working" here contradicts the error the caller is about to
+          // see if that retry also fails.
           setOpen(false);
           setLoading(false);
-          toast.success('Write access is already working');
           return true;
         }
         setUrl(data.url);

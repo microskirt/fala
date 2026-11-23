@@ -123,7 +123,7 @@ export function SearchPage() {
       : `${data.collection.length} results`;
 
   return (
-    <Page>
+    <Page className="pb-24">
       <PageHeader
         title={`Results for “${q}”`}
         description={countLabel}
