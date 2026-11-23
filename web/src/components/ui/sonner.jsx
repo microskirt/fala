@@ -12,6 +12,19 @@ function Toaster(props) {
     <Sonner
       theme={theme === 'light' ? 'light' : 'dark'}
       className="toaster group"
+      /*
+       * Sonner's own dark theme paints the close button with --normal-bg,
+       * which is plain black and ignores our palette. Pointing those variables
+       * at the same tokens the toast uses keeps the button on the Catppuccin
+       * surface instead of a black dot.
+       */
+      style={{
+        '--normal-bg': 'var(--popover)',
+        '--normal-bg-hover': 'var(--accent)',
+        '--normal-border': 'var(--border)',
+        '--normal-border-hover': 'var(--border)',
+        '--normal-text': 'var(--popover-foreground)',
+      }}
       position="top-right"
       offset={{ top: 'calc(var(--topbar-height) + 12px)', right: '12px' }}
       gap={8}
