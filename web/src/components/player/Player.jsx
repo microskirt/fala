@@ -76,7 +76,9 @@ function SeekLine({ value, max, onSeek }) {
 
 /*
  * The volume bar lives inside the icon: hovering opens a vertical slider
- * above it, so the bar itself stays as thin as SoundCloud's.
+ * above it, so the bar itself stays as thin as SoundCloud's. The slider is
+ * laid out vertically instead of being rotated, which is what used to leave it
+ * cramped and make the drag travel along the wrong axis.
  */
 function VolumeControl({ volume, muted, icon: Icon, onToggleMute, onVolume }) {
   const shown = muted ? 0 : Math.round(volume * 100);
@@ -93,13 +95,15 @@ function VolumeControl({ volume, muted, icon: Icon, onToggleMute, onVolume }) {
         <Icon size={15} />
       </Button>
 
-      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 -translate-x-1/2 pb-2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-        <div className="flex flex-col items-center gap-2 rounded-lg border bg-popover px-2.5 py-3 shadow-lg">
-          <span className="text-[10px] tabular-nums text-muted-foreground">{shown}</span>
-          {/* Radix sliders are horizontal, so the vertical bar is a rotated one. */}
-          <div className="flex h-24 w-6 items-center justify-center">
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 -translate-x-1/2 pb-1.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+        <div className="flex flex-col items-center gap-1.5 rounded-lg border bg-popover px-3 py-2.5 shadow-lg">
+          <span className="text-[10px] leading-none tabular-nums text-muted-foreground">
+            {shown}
+          </span>
+          <div className="flex h-32 w-7 items-center justify-center">
             <Slider
-              className="w-24 origin-center -rotate-90"
+              orientation="vertical"
+              className="h-full"
               value={[shown]}
               max={100}
               step={1}
