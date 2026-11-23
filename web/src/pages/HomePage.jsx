@@ -14,6 +14,7 @@ import {
 } from '@/components/Controls.jsx';
 import { Page, PageHeader, Section, CardGridSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
+import { trackLink, userLink, playlistLink } from '@/lib/scRoute.js';
 
 function greeting() {
   const h = new Date().getHours();
@@ -36,14 +37,13 @@ function FeedItem({ item }) {
 
   return (
     <div className="flex gap-3 border-b border-border/60 py-3.5 last:border-0">
-      <Link to="/artist/$id" params={{ id: String(item.user?.id) }} className="shrink-0">
+      <Link {...userLink(item.user)} className="shrink-0">
         <Avatar src={item.user?.avatar_url} name={item.user?.username} size={38} />
       </Link>
       <div className="min-w-0 flex-1">
         <div className="text-sm text-muted-foreground">
           <Link
-            to="/artist/$id"
-            params={{ id: String(item.user?.id) }}
+            {...userLink(item.user)}
             className="font-semibold text-foreground hover:underline"
           >
             {item.user?.username}
@@ -55,7 +55,7 @@ function FeedItem({ item }) {
 
         {isPlaylist && playlist ? (
           <div className="mt-2 flex items-center gap-2.5">
-            <Link to="/playlist/$id" params={{ id: `sc:${playlist.id}` }} className="shrink-0">
+            <Link {...playlistLink(playlist)} className="shrink-0">
               <Artwork
                 src={playlist.artwork_url}
                 alt={playlist.title}
@@ -66,8 +66,7 @@ function FeedItem({ item }) {
             </Link>
             <div className="min-w-0 flex-1">
               <Link
-                to="/playlist/$id"
-                params={{ id: `sc:${playlist.id}` }}
+                {...playlistLink(playlist)}
                 className="block truncate text-sm font-medium hover:underline"
               >
                 {playlist.title}
@@ -79,21 +78,19 @@ function FeedItem({ item }) {
           </div>
         ) : track ? (
           <div className="mt-2 flex items-center gap-2.5">
-            <Link to="/track/$id" params={{ id: String(track.id) }} className="shrink-0">
+            <Link {...trackLink(track)} className="shrink-0">
               <Artwork src={track.artwork_url} alt={track.title} size={46} rounded={6} />
             </Link>
             <div className="min-w-0 flex-1">
               <Link
-                to="/track/$id"
-                params={{ id: String(track.id) }}
+                {...trackLink(track)}
                 className="block truncate text-sm font-medium hover:underline"
               >
                 {track.title}
               </Link>
               {track.user ? (
                 <Link
-                  to="/artist/$id"
-                  params={{ id: String(track.user.id) }}
+                  {...userLink(track.user)}
                   className="block truncate text-xs text-muted-foreground hover:text-foreground"
                 >
                   {track.user.username}

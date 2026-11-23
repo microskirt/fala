@@ -7,6 +7,7 @@ import { Avatar, Artwork, EmptyState, ErrorState } from '@/components/Media.jsx'
 import { PlayButton, AddToQueueButton, AddToPlaylistButton } from '@/components/Controls.jsx';
 import { Page, PageHeader, TrackList, TrackListSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
+import { trackLink, userLink } from '@/lib/scRoute.js';
 
 /*
  * A `track` entry is either the artist posting their own track or someone
@@ -98,27 +99,24 @@ export function ActivityPage() {
                 className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50"
               >
                 <Link
-                  to="/artist/$id"
-                  params={{ id: String(item.user?.id) }}
+                  {...userLink(item.user)}
                   className="shrink-0"
                 >
                   <Avatar src={item.user?.avatar_url} name={item.user?.username} size={34} />
                 </Link>
-                <Link to="/track/$id" params={{ id: String(track.id) }} className="shrink-0">
+                <Link {...trackLink(track)} className="shrink-0">
                   <Artwork src={track.artwork_url} alt={track.title} size={52} rounded={6} />
                 </Link>
                 <div className="min-w-0 flex-1">
                   <Link
-                    to="/track/$id"
-                    params={{ id: String(track.id) }}
+                    {...trackLink(track)}
                     className="block truncate text-sm font-medium hover:underline"
                   >
                     {track.title}
                   </Link>
                   <div className="truncate text-xs text-muted-foreground">
                     <Link
-                      to="/artist/$id"
-                      params={{ id: String(item.user?.id) }}
+                      {...userLink(item.user)}
                       className="hover:text-foreground"
                     >
                       {item.user?.username || 'Someone'}
@@ -128,8 +126,7 @@ export function ActivityPage() {
                       <>
                         {' '}
                         <Link
-                          to="/artist/$id"
-                          params={{ id: String(track.user.id) }}
+                          {...userLink(track.user)}
                           className="hover:text-foreground"
                         >
                           {track.user.username}

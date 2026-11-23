@@ -86,6 +86,29 @@ const artistRoute = createRoute({
   component: ProfilePage,
 });
 
+/*
+ * The public addresses, shaped like SoundCloud's own: /artist, /artist/song and
+ * /artist/sets/playlist. Static first segments (search, settings, track, ...)
+ * outrank these, so the old id routes keep working as aliases.
+ */
+const slugArtistRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist',
+  component: ProfilePage,
+});
+
+const slugTrackRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/$track',
+  component: TrackPage,
+});
+
+const slugPlaylistRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/$artist/sets/$playlist',
+  component: PlaylistPage,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/settings',
@@ -153,6 +176,9 @@ const routeTree = rootRoute.addChildren([
     followingRoute,
     playlistsRoute,
     historyRoute,
+    slugArtistRoute,
+    slugTrackRoute,
+    slugPlaylistRoute,
   ]),
 ]);
 

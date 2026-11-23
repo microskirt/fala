@@ -5,6 +5,7 @@ import { usePagedList } from '@/lib/usePagedList.js';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Artwork, Avatar, ErrorState, EmptyState } from '@/components/Media.jsx';
 import { BadgeCheck } from 'lucide-react';
+import { userLink, playlistLink } from '@/lib/scRoute.js';
 import {
   Page,
   PageHeader,
@@ -19,13 +20,12 @@ function PersonRow({ user }) {
   if (!user) return null;
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card/40 px-3 py-2.5">
-      <Link to="/artist/$id" params={{ id: String(user.id) }} className="shrink-0">
+      <Link {...userLink(user)} className="shrink-0">
         <Avatar src={user.avatar_url} name={user.username} size={46} />
       </Link>
       <div className="min-w-0 flex-1">
         <Link
-          to="/artist/$id"
-          params={{ id: String(user.id) }}
+          {...userLink(user)}
           className="inline-flex items-center gap-1 truncate text-sm font-semibold hover:underline"
         >
           {user.username}
@@ -41,11 +41,9 @@ function PersonRow({ user }) {
 
 function PlaylistTile({ playlist }) {
   if (!playlist) return null;
-  const isSystem = playlist.kind === 'system-playlist';
-  const id = isSystem ? `system:${String(playlist.id).replace(/^system:/, '')}` : `sc:${playlist.id}`;
   return (
     <div className="group min-w-0">
-      <Link to="/playlist/$id" params={{ id }} className="block overflow-hidden rounded-lg">
+      <Link {...playlistLink(playlist)} className="block overflow-hidden rounded-lg">
         <Artwork
           src={playlist.artwork_url}
           alt={playlist.title}
@@ -55,16 +53,14 @@ function PlaylistTile({ playlist }) {
         />
       </Link>
       <Link
-        to="/playlist/$id"
-        params={{ id }}
+        {...playlistLink(playlist)}
         className="mt-2.5 block truncate text-sm font-semibold hover:underline"
       >
         {playlist.title}
       </Link>
       {playlist.user ? (
         <Link
-          to="/artist/$id"
-          params={{ id: String(playlist.user.id) }}
+          {...userLink(playlist.user)}
           className="block truncate text-xs text-muted-foreground hover:text-foreground"
         >
           {playlist.user.username}

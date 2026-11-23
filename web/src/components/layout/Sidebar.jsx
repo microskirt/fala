@@ -11,7 +11,6 @@ import {
   LogIn,
   History,
   LogOut,
-  ChevronUp,
   User,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -27,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx';
 import { cn } from '@/lib/utils.js';
+import { userLink } from '@/lib/scRoute.js';
 
 function NavLink({ to, icon: Icon, label, count, onClick }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -142,12 +142,11 @@ export function Sidebar({ open, onNavigate }) {
                   <div className="truncate text-sm font-semibold">{user.username}</div>
                   <div className="truncate text-xs text-muted-foreground">@{user.permalink}</div>
                 </div>
-                <ChevronUp size={14} className="shrink-0 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="w-[224px]">
               <DropdownMenuItem asChild>
-                <Link to="/artist/$id" params={{ id: String(user.id) }} onClick={onNavigate}>
+                <Link {...userLink(user)} onClick={onNavigate}>
                   <User size={16} /> Profile
                 </Link>
               </DropdownMenuItem>

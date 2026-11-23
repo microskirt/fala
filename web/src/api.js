@@ -142,12 +142,40 @@ export function initials(name) {
     .toUpperCase();
 }
 
+/*
+ * The address bar mirrors SoundCloud: a song lives at /artist/song, a playlist
+ * at /artist/sets/playlist and a person at /artist. SoundCloud already hands
+ * out those permalinks, so the path is taken from there instead of being built
+ * from ids that say nothing to a reader.
+ */
+export function scPath(obj) {
+  const raw = obj?.permalink_url;
+  if (!raw) return null;
+  try {
+    const path = new URL(raw, 'https://soundcloud.com').pathname.replace(/\/+$/, '');
+    if (!path || path === '/') return null;
+    return path.startsWith('/') ? path : `/${path}`;
+  } catch {
+    return null;
+  }
+}
+
 export function trackPath(track) {
-  if (!track) return '#';
-  return `/track/${track.id}`;
+  if (!track) return '/';
+  return scPath(track) || `/track/${track.id}`;
 }
 
 export function userPath(user) {
-  if (!user) return '#';
-  return `/artist/${user.id}`;
+  if (!user) return '/';
+  return scPath(user) || `/artist/${user.id}`;
+}
+
+export function playlistPath(playlist) {
+  if (!playlist) return '/';
+  const slug = scPath(playlist);
+  // A system playlist has no public permalink, so it keeps its id based route.
+  if (slug) return slug;
+  const raw = String(playlist.id);
+  const isSystem = playlist.kind === 'system-playlist' || raw.startsWith('system:');
+  return `/playlist/${isSystem ? `system:${raw.replace(/^system:/, '')}` : `sc:${raw}`}`;
 }

@@ -25,6 +25,7 @@ import { formatDuration } from '@/api.js';
 import { Slider } from '@/components/ui/slider.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils.js';
+import { trackLink, userLink } from '@/lib/scRoute.js';
 
 /* A thin line between the two timestamps, the way SoundCloud draws it. */
 function SeekLine({ value, max, onSeek }) {
@@ -294,8 +295,7 @@ export function Player() {
           {current ? (
             <>
               <Link
-                to="/track/$id"
-                params={{ id: String(current.id) }}
+                {...trackLink(current)}
                 className="shrink-0"
                 title={current.title}
               >
@@ -310,16 +310,14 @@ export function Player() {
               <div className="flex h-10 min-w-0 flex-col justify-center leading-tight">
                 {current.user ? (
                   <Link
-                    to="/artist/$id"
-                    params={{ id: String(current.user.id) }}
+                    {...userLink(current.user)}
                     className="truncate text-xs text-muted-foreground hover:text-foreground"
                   >
                     {current.user.username}
                   </Link>
                 ) : null}
                 <Link
-                  to="/track/$id"
-                  params={{ id: String(current.id) }}
+                  {...trackLink(current)}
                   className="truncate text-sm font-semibold hover:underline"
                   title={current.title}
                 >

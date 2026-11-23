@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { Avatar, Artwork } from '@/components/Media.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { KEYS, readKey, writeKey } from '@/lib/storage.js';
+import { userLink } from '@/lib/scRoute.js';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -149,8 +150,7 @@ export function NotificationsMenu() {
                   className="flex items-start gap-2.5 px-3 py-2.5 transition-colors hover:bg-accent/60"
                 >
                   <Link
-                    to="/artist/$id"
-                    params={{ id: String(n.user?.id) }}
+                    {...userLink(n.user)}
                     className="shrink-0"
                   >
                     <Avatar src={n.user?.avatar_url} name={n.user?.username} size={32} />
@@ -158,8 +158,7 @@ export function NotificationsMenu() {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm leading-snug text-muted-foreground">
                       <Link
-                        to="/artist/$id"
-                        params={{ id: String(n.user?.id) }}
+                        {...userLink(n.user)}
                         className="font-semibold text-foreground hover:underline"
                       >
                         {n.user?.username || 'Someone'}
