@@ -40,6 +40,7 @@ import { Label } from '@/components/ui/label.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
 import { trackLink, userLink, resolvePlaylistParam, playlistSubLink } from '@/lib/scRoute.js';
 import { cn } from '@/lib/utils.js';
+import { DETAIL_GRID } from '@/lib/layout.js';
 
 function PlaylistTrackRow({ track, index, context }) {
   return (
@@ -167,8 +168,8 @@ export function PlaylistPage() {
     return (
       <Page>
         {/* The cover lands on the right, so the skeleton does too. */}
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
-          <Skeleton className="aspect-square w-full max-w-[280px] rounded-xl lg:order-2 lg:ml-auto" />
+        <div className={cn('grid gap-8', DETAIL_GRID)}>
+          <Skeleton className="aspect-square w-full rounded-xl lg:order-2" />
           <div className="flex flex-col gap-3 lg:order-1">
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-8 w-3/5" />
@@ -236,8 +237,8 @@ export function PlaylistPage() {
        * at the page edge and the picture anchors the other side. It stays first
        * in the markup, which is the order it should stack in on a phone.
        */}
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
-        <div className="mx-auto w-full max-w-[280px] lg:order-2 lg:mx-0">
+      <div className={cn('grid gap-8', DETAIL_GRID)}>
+        <div className="mx-auto w-full max-w-[20rem] lg:order-2 lg:mx-0">
           <Artwork
             src={playlist.artwork_url}
             fallback={playlist.user?.avatar_url}

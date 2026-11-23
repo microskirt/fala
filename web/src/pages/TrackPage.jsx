@@ -5,7 +5,6 @@ import {
   Pause,
   Repeat2,
   MessageSquare,
-  Share2,
   Link2,
   Loader2,
   BadgeCheck,
@@ -16,6 +15,8 @@ import {
   MapPin,
   Users,
   PlayCircle,
+  Timer,
+  Send,
   X,
 } from 'lucide-react';
 import {
@@ -45,17 +46,12 @@ import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu.jsx';
 import { Modal } from '@/components/Modal.jsx';
 import { cn } from '@/lib/utils.js';
 import { placeLabel } from '@/lib/places.js';
 import { ClampedText } from '@/components/ClampedText.jsx';
 import { resolveTrackParam, playlistLink, userLink, trackSubLink } from '@/lib/scRoute.js';
+import { DETAIL_GRID } from '@/lib/layout.js';
 
 function Waveform({ samples, progress, onSeek, height = 96 }) {
   const ref = useRef(null);
@@ -128,23 +124,48 @@ function WaveformPlayer({ track, samples, active, onSeek, durationMs }) {
   const total = duration || durationMs || 0;
   const progress = active && total > 0 ? Math.min(1, currentTime / total) : 0;
 
+  /*
+   * The clock reads down the right edge the way SoundCloud shows it: where the
+   * playhead is on top, the length of the song under it. The bars keep the
+   * full width of the column.
+   */
   return (
-    <div className="mt-6 flex items-center gap-3">
-      <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-        {formatDuration(active ? currentTime : 0)}
-      </span>
-      <Waveform samples={samples} progress={progress} onSeek={onSeek} />
-      <span className="w-10 shrink-0 text-xs tabular-nums text-muted-foreground">
-        {formatDuration(track.duration)}
-      </span>
+    <div className="flex items-stretch gap-3">
+      <div className="min-w-0 flex-1">
+        <Waveform samples={samples} progress={progress} onSeek={onSeek} height={120} />
+      </div>
+      <div className="flex shrink-0 flex-col justify-between py-0.5 text-xs tabular-nums text-muted-foreground">
+        <span>{formatDuration(active ? currentTime : 0)}</span>
+        <span>{formatDuration(track.duration)}</span>
+      </div>
     </div>
   );
 }
 
 /* Reads the playhead itself so only this button re-renders while playing. */
-function TimestampToggle({ active, value, onChange }) {
+function TimestampToggle({ active, value, onChange, compact = false }) {
   const { currentTime } = usePlayerTime();
   if (!active) return null;
+
+  /*
+   * In the top card the control sits beside the comment field, where a full
+   * sentence would take the room the field needs. It becomes an icon there and
+   * keeps its wording in the comments section below.
+   */
+  if (compact) {
+    return (
+      <Button
+        variant={value == null ? 'outline' : 'secondary'}
+        size="icon"
+        onClick={() => onChange(value == null ? currentTime : null)}
+        aria-pressed={value != null}
+        aria-label={value == null ? 'Comment at current time' : `Comment at ${formatDuration(value)}`}
+        title={value == null ? 'Comment at current time' : `Comment at ${formatDuration(value)}`}
+      >
+        <Timer size={16} />
+      </Button>
+    );
+  }
 
   return (
     <Button
@@ -157,7 +178,7 @@ function TimestampToggle({ active, value, onChange }) {
   );
 }
 
-function CommentForm({ track, onPosted, timestampMs, replyTo = null }) {
+function CommentForm({ track, onPosted, timestampMs, replyTo = null, className, compact = false }) {
   const { addComment } = useLibrary();
   const { user } = useAuth();
   /*
@@ -171,7 +192,12 @@ function CommentForm({ track, onPosted, timestampMs, replyTo = null }) {
 
   if (!user) {
     return (
-      <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-3.5 py-2.5 text-sm text-muted-foreground">
+      <div
+        className={cn(
+          'flex items-center gap-2.5 rounded-lg border bg-muted/40 px-3.5 py-2.5 text-sm text-muted-foreground',
+          className
+        )}
+      >
         <MessageSquare size={16} />
         <span>
           <Link to="/login" className="font-medium text-primary hover:underline">
@@ -195,8 +221,39 @@ function CommentForm({ track, onPosted, timestampMs, replyTo = null }) {
     setBusy(false);
   };
 
+  /*
+   * The top card keeps the field short and posts with an icon, so the whole
+   * action line stays on one row. Replies and the signed-in box keep the
+   * labelled button, since they sit on a line of their own.
+   */
+  if (compact) {
+    return (
+      <form className={cn('flex items-center gap-1.5', className)} onSubmit={submit}>
+        <Input
+          className="h-9 flex-1"
+          placeholder={
+            timestampMs ? `Comment at ${formatDuration(timestampMs)}…` : 'Write a comment…'
+          }
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          maxLength={1000}
+          aria-label="Write a comment"
+        />
+        <Button
+          type="submit"
+          size="icon"
+          disabled={!body.trim() || busy}
+          aria-label="Post comment"
+          title="Post comment"
+        >
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+        </Button>
+      </form>
+    );
+  }
+
   return (
-    <form className="flex items-center gap-2.5" onSubmit={submit}>
+    <form className={cn('flex items-center gap-2.5', className)} onSubmit={submit}>
       <Avatar src={user.avatar_url} name={user.username} size={38} />
       <Input
         className="flex-1"
@@ -999,9 +1056,10 @@ export function TrackPage() {
   if (loading) {
     return (
       <Page>
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
-          <Skeleton className="aspect-square w-full rounded-xl" />
-          <div className="flex flex-col gap-3.5">
+        {/* The cover lands on the right, so the skeleton does too. */}
+        <div className={cn('grid gap-8', DETAIL_GRID)}>
+          <Skeleton className="aspect-square w-full rounded-xl lg:order-2" />
+          <div className="flex flex-col gap-3.5 lg:order-1">
             <Skeleton className="h-3 w-28" />
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-3.5 w-2/5" />
@@ -1043,8 +1101,13 @@ export function TrackPage() {
 
   return (
     <Page>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
-        <div className="mx-auto w-full max-w-[280px] lg:mx-0">
+      <div className={cn('grid gap-8', DETAIL_GRID)}>
+        {/*
+         * The cover takes the right column at the same width as the boxes under
+         * the card, so the page keeps one right edge. It stays first in the
+         * markup, which is the order a phone should stack it in.
+         */}
+        <div className="mx-auto w-full max-w-[20rem] lg:order-2 lg:mx-0">
           {/*
            * Some uploads carry no artwork at all, and SoundCloud shows the
            * artist avatar for those instead of a blank tile.
@@ -1059,43 +1122,18 @@ export function TrackPage() {
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 lg:order-1">
           {track.policy === 'BLOCK' ? (
             <div className="mb-2">
               <Badge variant="destructive">Unavailable</Badge>
             </div>
           ) : null}
 
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            {track.title}
-          </h1>
-
-          {/*
-           * The song's own credits, not the uploader. SoundCloud keeps them in
-           * publisher_metadata.artist and they often differ from the account
-           * that posted the file. The date sits next to them, relative at first
-           * glance and spelled out in full on hover.
-           */}
-          {metaArtist || track.display_date ? (
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
-              {metaArtist ? <span className="min-w-0 break-words">{metaArtist}</span> : null}
-              {metaArtist && track.display_date ? <span aria-hidden="true">-</span> : null}
-              {track.display_date ? (
-                <time
-                  dateTime={track.display_date}
-                  title={formatDate(track.display_date)}
-                  className="cursor-default"
-                >
-                  {formatRelativeDate(track.display_date)}
-                </time>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="mt-5 flex flex-wrap items-center gap-2">
+          {/* The play button leads the card, with the title and credits beside it. */}
+          <div className="flex items-start gap-4">
             <button
               type="button"
-              className="grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
+              className="grid size-14 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
               onClick={() => (active ? togglePlay() : playTrack(track, contextList))}
               aria-label={active && playing ? 'Pause' : 'Play'}
             >
@@ -1106,29 +1144,87 @@ export function TrackPage() {
               )}
             </button>
 
-            <LikeButton track={track} size={18} />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                {track.title}
+              </h1>
 
-            <RepostControl track={track} />
-
-            <AddToQueueButton track={track} size={18} />
-
-            <AddToPlaylistButton track={track} size={18} />
-
-            <ShareButton track={track} onCopy={copyLink} />
+              {/*
+               * The song's own credits, not the uploader. SoundCloud keeps them in
+               * publisher_metadata.artist and they often differ from the account
+               * that posted the file. The date sits next to them, relative at first
+               * glance and spelled out in full on hover.
+               */}
+              {metaArtist || track.display_date ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
+                  {metaArtist ? <span className="min-w-0 break-words">{metaArtist}</span> : null}
+                  {metaArtist && track.display_date ? <span aria-hidden="true">-</span> : null}
+                  {track.display_date ? (
+                    <time
+                      dateTime={track.display_date}
+                      title={formatDate(track.display_date)}
+                      className="cursor-default"
+                    >
+                      {formatRelativeDate(track.display_date)}
+                    </time>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {waveform ? (
-            <WaveformPlayer
-              track={track}
-              samples={waveform}
-              active={active}
-              durationMs={track.full_duration || track.duration || 0}
-              onSeek={(ratio) => {
-                if (!active) playTrack(track, contextList);
-                seek(ratio * (track.full_duration || track.duration || 0));
-              }}
-            />
+            <div className="mt-6">
+              <WaveformPlayer
+                track={track}
+                samples={waveform}
+                active={active}
+                durationMs={track.full_duration || track.duration || 0}
+                onSeek={(ratio) => {
+                  if (!active) playTrack(track, contextList);
+                  seek(ratio * (track.full_duration || track.duration || 0));
+                }}
+              />
+            </div>
           ) : null}
+
+          {/*
+           * The action line, in SoundCloud's order: like, the comment field,
+           * copy link, repost, add to playlist and add to queue. The comment
+           * field lives here now instead of under the comments heading, so a
+           * listener can say something without scrolling.
+           */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <LikeButton track={track} size={18} />
+
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <TimestampToggle
+                active={active}
+                value={commentTimestamp}
+                onChange={setCommentTimestamp}
+                compact
+              />
+              <CommentForm
+                track={track}
+                timestampMs={commentTimestamp}
+                className="min-w-0 flex-1"
+                compact
+                onPosted={(c) => {
+                  setComments((prev) => [c, ...prev]);
+                  setCommentTotal((n) => n + 1);
+                  setCommentTimestamp(null);
+                }}
+              />
+            </div>
+
+            <CopyLinkButton track={track} onCopy={copyLink} />
+
+            <RepostControl track={track} />
+
+            <AddToPlaylistButton track={track} size={18} />
+
+            <AddToQueueButton track={track} size={18} />
+          </div>
         </div>
       </div>
 
@@ -1138,7 +1234,7 @@ export function TrackPage() {
        * right. The comments lose a little width to make room for it, which is
        * the whole point of the split.
        */}
-      <div className="mt-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div className={cn('mt-12 grid gap-8 lg:items-start', DETAIL_GRID)}>
         <div className="min-w-0">
           {/*
            * Everything known about the song sits together here: the tags it
@@ -1194,31 +1290,18 @@ export function TrackPage() {
           </section>
 
           <section className="mt-12">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-                Comments
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
-                  {commentTotal}
-                </span>
-              </h2>
-              <TimestampToggle
-                active={active}
-                value={commentTimestamp}
-                onChange={setCommentTimestamp}
-              />
-            </div>
+            {/*
+             * The comment field sits in the top card now, so this section only
+             * carries the heading and the thread.
+             */}
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight">
+              Comments
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
+                {commentTotal}
+              </span>
+            </h2>
 
-            <CommentForm
-              track={track}
-              timestampMs={commentTimestamp}
-              onPosted={(c) => {
-                setComments((prev) => [c, ...prev]);
-                setCommentTotal((n) => n + 1);
-                setCommentTimestamp(null);
-              }}
-            />
-
-            <div className="mt-4">
+            <div>
               {comments.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
                   No comments yet. Be the first to say something.
@@ -1387,42 +1470,23 @@ function RepostControl({ track }) {
 }
 
 /*
- * Two links lead to the same song, so the choice is shown instead of guessed:
- * this copy of the page, or the original on SoundCloud.
+ * One click puts this page's address on the clipboard. The old control was a
+ * menu that asked which link to copy, which turned a single action into two
+ * decisions; the page address is the one people want.
  */
-function ShareButton({ track, onCopy }) {
+function CopyLinkButton({ track, onCopy }) {
   if (!track) return null;
   const here = `${window.location.origin}${trackPath(track)}`;
-  const rows = [
-    { id: 'fala', label: 'This page', url: here, icon: Link2 },
-    track.permalink_url
-      ? { id: 'sc', label: 'SoundCloud', url: track.permalink_url, icon: Share2 }
-      : null,
-  ].filter(Boolean);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" title="Copy link" aria-label="Copy link">
-          <Link2 size={16} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        {rows.map((row) => {
-          const Icon = row.icon;
-          return (
-            /*
-             * Selecting an item closes the menu on its own, so the only work
-             * here is handing the address to the copy helper, which raises the
-             * toast. No dialog and no page wide overlay.
-             */
-            <DropdownMenuItem key={row.id} onSelect={() => onCopy(row.url, row.label)}>
-              <Icon size={16} className="shrink-0 text-muted-foreground" />
-              <span className="truncate">{row.label}</span>
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => onCopy(here, 'Song')}
+      title="Copy link"
+      aria-label="Copy link"
+    >
+      <Link2 size={16} />
+    </Button>
   );
 }
