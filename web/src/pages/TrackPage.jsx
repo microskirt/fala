@@ -281,14 +281,20 @@ function CommentItem({ comment, trackId, onDelete, onReplied, isReply = false })
             {comment.user?.username || 'Listener'}
           </Link>
           <span>{timeAgo(comment.created_at)}</span>
+          {/*
+           * The timestamp used to be a themed pill, which made it read like a
+           * button competing with the comment itself. It now looks like the
+           * "time ago" beside it and only lifts to white on hover, which is
+           * enough to show it can be clicked.
+           */}
           {comment.timestamp_ms != null ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-1.5 py-0.5 text-xs font-semibold text-primary tabular-nums hover:bg-primary/25"
+              className="tabular-nums transition-colors hover:text-foreground"
               onClick={() => seek(comment.timestamp_ms)}
               title="Jump to this moment"
             >
-              <Play size={14} fill="currentColor" /> {formatDuration(comment.timestamp_ms)}
+              {formatDuration(comment.timestamp_ms)}
             </button>
           ) : null}
         </div>
