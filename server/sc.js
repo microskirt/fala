@@ -341,6 +341,12 @@ export function slimTrack(t) {
     policy: t.policy,
     monetization_model: t.monetization_model,
     waveform_url: t.waveform_url,
+    /*
+     * The song's own artist credit, which often differs from the account that
+     * uploaded the file. Lists show this name but still link to the uploader,
+     * so it has to travel with every track, not just the full song page.
+     */
+    publisher_metadata: t.publisher_metadata || null,
     user: slimUser(t.user),
   };
 }
@@ -356,7 +362,6 @@ export function fullTrack(t) {
     license: t.license || '',
     purchase_url: t.purchase_url || null,
     purchase_title: t.purchase_title || null,
-    publisher_metadata: t.publisher_metadata || null,
     embeddable_by: t.embeddable_by,
     downloadable: !!t.downloadable,
     transcodings: (t.media?.transcodings || []).map((x) => ({

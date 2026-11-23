@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Activity } from 'lucide-react';
-import { api, timeAgo } from '@/api.js';
+import { api, timeAgo, trackArtistName } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { Avatar, Artwork, EmptyState, ErrorState } from '@/components/Media.jsx';
 import { PlayButton, AddToQueueButton, AddToPlaylistButton } from '@/components/Controls.jsx';
@@ -135,7 +135,7 @@ export function ActivityPage() {
                           {...userLink(track.user)}
                           className="hover:text-foreground"
                         >
-                          {track.user.username}
+                          {trackArtistName(track)}
                         </Link>
                       </>
                     ) : null}

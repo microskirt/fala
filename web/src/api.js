@@ -195,6 +195,18 @@ export function trackPath(track) {
   return scPath(track) || `/track/${track.id}`;
 }
 
+/*
+ * The name shown for a song in a list. SoundCloud stores the song's own artist
+ * credit apart from the account that uploaded it, and the two often differ.
+ * The credit is what the song page shows under the title, so lists use the
+ * same name; the link beside it still goes to the uploader, because that is
+ * the account the track actually belongs to.
+ */
+export function trackArtistName(track) {
+  const credit = String(track?.publisher_metadata?.artist || '').trim();
+  return credit || track?.user?.username || '';
+}
+
 export function userPath(user) {
   if (!user) return '/';
   return scPath(user) || `/artist/${user.id}`;

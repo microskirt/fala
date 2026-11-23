@@ -19,7 +19,7 @@ import {
   QueueMenuButton,
   FollowButton,
 } from '@/components/Controls.jsx';
-import { formatCount, formatDuration } from '@/api.js';
+import { formatCount, formatDuration, trackArtistName } from '@/api.js';
 import { trackLink, userLink, playlistLink } from '@/lib/scRoute.js';
 
 export function TrackCard({ track, context, showStats = true }) {
@@ -63,7 +63,7 @@ export function TrackCard({ track, context, showStats = true }) {
             className="block truncate text-xs text-muted-foreground hover:text-foreground"
             {...userLink(track.user)}
           >
-            {track.user.username}
+            {trackArtistName(track)}
           </Link>
         ) : null}
         {showStats ? (
@@ -120,7 +120,7 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
         <div className="truncate text-xs text-muted-foreground">
           {track.user ? (
             <Link {...userLink(track.user)} className="hover:text-foreground">
-              {track.user.username}
+              {trackArtistName(track)}
             </Link>
           ) : (
             'Unknown artist'

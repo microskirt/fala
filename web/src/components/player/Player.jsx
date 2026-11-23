@@ -21,7 +21,7 @@ import { usePlayer, usePlayerTime, usePlayerVolume } from '@/context/PlayerConte
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { Artwork } from '@/components/Media.jsx';
-import { formatDuration } from '@/api.js';
+import { formatDuration, trackArtistName } from '@/api.js';
 import { Slider } from '@/components/ui/slider.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils.js';
@@ -328,7 +328,7 @@ export function Player() {
                     {...userLink(current.user)}
                     className="truncate text-xs text-muted-foreground hover:text-foreground"
                   >
-                    {current.user.username}
+                    {trackArtistName(current)}
                   </Link>
                 ) : null}
                 <Link

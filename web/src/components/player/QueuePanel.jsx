@@ -3,6 +3,7 @@ import { X, Trash2, ListMusic, GripVertical, Play } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { AddToPlaylistButton } from '@/components/Controls.jsx';
 import { Artwork } from '@/components/Media.jsx';
+import { trackArtistName } from '@/api.js';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils.js';
 
@@ -218,7 +219,7 @@ export function QueuePanel() {
                       {t.title}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {t.user?.username}
+                      {trackArtistName(t)}
                     </span>
                   </span>
                 </button>

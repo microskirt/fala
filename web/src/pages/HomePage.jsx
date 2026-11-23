@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Play, RefreshCw, Radio } from 'lucide-react';
-import { api, timeAgo } from '@/api.js';
+import { api, timeAgo, trackArtistName } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { TrackCard, PlaylistCard, ArtistCard, SectionScroller } from '@/components/Cards.jsx';
@@ -100,7 +100,7 @@ function FeedItem({ item }) {
                   {...userLink(track.user)}
                   className="block truncate text-xs text-muted-foreground hover:text-foreground"
                 >
-                  {track.user.username}
+                  {trackArtistName(track)}
                 </Link>
               ) : null}
             </div>

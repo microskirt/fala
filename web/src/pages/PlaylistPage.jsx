@@ -13,6 +13,7 @@ import {
   formatLongDuration,
   formatDuration,
   timeAgo,
+  trackArtistName,
 } from '@/api.js';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -67,7 +68,7 @@ function PlaylistTrackRow({ track, index, context }) {
               {...userLink(track.user)}
               className="hover:text-foreground"
             >
-              {track.user.username}
+              {trackArtistName(track)}
             </Link>
           ) : (
             'Unknown'
