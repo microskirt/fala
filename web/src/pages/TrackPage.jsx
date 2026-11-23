@@ -10,14 +10,13 @@ import {
   Loader2,
   BadgeCheck,
   Calendar,
-  Tag,
   Trash2,
   ListMusic,
   Disc3,
   Heart,
   Headphones,
 } from 'lucide-react';
-import { api, formatCount, formatDuration, timeAgo, formatDate } from '@/api.js';
+import { api, formatCount, formatDuration, timeAgo, formatDate, trackPath } from '@/api.js';
 import { usePlayer, usePlayerTime } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -38,6 +37,8 @@ import { Badge } from '@/components/ui/badge.jsx';
 import { Modal } from '@/components/Modal.jsx';
 import { cn } from '@/lib/utils.js';
 import { placeLabel } from '@/lib/places.js';
+import { ClampedText } from '@/components/ClampedText.jsx';
+import { resolveTrackParam, playlistLink, userLink } from '@/lib/scRoute.js';
 
 function Waveform({ samples, progress, onSeek, height = 96 }) {
   const ref = useRef(null);
@@ -201,7 +202,7 @@ function CommentForm({ track, onPosted, timestampMs, replyTo = null }) {
  * only exist for signed in listeners, because SoundCloud serves them from its
  * GraphQL gateway behind a token.
  */
-function CommentItem({ comment, trackId, onDelete, isReply = false }) {
+function CommentItem({ comment, trackId, onDelete, onReplied, isReply = false }) {
   const { user } = useAuth();
   const { seek } = usePlayer();
   const { likeComment } = useLibrary();
@@ -246,7 +247,7 @@ function CommentItem({ comment, trackId, onDelete, isReply = false }) {
         isReply ? 'border-0 pl-0' : 'border-b border-border/60 last:border-0'
       )}
     >
-      <Link to="/artist/$id" params={{ id: String(comment.user?.id) }} className="shrink-0">
+      <Link {...userLink(comment.user)} className="shrink-0">
         <Avatar
           src={comment.user?.avatar_url}
           name={comment.user?.username}
@@ -256,20 +257,11 @@ function CommentItem({ comment, trackId, onDelete, isReply = false }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Link
-            to="/artist/$id"
-            params={{ id: String(comment.user?.id) }}
+            {...userLink(comment.user)}
             className="text-sm font-semibold text-foreground hover:underline"
           >
             {comment.user?.username || 'Listener'}
           </Link>
-          {comment.creator_liked ? (
-            <span
-              className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[0.68rem] font-semibold text-primary"
-              title="The artist liked this comment"
-            >
-              <Heart size={11} fill="currentColor" /> Artist
-            </span>
-          ) : null}
           <span>{timeAgo(comment.created_at)}</span>
           {comment.timestamp_ms != null ? (
             <button
@@ -305,6 +297,15 @@ function CommentItem({ comment, trackId, onDelete, isReply = false }) {
             </span>
           ) : null}
 
+          {comment.creator_liked ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[0.68rem] font-semibold text-primary"
+              title="The artist liked this comment"
+            >
+              <Heart size={11} fill="currentColor" /> Liked by artist
+            </span>
+          ) : null}
+
           {!isReply && canInteract ? (
             <button
               type="button"
@@ -335,6 +336,7 @@ function CommentItem({ comment, trackId, onDelete, isReply = false }) {
               onPosted={(reply) => {
                 setReplies((prev) => [...prev, reply]);
                 setReplying(false);
+                onReplied?.();
               }}
             />
           </div>
@@ -348,6 +350,7 @@ function CommentItem({ comment, trackId, onDelete, isReply = false }) {
                 comment={r}
                 trackId={trackId}
                 onDelete={onDelete}
+                onReplied={onReplied}
                 isReply
               />
             ))}
@@ -372,8 +375,7 @@ function userRow(u, onClose) {
   return (
     <Link
       key={u.id}
-      to="/artist/$id"
-      params={{ id: String(u.id) }}
+      {...userLink(u)}
       className="flex items-center gap-2.5 rounded-md px-1.5 py-2 transition-colors hover:bg-accent/60"
       onClick={onClose}
     >
@@ -397,8 +399,7 @@ function playlistRow(p, onClose) {
   return (
     <Link
       key={p.id}
-      to="/playlist/$id"
-      params={{ id: String(p.id) }}
+      {...playlistLink(p)}
       className="flex items-center gap-2.5 rounded-md px-1.5 py-2 transition-colors hover:bg-accent/60"
       onClick={onClose}
     >
@@ -431,8 +432,7 @@ function AlsoLiked({ people }) {
         {shown.map((u) => (
           <Link
             key={u.id}
-            to="/artist/$id"
-            params={{ id: String(u.id) }}
+            {...userLink(u)}
             className="relative rounded-full ring-2 ring-background"
             title={u.username}
           >
@@ -444,8 +444,7 @@ function AlsoLiked({ people }) {
         {shown.map((u, i) => (
           <span key={u.id}>
             <Link
-              to="/artist/$id"
-              params={{ id: String(u.id) }}
+              {...userLink(u)}
               className="font-medium text-foreground hover:underline"
             >
               {u.username}
@@ -485,19 +484,20 @@ function AlsoLiked({ people }) {
 }
 
 /*
- * The listener ranking SoundCloud keeps behind its insights page. It is ranked by
- * plays inside a time window, and the numbers only come back for a signed in
- * listener, so the panel renders nothing at all when there is no data.
+ * The listener ranking SoundCloud keeps behind its insights page, for this
+ * track. It only offers two windows: the last few days and all time. The numbers
+ * come from a signed-in-only endpoint, so the panel stays out of the way when
+ * there is no token or no data.
  */
 const LISTENER_WINDOWS = [
-  { id: 'DAYS_7', label: 'Last 7 days' },
-  { id: 'DAYS_30', label: 'Last 30 days' },
   { id: 'ALL_TIME', label: 'All time' },
+  { id: 'DAYS_7', label: 'Last 7 days' },
 ];
 
 function TopListeners({ trackId }) {
-  const [window, setWindow] = useState('DAYS_30');
+  const [window, setWindow] = useState('ALL_TIME');
   const [fans, setFans] = useState(null);
+  const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -505,7 +505,11 @@ function TopListeners({ trackId }) {
     setLoading(true);
     api
       .get(`/api/tracks/${trackId}/listeners?window=${window}&limit=5`)
-      .then((r) => !cancelled && setFans(r.fans || []))
+      .then((r) => {
+        if (cancelled) return;
+        setFans(r.fans || []);
+        if (r.days) setDays(r.days);
+      })
       .catch(() => !cancelled && setFans([]))
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -536,7 +540,7 @@ function TopListeners({ trackId }) {
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               )}
             >
-              {w.label}
+              {w.id === 'DAYS_7' ? `Last ${days} days` : w.label}
             </button>
           ))}
         </div>
@@ -553,8 +557,7 @@ function TopListeners({ trackId }) {
           {fans.map((entry, i) => (
             <li key={`${entry.user.id}-${i}`}>
               <Link
-                to="/artist/$id"
-                params={{ id: String(entry.user.id) }}
+                {...userLink(entry.user)}
                 className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent/60"
               >
                 <span className="w-4 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground">
@@ -587,7 +590,14 @@ function TopListeners({ trackId }) {
 }
 
 export function TrackPage() {
-  const { id } = useParams({ from: '/shell/track/$id' });
+  /*
+   * The song page answers on both /track/:id and the SoundCloud shaped
+   * /:artist/:track. A slug address carries words, so it is resolved to an id
+   * once before any of the usual requests run.
+   */
+  const params = useParams({ strict: false });
+  const [id, setId] = useState(params.id ? String(params.id) : null);
+  const [resolveError, setResolveError] = useState(null);
   const toast = useToast();
   const { playTrack, isCurrent, playing, togglePlay, duration, seek, queue, audioRef } =
     usePlayer();
@@ -600,18 +610,59 @@ export function TrackPage() {
   const [nextComments, setNextComments] = useState(null);
   const [nextCursor, setNextCursor] = useState(null);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [listeners, setListeners] = useState(null);
   const [waveform, setWaveform] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [descExpanded, setDescExpanded] = useState(false);
   const [commentTimestamp, setCommentTimestamp] = useState(null);
   const [counts, setCounts] = useState(null);
   const [alsoLiked, setAlsoLiked] = useState([]);
+  // SoundCloud's own total counts replies, so it is used instead of the number
+  // of top-level rows loaded so far.
+  const [commentTotal, setCommentTotal] = useState(0);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const active = isCurrent(track);
 
+  // A slug address has to become an id before anything else can be fetched.
   useEffect(() => {
+    let cancelled = false;
+    if (params.id) {
+      setId(String(params.id));
+      setResolveError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setId(null);
+    setLoading(true);
+    (async () => {
+      try {
+        const resolved = await resolveTrackParam({
+          artist: params.artist,
+          track: params.track,
+        });
+        if (cancelled) return;
+        if (!resolved) {
+          setResolveError('Track not found');
+          setLoading(false);
+          return;
+        }
+        setResolveError(null);
+        setId(resolved);
+      } catch (err) {
+        if (!cancelled) {
+          setResolveError(err.message || 'Track not found');
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, params.artist, params.track]);
+
+  useEffect(() => {
+    if (!id) return undefined;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -623,6 +674,7 @@ export function TrackPage() {
         const t = await api.get(`/api/tracks/${id}`);
         if (cancelled) return;
         setTrack(t);
+        setCommentTotal(t.comment_count || 0);
         setLoading(false);
 
         if (t.waveform_url) {
@@ -654,13 +706,6 @@ export function TrackPage() {
           setComments(c.collection || []);
           setNextComments(c.next_href || null);
           setNextCursor(c.next_cursor || null);
-        }
-
-        if (isAuthed) {
-          api
-            .get(`/api/tracks/${id}/listeners?limit=5`)
-            .then((r) => !cancelled && setListeners(r.fans || []))
-            .catch(() => {});
         }
       } catch (err) {
         if (!cancelled) {
@@ -703,10 +748,10 @@ export function TrackPage() {
     if (ok) setComments((prev) => prev.filter((c) => c.id !== commentId));
   };
 
-  const copyLink = async () => {
+  const copyLink = async (url, label) => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/track/${track.id}`);
-      toast.success('Link copied');
+      await navigator.clipboard.writeText(url);
+      toast.success(`${label} link copied`);
     } catch {
       toast.error('Could not copy link');
     }
@@ -728,11 +773,11 @@ export function TrackPage() {
     );
   }
 
-  if (error || !track) {
+  if (error || resolveError || !track) {
     return (
       <Page>
         <ErrorState
-          message={error || 'This track could not be found.'}
+          message={error || resolveError || 'This track could not be found.'}
           onRetry={() => window.location.reload()}
         />
       </Page>
@@ -781,12 +826,11 @@ export function TrackPage() {
 
           {track.user ? (
             <div className="mt-3 flex flex-wrap items-center gap-2.5">
-              <Link to="/artist/$id" params={{ id: String(track.user.id) }}>
+              <Link {...userLink(track.user)}>
                 <Avatar src={track.user.avatar_url} name={track.user.username} size={30} />
               </Link>
               <Link
-                to="/artist/$id"
-                params={{ id: String(track.user.id) }}
+                {...userLink(track.user)}
                 className="inline-flex items-center gap-1 text-sm font-semibold hover:underline"
               >
                 {track.user.username}
@@ -861,17 +905,15 @@ export function TrackPage() {
 
             <AddToPlaylistButton track={track} size={18} />
 
-            <Button variant="ghost" size="icon" onClick={copyLink} title="Copy link" aria-label="Copy link">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShareOpen(true)}
+              title="Copy link"
+              aria-label="Copy link"
+            >
               <Link2 size={16} />
             </Button>
-
-            {track.permalink_url ? (
-              <Button variant="ghost" size="icon" asChild title="Open on SoundCloud">
-                <a href={track.permalink_url} target="_blank" rel="noreferrer" aria-label="Open on SoundCloud">
-                  <Share2 size={16} />
-                </a>
-              </Button>
-            ) : null}
           </div>
 
           {waveform ? (
@@ -891,48 +933,24 @@ export function TrackPage() {
             <TrackStatLine track={track} />
           </div>
 
-          <AlsoLiked people={alsoLiked} />
-
           {isAuthed ? <TopListeners trackId={track.id} /> : null}
-
-          {track.description ? (
-            <div className="mt-4">
-              <p
-                className={cn(
-                  'text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground',
-                  !descExpanded && 'line-clamp-4'
-                )}
-              >
-                {track.description}
-              </p>
-              {track.description.length > 220 ? (
-                <button
-                  type="button"
-                  className="mt-1 text-xs font-medium text-primary hover:underline"
-                  onClick={() => setDescExpanded((v) => !v)}
-                >
-                  {descExpanded ? 'Show less' : 'Show more'}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
 
           {mainTag || tags.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-1.5">
               {mainTag ? (
                 <span
-                  className="inline-flex items-center gap-1 rounded-md border border-white px-2 py-0.5 text-xs text-white"
+                  className="rounded-md border border-white px-2 py-0.5 text-xs text-white"
                   title="Main tag"
                 >
-                  <Tag size={14} /> {mainTag}
+                  {mainTag}
                 </span>
               ) : null}
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
+                  className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
                 >
-                  <Tag size={14} /> {tag}
+                  {tag}
                 </span>
               ))}
             </div>
@@ -947,15 +965,24 @@ export function TrackPage() {
             {track.label_name ? <span>Label: {track.label_name}</span> : null}
             {track.license ? <span>{track.license.replace(/-/g, ' ')}</span> : null}
           </div>
+
+          <AlsoLiked people={alsoLiked} />
         </div>
       </div>
+
+      {track.description ? (
+        <section className="mt-12">
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">Description</h2>
+          <ClampedText text={track.description} lines={5} />
+        </section>
+      ) : null}
 
       <section className="mt-12">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-            <MessageSquare size={18} /> Comments
+            Comments
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
-              {comments.length}
+              {commentTotal}
             </span>
           </h2>
           <TimestampToggle
@@ -970,6 +997,7 @@ export function TrackPage() {
           timestampMs={commentTimestamp}
           onPosted={(c) => {
             setComments((prev) => [c, ...prev]);
+            setCommentTotal((n) => n + 1);
             setCommentTimestamp(null);
           }}
         />
@@ -986,6 +1014,7 @@ export function TrackPage() {
               comment={c}
               trackId={track.id}
               onDelete={handleDeleteComment}
+              onReplied={() => setCommentTotal((n) => n + 1)}
             />
           ))}
         </div>
@@ -1003,6 +1032,55 @@ export function TrackPage() {
           </CardGrid>
         </section>
       ) : null}
+
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        track={track}
+        onCopy={copyLink}
+      />
     </Page>
+  );
+}
+
+/*
+ * Two links lead to the same song, so the choice is shown instead of guessed:
+ * this copy of the page, or the original on SoundCloud.
+ */
+function ShareDialog({ open, onClose, track, onCopy }) {
+  if (!track) return null;
+  const here = `${window.location.origin}${trackPath(track)}`;
+  const rows = [
+    { id: 'fala', label: 'This page', url: here, icon: Link2 },
+    track.permalink_url
+      ? { id: 'sc', label: 'SoundCloud', url: track.permalink_url, icon: Share2 }
+      : null,
+  ].filter(Boolean);
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Copy link"
+      description="Pick where the link should point."
+    >
+      <div className="space-y-2">
+        {rows.map((row) => {
+          const Icon = row.icon;
+          return (
+            <div key={row.id} className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+              <Icon size={16} className="shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium">{row.label}</div>
+                <div className="truncate text-xs text-muted-foreground">{row.url}</div>
+              </div>
+              <Button size="sm" onClick={() => onCopy(row.url, row.label)}>
+                Copy
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </Modal>
   );
 }
