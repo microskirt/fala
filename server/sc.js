@@ -281,9 +281,11 @@ function rememberUsers(data) {
 
 const QUALITY_PRESETS = {
   // 256 kbps is a Go+ preset. SoundCloud only lists it when the request carries
-  // a Go+ token, so it leads the chain and free accounts fall through.
+  // a Go+ token, so it leads the chain and free accounts fall through to 160.
   hq: ['aac_256k', 'abr_hq', 'aac_160k', 'abr_sq', 'aac_96k'],
-  sq: ['aac_96k', 'aac_160k'],
+  // Standard is the 160 kbps stream, which every account can play. 96 is the
+  // data saver, one step below, and is never what Standard should land on.
+  sq: ['aac_160k', 'abr_sq', 'aac_96k'],
   lq: ['aac_96k'],
 };
 
