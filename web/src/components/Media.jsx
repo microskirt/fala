@@ -27,6 +27,13 @@ export function Artwork({
   const url = !primary || failed ? null : primary;
   const backup = fallback && !fallbackFailed ? avatarUrl(fallback, 't300x300') : null;
   const Icon = kind === 'user' ? UserIcon : kind === 'playlist' ? ListMusic : Music2;
+  /*
+   * A numeric size gives a fixed square. A percentage size cannot use the same
+   * height, because the parent usually has no height of its own and the box
+   * would collapse; an aspect ratio keeps it square at whatever width it lands
+   * on, so a cover is never taller or shorter than it is wide.
+   */
+  const isFluid = typeof size === 'string';
 
   return (
     <div
@@ -34,7 +41,12 @@ export function Artwork({
         'relative flex shrink-0 items-center justify-center overflow-hidden bg-muted',
         className
       )}
-      style={{ width: size, height: size, borderRadius: rounded, ...style }}
+      style={{
+        width: size,
+        ...(isFluid ? { aspectRatio: '1 / 1' } : { height: size }),
+        borderRadius: rounded,
+        ...style,
+      }}
     >
       {url ? (
         <img

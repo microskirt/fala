@@ -997,7 +997,7 @@ export function TrackPage() {
   if (loading) {
     return (
       <Page>
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
           <Skeleton className="aspect-square w-full rounded-xl" />
           <div className="flex flex-col gap-3.5">
             <Skeleton className="h-3 w-28" />
@@ -1041,8 +1041,8 @@ export function TrackPage() {
 
   return (
     <Page>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-        <div className="mx-auto w-full max-w-[340px] lg:mx-0">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+        <div className="mx-auto w-full max-w-[280px] lg:mx-0">
           {/*
            * Some uploads carry no artwork at all, and SoundCloud shows the
            * artist avatar for those instead of a blank tile.
