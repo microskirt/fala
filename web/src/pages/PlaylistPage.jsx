@@ -269,12 +269,12 @@ export function PlaylistPage() {
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
-            <Button
-              size="lg"
-              className="rounded-full"
-              onClick={() => playQueue(tracks, 0)}
-              disabled={tracks.length === 0}
-            >
+            {/*
+             * Same shape as the outline buttons beside it: default size, so
+             * the radius and height come from the shared button variants. The
+             * old pill shape was taller and rounder than its neighbours.
+             */}
+            <Button onClick={() => playQueue(tracks, 0)} disabled={tracks.length === 0}>
               <Play size={16} fill="currentColor" /> Play
             </Button>
             <Button
