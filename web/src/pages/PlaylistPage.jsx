@@ -7,9 +7,11 @@ import {
   Pencil,
   Lock,
   Music2,
+  Heart,
 } from 'lucide-react';
 import {
   api,
+  formatCount,
   formatLongDuration,
   formatDuration,
   timeAgo,
@@ -37,6 +39,7 @@ import { Textarea } from '@/components/ui/textarea.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
 import { trackLink, userLink, resolvePlaylistParam } from '@/lib/scRoute.js';
+import { cn } from '@/lib/utils.js';
 
 function PlaylistTrackRow({ track, index, context }) {
   return (
@@ -100,7 +103,7 @@ export function PlaylistPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { playQueue, addToQueue } = usePlayer();
-  const { updatePlaylist, deletePlaylist } = useLibrary();
+  const { updatePlaylist, deletePlaylist, isPlaylistLiked, togglePlaylistLike } = useLibrary();
   const toast = useToast();
 
   const [playlist, setPlaylist] = useState(null);
@@ -194,6 +197,10 @@ export function PlaylistPage() {
   const owner = isSystem ? null : playlist.user;
   const description = /^based on\b/i.test(playlist.description || '') ? '' : playlist.description;
   const canEdit = user && owner && String(user.id) === String(owner.id);
+  const liked = isPlaylistLiked(playlist);
+  // The button flips the state at once, so the number beside the track count
+  // follows the same step instead of waiting for the playlist to be refetched.
+  const likesCount = Math.max(0, Number(playlist.likes_count || 0) + (liked && !playlist.liked ? 1 : 0));
 
   const save = async () => {
     setBusy(true);
@@ -223,8 +230,13 @@ export function PlaylistPage() {
 
   return (
     <Page>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
-        <div className="mx-auto w-full max-w-[280px] lg:mx-0">
+      {/*
+       * The cover sits on the right on wide screens, so the text column starts
+       * at the page edge and the picture anchors the other side. It stays first
+       * in the markup, which is the order it should stack in on a phone.
+       */}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
+        <div className="mx-auto w-full max-w-[280px] lg:order-2 lg:mx-0">
           <Artwork
             src={playlist.artwork_url}
             fallback={playlist.user?.avatar_url}
@@ -236,7 +248,7 @@ export function PlaylistPage() {
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 lg:order-1">
           <Eyebrow>
             {playlist.is_private ? (
               <>
@@ -275,6 +287,12 @@ export function PlaylistPage() {
               </>
             ) : null}
             <span>{tracks.length} tracks</span>
+            <>
+              <span className="opacity-40">·</span>
+              <span>
+                {formatCount(likesCount)} {likesCount === 1 ? 'like' : 'likes'}
+              </span>
+            </>
             {playlist.duration ? (
               <>
                 <span className="opacity-40">·</span>
@@ -304,6 +322,20 @@ export function PlaylistPage() {
               disabled={tracks.length === 0}
             >
               <ListMusic size={16} /> Add to queue
+            </Button>
+            {/*
+             * The like sits between the two queue actions and the owner
+             * controls, so the shared actions stay together and the edits keep
+             * their own group at the end.
+             */}
+            <Button
+              variant="outline"
+              onClick={() => togglePlaylistLike(playlist)}
+              aria-pressed={liked}
+              className={cn(liked && 'text-rose-500')}
+              title={user ? (liked ? 'Unlike this playlist' : 'Like this playlist') : 'Sign in to like'}
+            >
+              <Heart size={16} fill={liked ? 'currentColor' : 'none'} /> Like
             </Button>
             {canEdit ? (
               <>

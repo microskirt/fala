@@ -1384,6 +1384,14 @@ export async function likeIds(token) {
   }
 }
 
+export async function playlistLikeIds(token) {
+  try {
+    return await idSet('/me/playlist_likes/ids', token);
+  } catch {
+    return new Set();
+  }
+}
+
 export async function repostIds(token) {
   try {
     return await idSet('/me/track_reposts/ids', token);
@@ -1519,6 +1527,13 @@ export async function myStream(token, { limit = 50 } = {}) {
 export async function like(token, trackId, on) {
   const id = await meId(token);
   await apiWrite(on ? 'PUT' : 'DELETE', `/users/${id}/track_likes/${trackId}`, { token });
+  invalidateToken(token);
+  return { liked: !!on };
+}
+
+export async function likePlaylist(token, playlistId, on) {
+  const id = await meId(token);
+  await apiWrite(on ? 'PUT' : 'DELETE', `/users/${id}/playlist_likes/${playlistId}`, { token });
   invalidateToken(token);
   return { liked: !!on };
 }

@@ -96,14 +96,23 @@ function requireToken(ctx) {
 // Liked / reposted / followed flags. SoundCloud does not return them inline, so
 // they are looked up per token (cached briefly in sc.js).
 async function flagsFor(token) {
-  if (!token) return { likes: new Set(), reposts: new Set(), follows: new Set(), me: null };
-  const [likes, reposts, follows, me] = await Promise.all([
+  if (!token) {
+    return {
+      likes: new Set(),
+      reposts: new Set(),
+      follows: new Set(),
+      playlistLikes: new Set(),
+      me: null,
+    };
+  }
+  const [likes, reposts, follows, playlistLikes, me] = await Promise.all([
     sc.likeIds(token),
     sc.repostIds(token),
     sc.followIds(token),
+    sc.playlistLikeIds(token),
     sc.me(token).catch(() => null),
   ]);
-  return { likes, reposts, follows, me };
+  return { likes, reposts, follows, playlistLikes, me };
 }
 
 function decorateTrack(track, flags) {
@@ -129,18 +138,26 @@ function decorateUser(user, flags) {
   };
 }
 
+function decoratePlaylist(playlist, flags) {
+  if (!playlist) return null;
+  return {
+    ...playlist,
+    liked: flags?.playlistLikes
+      ? flags.playlistLikes.has(String(playlist.id))
+      : !!playlist.liked,
+    tracks: playlist.tracks
+      ? playlist.tracks.map((t) => decorateTrack(t, flags))
+      : playlist.tracks,
+    user: playlist.user ? decorateUser(playlist.user, flags) : playlist.user,
+  };
+}
+
 function decorateItems(items, flags) {
   return (items || []).map((item) => {
     if (!item) return item;
     if (item.kind === 'track') return decorateTrack(item, flags);
     if (item.kind === 'user') return decorateUser(item, flags);
-    if (item.kind === 'playlist') {
-      return {
-        ...item,
-        tracks: item.tracks ? item.tracks.map((t) => decorateTrack(t, flags)) : item.tracks,
-        user: item.user ? decorateUser(item.user, flags) : item.user,
-      };
-    }
+    if (item.kind === 'playlist') return decoratePlaylist(item, flags);
     return item;
   });
 }
@@ -577,7 +594,12 @@ route('GET', '/api/playlists/:id', async (ctx) => {
   const pl = await sc.playlist(id, { token: ctx.token || null });
   if (!pl) throw new HttpError(404, 'Playlist not found');
   const flags = await flagsFor(ctx.token);
-  return { ...pl, tracks: (pl.tracks || []).map((t) => decorateTrack(t, flags)) };
+  return decoratePlaylist(pl, flags);
+});
+
+route('PUT', '/api/playlists/:id/like', async (ctx) => {
+  const token = requireToken(ctx);
+  return sc.likePlaylist(token, ctx.params.id, !!ctx.body.on);
 });
 
 // A cover arrives as a data URI, so these two allow a larger body than the

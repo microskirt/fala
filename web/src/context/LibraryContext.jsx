@@ -34,6 +34,7 @@ export function LibraryProvider({ children }) {
 
   // Optimistic overrides for this session, layered over SoundCloud's state.
   const [liked, setLiked] = useState(() => new Map());
+  const [likedPlaylists, setLikedPlaylists] = useState(() => new Map());
   const [reposted, setReposted] = useState(() => new Map());
   const [followed, setFollowed] = useState(() => new Map());
   const [busy, setBusy] = useState(() => new Set());
@@ -60,6 +61,15 @@ export function LibraryProvider({ children }) {
       return override === undefined ? !!track.liked : override;
     },
     [liked]
+  );
+
+  const isPlaylistLiked = useCallback(
+    (playlist) => {
+      if (!playlist) return false;
+      const override = likedPlaylists.get(String(playlist.id));
+      return override === undefined ? !!playlist.liked : override;
+    },
+    [likedPlaylists]
   );
 
   const isReposted = useCallback(
@@ -140,6 +150,40 @@ export function LibraryProvider({ children }) {
       }
     },
     [user, busy, toast, isLiked, withCaptcha]
+  );
+
+  /*
+   * Playlists are liked through the same kind of write as tracks, but the id
+   * belongs to a playlist, so it keeps its own override map and its own key.
+   * The like count on the page is not tracked here: it is refreshed with the
+   * playlist itself.
+   */
+  const togglePlaylistLike = useCallback(
+    async (playlist) => {
+      if (!playlist) return;
+      if (!user) {
+        toast.error('Connect your SoundCloud account to like playlists');
+        return;
+      }
+      const key = 'playlist-like:' + playlist.id;
+      if (busy.has(key)) return;
+      const next = !isPlaylistLiked(playlist);
+      markBusy(key, true);
+      setLikedPlaylists((prev) => new Map(prev).set(String(playlist.id), next));
+      try {
+        await withCaptcha(() => api.put(`/api/playlists/${playlist.id}/like`, { on: next }));
+      } catch (err) {
+        setLikedPlaylists((prev) => {
+          const copy = new Map(prev);
+          copy.delete(String(playlist.id));
+          return copy;
+        });
+        toast.error(err.message || 'Could not update like');
+      } finally {
+        markBusy(key, false);
+      }
+    },
+    [user, busy, toast, isPlaylistLiked, withCaptcha]
   );
 
   /*
@@ -382,10 +426,12 @@ export function LibraryProvider({ children }) {
       counts,
       recentFollows,
       isLiked,
+      isPlaylistLiked,
       isReposted,
       isFollowing,
       isBusy,
       toggleLike,
+      togglePlaylistLike,
       toggleRepost,
       toggleFollow,
       createPlaylist,
@@ -399,10 +445,11 @@ export function LibraryProvider({ children }) {
       likeComment,
     }),
     [
-      playlists, counts, recentFollows, isLiked, isReposted, isFollowing, isBusy,
-      toggleLike, toggleRepost, toggleFollow, createPlaylist, updatePlaylist,
-      deletePlaylist, addTrackToPlaylist, removeTrackFromPlaylist, refreshLibrary,
-      addComment, deleteComment, likeComment,
+      playlists, counts, recentFollows, isLiked, isPlaylistLiked, isReposted,
+      isFollowing, isBusy, toggleLike, togglePlaylistLike, toggleRepost,
+      toggleFollow, createPlaylist, updatePlaylist, deletePlaylist,
+      addTrackToPlaylist, removeTrackFromPlaylist, refreshLibrary, addComment,
+      deleteComment, likeComment,
     ]
   );
 
