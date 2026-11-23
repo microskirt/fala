@@ -11,7 +11,6 @@ const KEY = KEYS.prefs;
 const DEFAULTS = {
   quality: 'hq',
   autoplay: true,
-  normalize: false,
 };
 
 function read() {

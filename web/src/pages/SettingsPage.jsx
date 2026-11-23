@@ -414,16 +414,16 @@ export function SettingsPage() {
                     {
                       id: 'hq',
                       title: 'High (up to 256 kbps)',
-                      desc: 'Best stream your account can play. 256 kbps needs SoundCloud Go+.',
+                      desc: 'Best stream your account can play. 256 kbps needs SoundCloud Go+, everyone else gets 160.',
                     },
                     {
                       id: 'sq',
-                      title: 'Standard (96 kbps)',
-                      desc: 'Balanced quality for slower connections.',
+                      title: 'Standard (160 kbps)',
+                      desc: 'The normal stream for every account.',
                     },
                     {
                       id: 'lq',
-                      title: 'Data saver',
+                      title: 'Data saver (96 kbps)',
                       desc: 'Lowest bitrate to stretch mobile data.',
                     },
                   ].map((q) => (
@@ -472,16 +472,6 @@ export function SettingsPage() {
                     checked={!!prefs.autoplay}
                     onCheckedChange={(v) => setPrefs({ autoplay: v })}
                     aria-label="Autoplay similar tracks"
-                  />
-                </Row>
-                <Row
-                  title="Normalise volume"
-                  description="Even out loud and quiet tracks automatically."
-                >
-                  <Switch
-                    checked={!!prefs.normalize}
-                    onCheckedChange={(v) => setPrefs({ normalize: v })}
-                    aria-label="Normalise volume"
                   />
                 </Row>
               </Group>
