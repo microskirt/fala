@@ -116,6 +116,36 @@ export function timeAgo(input) {
   return `${yr} year${yr === 1 ? '' : 's'} ago`;
 }
 
+/*
+ * How long ago something happened, in the largest unit that still reads
+ * naturally. Unlike timeAgo this also handles a date in the future, which a
+ * signed difference would otherwise round to "just now".
+ */
+export function formatRelativeDate(input) {
+  if (!input) return '';
+  const time = new Date(input).getTime();
+  if (Number.isNaN(time)) return '';
+
+  const diff = Date.now() - time;
+  const future = diff < 0;
+  const sec = Math.round(Math.abs(diff) / 1000);
+  const wrap = (n, unit) => {
+    const label = `${n} ${unit}${n === 1 ? '' : 's'}`;
+    return future ? `in ${label}` : `${label} ago`;
+  };
+
+  if (sec < 45) return 'just now';
+  const min = Math.round(sec / 60);
+  if (min < 60) return wrap(min, 'minute');
+  const hr = Math.round(min / 60);
+  if (hr < 24) return wrap(hr, 'hour');
+  const day = Math.round(hr / 24);
+  if (day < 30) return wrap(day, 'day');
+  const mon = Math.round(day / 30);
+  if (mon < 12) return wrap(mon, 'month');
+  return wrap(Math.round(mon / 12), 'year');
+}
+
 export function formatDate(input) {
   if (!input) return '';
   const d = new Date(input);

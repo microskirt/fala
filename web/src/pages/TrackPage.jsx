@@ -9,7 +9,6 @@ import {
   Link2,
   Loader2,
   BadgeCheck,
-  Calendar,
   Trash2,
   ListMusic,
   Disc3,
@@ -19,7 +18,15 @@ import {
   Users,
   PlayCircle,
 } from 'lucide-react';
-import { api, formatCount, formatDuration, timeAgo, formatDate, trackPath } from '@/api.js';
+import {
+  api,
+  formatCount,
+  formatDuration,
+  timeAgo,
+  formatDate,
+  formatRelativeDate,
+  trackPath,
+} from '@/api.js';
 import { usePlayer, usePlayerTime } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -903,6 +910,9 @@ export function TrackPage() {
     .filter(Boolean)
     .filter((t) => t.toLowerCase() !== mainKey)
     .slice(0, 12);
+  // The credits for the song itself, which SoundCloud stores apart from the
+  // account that uploaded it.
+  const metaArtist = String(track.publisher_metadata?.artist || '').trim();
 
   return (
     <Page>
@@ -927,6 +937,28 @@ export function TrackPage() {
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {track.title}
           </h1>
+
+          {/*
+           * The song's own credits, not the uploader. SoundCloud keeps them in
+           * publisher_metadata.artist and they often differ from the account
+           * that posted the file. The date sits next to them, relative at first
+           * glance and spelled out in full on hover.
+           */}
+          {metaArtist || track.display_date ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
+              {metaArtist ? <span className="min-w-0 break-words">{metaArtist}</span> : null}
+              {metaArtist && track.display_date ? <span aria-hidden="true">-</span> : null}
+              {track.display_date ? (
+                <time
+                  dateTime={track.display_date}
+                  title={formatDate(track.display_date)}
+                  className="cursor-default"
+                >
+                  {formatRelativeDate(track.display_date)}
+                </time>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <button
@@ -995,36 +1027,12 @@ export function TrackPage() {
             />
           ) : null}
 
-          {mainTag || tags.length > 0 ? (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {mainTag ? (
-                <span
-                  className="rounded-md border border-white px-2 py-0.5 text-xs text-white"
-                  title="Main tag"
-                >
-                  {mainTag}
-                </span>
-              ) : null}
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
-                >
-                  {tag}
-                </span>
-              ))}
+          {track.label_name || track.license ? (
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              {track.label_name ? <span>Label: {track.label_name}</span> : null}
+              {track.license ? <span>{track.license.replace(/-/g, ' ')}</span> : null}
             </div>
           ) : null}
-
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {track.display_date ? (
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar size={14} /> {formatDate(track.display_date)}
-              </span>
-            ) : null}
-            {track.label_name ? <span>Label: {track.label_name}</span> : null}
-            {track.license ? <span>{track.license.replace(/-/g, ' ')}</span> : null}
-          </div>
         </div>
       </div>
 
@@ -1036,14 +1044,46 @@ export function TrackPage() {
        */}
       <div className="mt-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="min-w-0">
-          {track.description ? (
-            <section>
-              <h2 className="mb-4 text-lg font-semibold tracking-tight">Description</h2>
-              <ClampedText text={track.description} lines={5} />
-            </section>
-          ) : null}
+          {/*
+           * Everything known about the song sits together here: the tags it
+           * was uploaded with, then the uploader's own words. The section is
+           * always present, since the tags alone are worth showing, and the
+           * description keeps its first lines visible before any expansion.
+           */}
+          <section>
+            <h2 className="mb-4 text-lg font-semibold tracking-tight">Details</h2>
 
-          <section className={cn(track.description && 'mt-12')}>
+            {mainTag || tags.length > 0 ? (
+              <div className="mb-4 flex flex-wrap gap-1.5">
+                {mainTag ? (
+                  <span
+                    className="rounded-md border border-white px-2 py-0.5 text-xs text-white"
+                    title="Main tag"
+                  >
+                    {mainTag}
+                  </span>
+                ) : null}
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {track.description ? (
+              <ClampedText text={track.description} lines={5} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No description was written for this song.
+              </p>
+            )}
+          </section>
+
+          <section className="mt-12">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
                 Comments
