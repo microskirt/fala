@@ -28,6 +28,7 @@ import {
   PlayButton,
 } from '@/components/Controls.jsx';
 import { Modal, ConfirmDialog } from '@/components/Modal.jsx';
+import { linkify } from '@/components/Linkify.jsx';
 import { PlaylistArtworkField } from '@/components/PlaylistArtwork.jsx';
 import { Page, TrackList, Eyebrow } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -254,7 +255,7 @@ export function PlaylistPage() {
 
           {description ? (
             <p className="mt-2.5 max-w-2xl text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              {description}
+              {linkify(description)}
             </p>
           ) : null}
 

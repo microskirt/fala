@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils.js';
+import { linkify } from '@/components/Linkify.jsx';
 
 /*
  * Long profile and track text is cut to a few lines until the reader asks for
@@ -48,7 +49,7 @@ export function ClampedText({ text, lines = 4, className }) {
           className
         )}
       >
-        {text}
+        {linkify(text)}
       </p>
       {overflows || expanded ? (
         <button

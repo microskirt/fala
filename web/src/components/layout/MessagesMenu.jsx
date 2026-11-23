@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx';
 import { cn } from '@/lib/utils.js';
+import { linkify } from '@/components/Linkify.jsx';
 
 // The other person in a conversation, since the list includes both sides.
 function otherUser(conversation, meId) {
@@ -152,7 +153,7 @@ export function MessagesMenu() {
                           mine ? 'bg-primary text-primary-foreground' : 'bg-muted'
                         )}
                       >
-                        <span className="whitespace-pre-wrap">{m.content}</span>
+                        <span className="whitespace-pre-wrap">{linkify(m.content)}</span>
                         {m.created_at ? (
                           <div className="mt-0.5 text-[10px] opacity-70">{timeAgo(m.created_at)}</div>
                         ) : null}
