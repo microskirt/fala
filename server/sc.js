@@ -1616,7 +1616,7 @@ export async function myPlaylists(token, { limit = 200, next } = {}) {
  */
 export async function searchMine(token, q, { maxPages = 10, pageSize = 200 } = {}) {
   const needle = String(q || '').trim().toLowerCase();
-  if (!needle) return { tracks: [], playlists: [] };
+  if (!needle) return { people: [], tracks: [], playlists: [] };
 
   const walk = async (first, mapper) => {
     const found = [];
@@ -1639,7 +1639,8 @@ export async function searchMine(token, q, { maxPages = 10, pageSize = 200 } = {
   const asLikedPlaylist = (item) =>
     slimPlaylist(item?.playlist || (item?.kind === 'playlist' ? item : null));
 
-  const [likes, owned, liked] = await Promise.all([
+  const [followed, likes, owned, liked] = await Promise.all([
+    walk(`/users/${id}/followings?limit=${pageSize}`, slimUser).catch(() => []),
     walk(`/users/${id}/track_likes?limit=${pageSize}`, asTrack).catch(() => []),
     walk(`/users/${id}/playlists?limit=${pageSize}`, slimPlaylist).catch(() => []),
     walk(`/users/${id}/playlist_likes?limit=${pageSize}`, asLikedPlaylist).catch(() => []),
@@ -1651,6 +1652,18 @@ export async function searchMine(token, q, { maxPages = 10, pageSize = 200 } = {
     return title.includes(needle) || artist.includes(needle);
   };
 
+  /*
+   * People are matched on the name they show and the permalink, so "gabber"
+   * finds a followed account called Gabber Industries Berlin but not one whose
+   * description happens to mention it. A follow match is a person, not a
+   * result, so it only answers on the name.
+   */
+  const matchesPerson = (user) => {
+    const name = String(user?.username || '').toLowerCase();
+    const permalink = String(user?.permalink || '').toLowerCase();
+    return name.includes(needle) || permalink.includes(needle);
+  };
+
   // A playlist can be both owned and liked, so the two lists are merged by id.
   const seen = new Set();
   const playlists = [];
@@ -1660,7 +1673,11 @@ export async function searchMine(token, q, { maxPages = 10, pageSize = 200 } = {
     if (matches(p)) playlists.push(p);
   }
 
-  return { tracks: likes.filter((t) => t && matches(t)), playlists };
+  return {
+    people: followed.filter((u) => u && matchesPerson(u)),
+    tracks: likes.filter((t) => t && matches(t)),
+    playlists,
+  };
 }
 
 export async function myFollowing(token, { limit = 200, next } = {}) {
