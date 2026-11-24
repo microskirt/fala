@@ -225,7 +225,13 @@ export function Player() {
 
   return (
     <div className="shrink-0 border-t border-border bg-card/90 backdrop-blur">
-      <div className="flex h-(--player-height) items-center gap-1.5 px-2 sm:gap-3 sm:px-3 lg:px-4">
+      {/*
+        * The bar keeps its own border and tint across the full width, but its
+        * contents sit on the same column as the page: same max width, same
+        * gutters. That lines the transport up with the content's left edge and
+        * the volume with its right edge, instead of hugging the window.
+        */}
+      <div className="mx-auto flex h-(--player-height) w-full max-w-[1400px] items-center gap-1.5 px-4 sm:gap-3 sm:px-6 lg:px-8">
         {/* 1. Transport */}
         <div className="flex shrink-0 items-center gap-0.5">
           <Button
