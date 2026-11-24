@@ -1883,8 +1883,15 @@ export function TrackPage() {
            * listener can say something without scrolling. Its moment comes
            * from the playhead, so there is no separate timestamp control.
            */}
+          {/*
+            * Every control on this line is the same 36px tall as the comment
+            * field and its Post button, so the row reads as one strip instead
+            * of a mix of sizes. The smaller controls keep their own size on
+            * the list rows, which is why the height is set here and not in
+            * the components.
+            */}
           <div className="mt-3.5 flex flex-wrap items-center gap-2">
-            <LikeButton track={track} size={18} />
+            <LikeButton track={track} size={18} className="size-9 justify-center px-0" />
 
             <CommentForm
               track={track}
@@ -1901,9 +1908,9 @@ export function TrackPage() {
 
             <RepostControl track={track} />
 
-            <AddToPlaylistButton track={track} size={18} />
+            <AddToPlaylistButton track={track} size={18} className="size-9" />
 
-            <AddToQueueButton track={track} size={18} />
+            <AddToQueueButton track={track} size={18} className="size-9" />
           </div>
         </div>
       </div>
