@@ -871,9 +871,16 @@ function AlsoLiked({ people }) {
   const FACE = 26;
   const STEP = 18;
   const GAP = 8;
-  // How many pictures fit when `reserve` pixels stay free on the right.
-  const fit = (reserve) =>
-    rowWidth ? Math.max(1, Math.floor((rowWidth - reserve - FACE) / STEP) + 1) : 3;
+  /*
+   * How many pictures fit when `reserve` pixels stay free on the right. Until
+   * the row has been measured nothing is hidden: assuming a small number here
+   * would push everyone past the third picture behind the dots, even with a
+   * row wide enough to show them all.
+   */
+  const fit = (reserve) => {
+    if (!rowWidth) return people.length;
+    return Math.max(1, Math.floor((rowWidth - reserve - FACE) / STEP) + 1);
+  };
   const crowded = people.length > fit(0);
   const faces = crowded ? people.slice(0, fit(FACE + GAP)) : people;
 
