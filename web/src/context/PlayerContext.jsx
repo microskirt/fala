@@ -148,27 +148,85 @@ export function PlayerProvider({ children }) {
         if (cancelled || loadId !== loadIdRef.current) return;
 
         const src = info.url;
+        /*
+         * A protected track needs a content decryption module to unlock its
+         * audio. Without one there is no point attaching the stream: it would
+         * only fail while decoding. Say it plainly and stop.
+         */
+        if (info.drm && typeof navigator.requestMediaKeySystemAccess !== 'function') {
+          setBuffering(false);
+          setPlaying(false);
+          toast.error('This track is protected and cannot be played in this browser');
+          return;
+        }
         const looksHls =
           /\.m3u8(\?|$)/i.test(src) ||
           info.protocol === 'hls' ||
+          info.protocol === 'ctr-encrypted-hls' ||
           String(info.mime || '').includes('mpegurl');
         const nativeHls = audio.canPlayType('application/vnd.apple.mpegurl');
+        const drm = !!(info.drm && info.licenseUrl);
 
         // hls.js owns the media element once attached. Calling audio.load()
         // afterwards resets it and makes the stream error out, which is what
         // used to break playback when switching between queued tracks.
         let usingHls = false;
 
-        if (looksHls && !nativeHls) {
+        /*
+         * A protected stream always goes through hls.js, even where native HLS
+         * exists, because the native path only knows FairPlay and this manifest
+         * is keyed for Widevine.
+         */
+        if (looksHls && (!nativeHls || drm)) {
           const mod = await import('hls.js');
           if (cancelled || loadId !== loadIdRef.current) return;
           const Hls = mod.default || mod;
+          if (!Hls.isSupported() && drm) {
+            setBuffering(false);
+            setPlaying(false);
+            toast.error('This track is protected and cannot be played in this browser');
+            return;
+          }
           if (Hls.isSupported()) {
-            const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+            /*
+             * A protected upload has no plain stream, so the manifest carries
+             * a Widevine key line and the player has to ask a licence server
+             * for the key through the browser's own CDM. hls.js does that when
+             * `emeEnabled` is on and a licence URL is configured. The licence
+             * token from the stream response rides along as `license_token`,
+             * which is how SoundCloud's own player authenticates the request.
+             */
+            const config = { enableWorker: true, lowLatencyMode: false };
+            if (drm) {
+              const token = info.licenseAuthToken || '';
+              config.emeEnabled = true;
+              config.drmSystems = {
+                'com.widevine.alpha': { licenseUrl: info.licenseUrl },
+              };
+              config.licenseXhrSetup = (xhr, url) => {
+                const target = new URL(url);
+                if (token) target.searchParams.set('license_token', token);
+                xhr.open('POST', target.toString(), true);
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+              };
+            }
+            const hls = new Hls(config);
             hls.loadSource(src);
             hls.attachMedia(audio);
             hls.on(Hls.Events.ERROR, (_evt, data) => {
-              if (data?.fatal) failRef.current();
+              if (!data?.fatal) return;
+              /*
+               * A key system that is missing or refuses the licence is not a
+               * stale URL, so retrying the same track would ask the same
+               * question twice. Say plainly that it cannot play here.
+               */
+              if (drm && data.type === 'keySystemError') {
+                setBuffering(false);
+                setPlaying(false);
+                toast.error('This track is protected and cannot be played in this browser');
+                return;
+              }
+              failRef.current();
             });
             hlsRef.current = hls;
             usingHls = true;

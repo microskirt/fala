@@ -1162,6 +1162,15 @@ export async function alsoLiked(token, trackId, { pages = 6 } = {}) {
   return { collection: found, following_count: following.size, more: Math.max(0, found.length - 3) };
 }
 
+/*
+ * Widevine licences for encrypted SoundCloud streams. The endpoint answers a
+ * CDM challenge, not a raw PSSH, and the resolved stream carries the
+ * `licenseAuthToken` that has to ride along as `license_token`. SoundCloud's own
+ * player posts to exactly this address, and it sends `access-control-allow-
+ * origin: *`, so the browser can talk to it directly.
+ */
+const WIDEVINE_LICENSE_URL = 'https://license.media-streaming.soundcloud.cloud/playback/widevine';
+
 export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
   const data = await apiGet(`/tracks/${id}`, { ttl: 120_000, token });
   if (!data.streamable) throw new ScError(404, 'This track is not streamable');
@@ -1172,17 +1181,22 @@ export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
   const transcodings = data.media?.transcodings || [];
   if (!transcodings.length) throw new ScError(404, 'No audio available for this track');
   /*
-   * A monetised upload can list DRM variants (`cbc-encrypted-hls` for FairPlay,
-   * `ctr-encrypted-hls` for Widevine) next to a plain `hls` stream, and often
-   * under the same preset name. A DRM playlist points its key at `skd://` or a
-   * PSSH blob, which no audio element can open, so choosing by preset alone can
-   * land on a stream that cannot play. Plain variants are preferred first; the
-   * encrypted ones are never used, because the key is out of reach here.
+   * A monetised upload lists DRM variants (`cbc-encrypted-hls` for FairPlay,
+   * `ctr-encrypted-hls` for Widevine) and sometimes no plain stream at all. A
+   * plain stream is always preferred when it exists, because it needs no key
+   * exchange. When there is none, the CTR variant can still play through EME:
+   * its manifest carries a Widevine PSSH and the resolved URL carries the
+   * licence token. The FairPlay variant is skipped, since its `skd://` key is
+   * only usable by Safari's own key system.
    */
   const plain = transcodings.filter(
     (t) => !/encrypted/i.test(String(t.format?.protocol || ''))
   );
-  if (!plain.length) {
+  const widevine = transcodings.filter(
+    (t) => String(t.format?.protocol || '') === 'ctr-encrypted-hls'
+  );
+  const pool = plain.length ? plain : widevine;
+  if (!pool.length) {
     throw new ScError(
       403,
       'This track is protected by SoundCloud and cannot be played here',
@@ -1190,29 +1204,47 @@ export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
       'DRM_PROTECTED'
     );
   }
+  const drm = !plain.length;
+  /*
+   * Preset names vary between uploads, so the quality chain is tried first and
+   * the coarse quality field after it. Encrypted uploads also list a few
+   * variants that resolve to nothing (`abr_sq` is a 404), so a candidate that
+   * will not resolve is skipped rather than failing the whole track.
+   */
   const presets = QUALITY_PRESETS[quality] || QUALITY_PRESETS.hq;
-  let chosen = null;
-  for (const preset of presets) {
-    chosen = plain.find((t) => t.preset === preset);
-    if (chosen) break;
-  }
-  if (!chosen) {
-    // Preset names vary between uploads, so fall back to the quality field.
-    const wanted = quality === 'lq' ? ['lq'] : quality === 'sq' ? ['sq', 'lq'] : ['hq', 'sq', 'lq'];
-    for (const q of wanted) {
-      chosen = plain.find((t) => t.quality === q);
-      if (chosen) break;
-    }
-  }
-  if (!chosen) chosen = plain[0];
-  const resolved = await apiGet(chosen.url, { ttl: 60_000, token });
-  return {
-    url: resolved.url,
-    mime: chosen.format?.mime_type,
-    protocol: chosen.format?.protocol,
-    preset: chosen.preset,
-    duration: data.full_duration || data.duration,
+  const wanted = quality === 'lq' ? ['lq'] : quality === 'sq' ? ['sq', 'lq'] : ['hq', 'sq', 'lq'];
+  const ordered = [];
+  const add = (t) => {
+    if (t && !ordered.includes(t)) ordered.push(t);
   };
+  for (const preset of presets) for (const t of pool) if (t.preset === preset) add(t);
+  for (const q of wanted) for (const t of pool) if (t.quality === q) add(t);
+  for (const t of pool) add(t);
+
+  for (const chosen of ordered.slice(0, 6)) {
+    let resolved = null;
+    try {
+      resolved = await apiGet(chosen.url, { ttl: 60_000, token });
+    } catch {
+      continue;
+    }
+    if (!resolved?.url) continue;
+    const out = {
+      url: resolved.url,
+      mime: chosen.format?.mime_type,
+      protocol: chosen.format?.protocol,
+      preset: chosen.preset,
+      duration: data.full_duration || data.duration,
+      drm,
+    };
+    if (drm) {
+      out.licenseUrl = WIDEVINE_LICENSE_URL;
+      out.licenseAuthToken = resolved.licenseAuthToken || null;
+      if (!out.licenseAuthToken) continue;
+    }
+    return out;
+  }
+  throw new ScError(404, 'No audio available for this track');
 }
 
 export async function waveform(url) {
