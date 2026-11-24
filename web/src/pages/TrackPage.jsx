@@ -419,14 +419,14 @@ function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers })
   const tip = activeMarker || playingMarker;
 
   /*
-   * The bars take the full width, and the clock sits under the right end the
-   * way SoundCloud lays it out: where the playhead is, then the length of the
-   * song. Keeping the times out of the bar area lets the waveform reach both
-   * edges of the card.
+   * The clock is split over the bars the way SoundCloud lays it out: where the
+   * playhead is sits at the top left, the length of the song at the bottom
+   * left. Both float above the bars, so the waveform keeps the full width of
+   * the card and the times never steal a row from it.
    */
   return (
     <div className="flex h-full flex-col">
-      {/* `relative` anchors the comment popup, which opens under the bars. */}
+      {/* `relative` anchors the clock and the comment popup. */}
       <div className="relative min-h-0 flex-1">
         <Waveform
           samples={samples}
@@ -439,11 +439,12 @@ function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers })
           onMarkerEnter={setActiveMarker}
           onMarkerLeave={() => setActiveMarker(null)}
         />
-      </div>
-      <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1 text-xs tabular-nums text-muted-foreground">
-        <span className="text-foreground">{formatDuration(time)}</span>
-        <span aria-hidden="true">/</span>
-        <span>{formatDuration(track.duration)}</span>
+        <span className="pointer-events-none absolute left-0 top-0 z-20 text-xs font-medium tabular-nums text-foreground">
+          {formatDuration(time)}
+        </span>
+        <span className="pointer-events-none absolute bottom-0 left-0 z-20 text-xs tabular-nums text-muted-foreground">
+          {formatDuration(track.duration)}
+        </span>
       </div>
     </div>
   );
