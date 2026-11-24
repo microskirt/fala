@@ -15,6 +15,7 @@ import {
   Share2,
   Link2,
   MoreHorizontal,
+  Search,
 } from 'lucide-react';
 import { api } from '@/api.js';
 import { Artwork } from '@/components/Media.jsx';
@@ -175,6 +176,12 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState('');
+  /*
+   * The picker opens with a field for narrowing the list. A listener with many
+   * playlists should not have to scroll to find one, so the filter sits at the
+   * top and takes the focus on open.
+   */
+  const [query, setQuery] = useState('');
   // Playlist ids known to hold this song. Filled from the server, then kept in
   // step locally so the row flips to Remove the moment the write lands.
   const [contained, setContained] = useState(() => new Set());
@@ -230,6 +237,20 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
     });
   };
 
+  const closePicker = () => {
+    setOpen(false);
+    setQuery('');
+  };
+
+  /*
+   * Narrowed by title alone. The field sits above the list and takes the
+   * focus on open, so a long list can be cut down by typing straight away.
+   */
+  const needle = query.trim().toLowerCase();
+  const shown = needle
+    ? playlists.filter((pl) => (pl.title || '').toLowerCase().includes(needle))
+    : playlists;
+
   const handleCreate = async () => {
     if (!title.trim()) return;
     const pl = await createPlaylist({ title: title.trim() });
@@ -255,18 +276,38 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
 
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={closePicker}
         title="Add to playlist"
         description={track?.title ? `Choose where ${track.title} belongs.` : undefined}
       >
-        <div className="max-h-[22rem] space-y-1 overflow-y-auto pr-1">
+        <div className="relative mb-2">
+          <Search
+            size={14}
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            className="h-9 pl-8 text-sm"
+            placeholder="Search your playlists"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+          />
+        </div>
+
+        <div className="max-h-[30rem] space-y-1 overflow-y-auto pr-1">
           {playlists.length === 0 && !loading ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               You have no playlists yet.
             </p>
           ) : null}
 
-          {playlists.map((pl) => {
+          {playlists.length > 0 && shown.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No playlist matches that name.
+            </p>
+          ) : null}
+
+          {shown.map((pl) => {
             const inside = has(pl);
             const busy = String(busyId) === String(pl.id);
             return (
