@@ -341,7 +341,14 @@ function Waveform({
         className="pointer-events-none absolute right-0 top-1/2 z-20 flex -translate-y-1/2 flex-col justify-center gap-3 text-right text-xs leading-none tabular-nums"
         style={{ width: gutter }}
       >
-        <span className="font-medium text-foreground">{formatDuration(currentTime)}</span>
+        {/*
+          * While the pointer is over the bars the clock names the spot it is
+          * on, so a listener can read where a click will land before taking it.
+          * Off the bars it goes back to the real playhead.
+          */}
+        <span className="font-medium text-foreground">
+          {formatDuration(hoverRatio !== null ? hoverRatio * duration : currentTime)}
+        </span>
         <span className="text-muted-foreground">{formatDuration(duration)}</span>
       </div>
     </div>
