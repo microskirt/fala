@@ -107,13 +107,18 @@ function VolumeControl({ volume, muted, icon: Icon, onToggleMute, onVolume }) {
        * hover and hide the popup halfway through the gesture.
        */}
       <div className="pointer-events-none absolute bottom-full left-1/2 z-50 -translate-x-1/2 pb-1.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-has-[:focus-visible]:pointer-events-auto group-has-[:focus-visible]:opacity-100 group-has-[:active]:pointer-events-auto group-has-[:active]:opacity-100">
-        <div className="flex flex-col items-center rounded-lg border bg-popover px-2 py-2 shadow-lg">
+        {/*
+         * The box hugs the fader. The padding is tighter than the fader's own
+         * width so the sides do not read as dead space, and the height comes
+         * from the fader rather than being padded out around a short one.
+         */}
+        <div className="flex flex-col items-center rounded-lg border bg-popover px-1 py-1.5 shadow-lg">
           {/*
            * The track is thin, but the box around it is wider so the thumb is
-           * easy to hit. A 6px grab target was the other half of the drag
-           * feeling unreliable.
+           * easy to hit. The inner width is only as wide as the thumb needs, so
+           * the sides do not read as dead space beside the fader.
            */}
-          <div className="flex h-32 w-8 items-center justify-center">
+          <div className="flex h-44 w-7 items-center justify-center">
             <Slider
               orientation="vertical"
               className="h-full"

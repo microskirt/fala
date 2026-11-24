@@ -28,8 +28,15 @@ function Slider({ className, defaultValue, value, min = 0, max = 100, orientatio
       <SliderPrimitive.Track
         data-slot="slider-track"
         className={cn(
-          'bg-muted relative overflow-hidden rounded-full',
-          vertical ? 'h-full w-1.5 grow' : 'h-1 w-full grow'
+          'relative overflow-hidden rounded-full',
+          /*
+           * The vertical track is read against the popover it floats in, where
+           * `bg-muted` sits only a few steps from `bg-popover` and the unplayed
+           * half of the bar vanished into the box. A foreground tint stays
+           * visible in every theme, and the track is wider so the bar has some
+           * body at this size.
+           */
+          vertical ? 'h-full w-2 grow bg-foreground/15' : 'h-1 w-full grow bg-muted'
         )}
       >
         <SliderPrimitive.Range
@@ -41,7 +48,11 @@ function Slider({ className, defaultValue, value, min = 0, max = 100, orientatio
         <SliderPrimitive.Thumb
           key={i}
           data-slot="slider-thumb"
-          className="border-primary bg-background ring-ring/50 block size-3.5 shrink-0 cursor-grab rounded-full border-2 shadow-sm transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden active:cursor-grabbing disabled:pointer-events-none disabled:opacity-50"
+          className={cn(
+            'border-primary bg-background ring-ring/50 block shrink-0 cursor-grab rounded-full border-2 shadow-sm transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden active:cursor-grabbing disabled:pointer-events-none disabled:opacity-50',
+            /* The vertical fader is larger than a horizontal one needs to be. */
+            vertical ? 'size-4' : 'size-3.5'
+          )}
         />
       ))}
     </SliderPrimitive.Root>
