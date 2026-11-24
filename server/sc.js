@@ -489,7 +489,16 @@ export async function systemPlaylist(id, { trackLimit, token = null } = {}) {
   const total = ids.length;
   if (trackLimit) ids = ids.slice(0, trackLimit);
   const tracks = await tracksByIds(ids);
-  return { ...slimPlaylist(data), tracks, track_count: data.track_count ?? total };
+  const slim = slimPlaylist(data);
+  /*
+   * These mixes carry only track ids inline, so slimPlaylist finds no cover to
+   * borrow and the band behind the card comes out empty. Once the tracks are
+   * fetched, the first one with artwork can stand in for the mix.
+   */
+  if (!slim.artwork_url) {
+    slim.artwork_url = tracks.find((t) => t?.artwork_url)?.artwork_url || null;
+  }
+  return { ...slim, tracks, track_count: data.track_count ?? total };
 }
 
 export async function playlist(id, { token = null } = {}) {
@@ -505,7 +514,15 @@ export async function playlist(id, { token = null } = {}) {
   if (!incomplete) return slim;
   const ids = raw.map((t) => (t && t.id != null ? t.id : null)).filter((v) => v != null);
   const hydrated = await tracksByIds(ids);
-  return hydrated.length ? { ...slim, tracks: hydrated } : slim;
+  if (!hydrated.length) return slim;
+  /*
+   * A playlist with no cover of its own borrows the first track's, but the
+   * inline stubs carry no artwork, so the borrow above found nothing. The
+   * hydrated tracks do, and without this the "Liked by ..." shelves open on a
+   * page with no band.
+   */
+  const artwork = slim.artwork_url || hydrated.find((t) => t?.artwork_url)?.artwork_url || null;
+  return { ...slim, artwork_url: artwork, tracks: hydrated };
 }
 
 export async function tracksByIds(ids) {

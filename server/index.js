@@ -691,6 +691,60 @@ route('DELETE', '/api/playlists/:id/tracks/:trackId', async (ctx) => {
   return sc.removeTrackFromPlaylist(token, ctx.params.id, ctx.params.trackId);
 });
 
+/* -------------------------------- artwork --------------------------------- */
+
+/*
+ * Some covers sit on a SoundCloud host that sends no `access-control-allow-
+ * origin`, so a canvas cannot read their pixels and the tinted band behind a
+ * card comes out empty. The system playlist covers (Daily Drops, Weekly Wave,
+ * Your Mix) are exactly that case. Fetching the image here and handing it back
+ * from our own origin makes the canvas readable. Only SoundCloud image hosts
+ * are allowed through, so this never becomes an open proxy.
+ */
+const ARTWORK_HOST = /(^|\.)(sndcdn\.com|soundcloud\.cloud)$/i;
+const ARTWORK_MAX = 4_000_000;
+
+async function proxyArtwork(res, raw) {
+  let target;
+  try {
+    target = new URL(String(raw || ''));
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain' }).end('Bad url');
+    return;
+  }
+  if (target.protocol !== 'https:' || !ARTWORK_HOST.test(target.hostname)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' }).end('Forbidden');
+    return;
+  }
+  let upstream;
+  try {
+    upstream = await fetch(target, {
+      headers: { Accept: 'image/*', 'User-Agent': 'Fala/1.0' },
+      redirect: 'follow',
+    });
+  } catch {
+    res.writeHead(502, { 'Content-Type': 'text/plain' }).end('Upstream failed');
+    return;
+  }
+  const type = upstream.headers.get('content-type') || '';
+  if (!upstream.ok || !type.startsWith('image/')) {
+    res.writeHead(upstream.ok ? 415 : upstream.status, { 'Content-Type': 'text/plain' }).end('No image');
+    return;
+  }
+  const body = Buffer.from(await upstream.arrayBuffer());
+  if (body.length > ARTWORK_MAX) {
+    res.writeHead(413, { 'Content-Type': 'text/plain' }).end('Too large');
+    return;
+  }
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Content-Length': body.length,
+    'Cache-Control': 'public, max-age=86400',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(body);
+}
+
 /* --------------------------------- static --------------------------------- */
 
 const MIME = {
@@ -757,6 +811,15 @@ async function handle(req, res) {
   const pathname = url.pathname;
 
   if (!pathname.startsWith('/api/')) return serveStatic(req, res, pathname);
+
+  /*
+   * Covers that cannot be read cross-origin come back through here. It answers
+   * with image bytes rather than JSON, so it is handled before the route table.
+   */
+  if (pathname === '/api/artwork') {
+    await proxyArtwork(res, url.searchParams.get('url'));
+    return;
+  }
 
   const ctx = {
     req,

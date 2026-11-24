@@ -14,7 +14,17 @@ import { artwork } from '@/api.js';
  */
 const cache = new Map();
 
-function averageColor(url) {
+/*
+ * Some covers live on a host that sends no CORS header, so the canvas is
+ * tainted and the pixels cannot be read. The system playlist covers are that
+ * case, which is why those cards had no band. Asking our own server for the
+ * bytes puts the image on this origin, where the canvas can read it.
+ */
+function proxied(url) {
+  return `/api/artwork?url=${encodeURIComponent(url)}`;
+}
+
+function sample(url) {
   return new Promise((resolve) => {
     if (typeof document === 'undefined') return resolve(null);
     const img = new Image();
@@ -52,6 +62,17 @@ function averageColor(url) {
     img.onerror = () => resolve(null);
     img.src = url;
   });
+}
+
+/*
+ * Read the cover directly when the host allows it, and only fall back to the
+ * server copy when that fails. Most covers are on a host that already sends
+ * the CORS header, so the common path stays one request.
+ */
+async function averageColor(url) {
+  const direct = await sample(url);
+  if (direct) return direct;
+  return sample(proxied(url));
 }
 
 /*
