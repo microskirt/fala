@@ -386,8 +386,11 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
 
 export function AddToQueueButton({ track, size = 18, className }) {
   const { addToQueue } = usePlayer();
-  const toast = useToast();
 
+  /*
+   * `addToQueue` already reports the result, so this only has to forward the
+   * click. Toasting here as well printed the message twice.
+   */
   return (
     <Button
       variant="ghost"
@@ -395,10 +398,7 @@ export function AddToQueueButton({ track, size = 18, className }) {
       className={className}
       aria-label="Add to queue"
       title="Add to queue"
-      onClick={() => {
-        addToQueue(track);
-        toast.success('Added to queue');
-      }}
+      onClick={() => addToQueue(track)}
     >
       <ListEnd size={size} />
     </Button>

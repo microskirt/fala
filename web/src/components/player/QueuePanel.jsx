@@ -223,15 +223,16 @@ export function QueuePanel() {
                     </span>
                   </span>
                 </button>
+                {/* Hidden controls stay out of the hit test until the row is hovered. */}
                 <AddToPlaylistButton
                   track={t}
                   size={14}
-                  className="opacity-0 group-hover:opacity-100"
+                  className="pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
                 />
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="opacity-0 group-hover:opacity-100"
+                  className="pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
                   onClick={() => removeFromQueue(t.id)}
                   aria-label={`Remove ${t.title} from queue`}
                   title="Remove from queue"

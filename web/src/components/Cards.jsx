@@ -63,11 +63,27 @@ export function TrackCard({ track, context, showStats = true }) {
            * The action tray matches the buttons elsewhere on the page rather
            * than being a pill, so the two shapes do not compete.
            */}
-          <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
+          {/**
+           * The tray is only hit-testable while it is showing. `opacity-0` alone
+           * leaves the buttons in the layout, so a click aimed at something
+           * else, such as the notifications popup, could land on an invisible
+           * Add to queue and fire it. Hover and focus turn the events back on.
+           */}
+          <div
+            className={cn(
+              'pointer-events-none flex items-center gap-0.5 rounded-md bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm group-hover/art:pointer-events-auto focus-within:pointer-events-auto',
+              active && 'pointer-events-auto'
+            )}
+          >
             <AddToQueueButton track={track} size={16} />
             <AddToPlaylistButton track={track} size={16} />
           </div>
-          <div className="pointer-events-auto">
+          <div
+            className={cn(
+              'pointer-events-none group-hover/art:pointer-events-auto focus-within:pointer-events-auto',
+              active && 'pointer-events-auto'
+            )}
+          >
             <PlayButton track={track} context={context} />
           </div>
         </div>
@@ -134,8 +150,8 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
           {isTrack ? (
             <span
               className={cn(
-                'absolute transition-opacity group-hover:opacity-100',
-                active ? 'opacity-100' : 'opacity-0'
+                'absolute transition-opacity group-hover:pointer-events-auto group-hover:opacity-100',
+                active ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
               )}
             >
               <PlayButton track={track} context={context} size="sm" />
@@ -170,7 +186,12 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
           {track.genre}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      {/*
+       * A row keeps its controls in the layout so nothing shifts on hover, but
+       * a hidden row must not answer clicks. Without the pointer gate a click
+       * meant for a popup above could land on an invisible Add to queue.
+       */}
+      <div className="pointer-events-none flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
         <LikeButton track={track} size={16} />
         <AddToQueueButton track={track} size={16} />
         <AddToPlaylistButton track={track} size={16} />
@@ -222,7 +243,8 @@ export function PlaylistCard({ playlist }) {
          * swallow each other's clicks.
          */}
         <div className="pointer-events-none absolute inset-0 flex items-end justify-start bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 opacity-0 transition-opacity group-hover/art:opacity-100 focus-within:opacity-100">
-          <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
+          {/* Hidden means not clickable: only a raised tray takes the pointer. */}
+          <div className="pointer-events-none flex items-center gap-0.5 rounded-md bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm group-hover/art:pointer-events-auto focus-within:pointer-events-auto">
             <AddPlaylistToQueueButton playlist={playlist} size={16} />
           </div>
         </div>

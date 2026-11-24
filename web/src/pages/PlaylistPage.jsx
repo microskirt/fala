@@ -62,8 +62,8 @@ function PlaylistTrackRow({ track, index, context }) {
         <span className={cn('group-hover:opacity-0', active && 'opacity-0')}>{index + 1}</span>
         <span
           className={cn(
-            'absolute transition-opacity group-hover:opacity-100',
-            active ? 'opacity-100' : 'opacity-0'
+            'absolute transition-opacity group-hover:pointer-events-auto group-hover:opacity-100',
+            active ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
           )}
         >
           <PlayButton track={track} context={context} size="sm" />
@@ -98,7 +98,8 @@ function PlaylistTrackRow({ track, index, context }) {
           )}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      {/* Hidden until the row is hovered, and not clickable while hidden. */}
+      <div className="pointer-events-none flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
         <LikeButton track={track} size={16} />
         <AddToQueueButton track={track} size={16} />
         <AddToPlaylistButton track={track} size={16} />
