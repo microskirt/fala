@@ -451,6 +451,7 @@ function CommentForm({
   className,
   compact = false,
   active = false,
+  onCancel = null,
 }) {
   const { addComment } = useLibrary();
   const { user } = useAuth();
@@ -571,6 +572,23 @@ function CommentForm({
         onChange={(e) => setBody(e.target.value)}
         maxLength={1000}
       />
+      {/*
+        * A reply can be backed out of. The close button sits just before the
+        * post button, so cancelling is a single small step and never needs a
+        * reload to get rid of the open field.
+        */}
+      {onCancel ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onCancel}
+          aria-label="Cancel reply"
+          title="Cancel reply"
+        >
+          <X size={16} />
+        </Button>
+      ) : null}
       <Button type="submit" disabled={!body.trim() || busy}>
         {busy ? <Loader2 size={14} className="animate-spin" /> : 'Post'}
       </Button>
@@ -720,6 +738,7 @@ function CommentItem({ comment, trackId, onDelete, onReplied, isReply = false })
             <CommentForm
               track={{ id: trackId }}
               replyTo={comment}
+              onCancel={() => setReplying(false)}
               onPosted={(reply) => {
                 setReplies((prev) => [...prev, reply]);
                 setReplying(false);
