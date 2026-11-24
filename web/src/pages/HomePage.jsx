@@ -151,7 +151,7 @@ export function HomePage() {
         title={`${greeting()}${isAuthed && user ? `, ${user.username}` : ''}`}
         description={
           isAuthed
-            ? 'Mixes, stations and tracks picked from what you listen to.'
+            ? 'Mixes and tracks picked from what you listen to.'
             : 'Mixes and tracks picked for you by SoundCloud.'
         }
       />

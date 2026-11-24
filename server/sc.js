@@ -1292,7 +1292,11 @@ export async function home({ token = null } = {}) {
   ];
 
   // Shelves nobody asked for, shown to signed-in and anonymous visitors alike.
-  const ALWAYS_HIDDEN = ['soundcloud:selections:buzzing'];
+  // The stations shelf is dropped for everyone, not just signed-in listeners.
+  const ALWAYS_HIDDEN = [
+    'soundcloud:selections:buzzing',
+    'soundcloud:selections:artist-stations',
+  ];
 
   for (const sel of selections) {
     const urn = String(sel.urn || '');
