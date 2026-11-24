@@ -1018,11 +1018,6 @@ function ListenerRow({ rank, user, plays, isViewer = false }) {
             </span>
           ) : null}
         </span>
-        {placeLabel(user.city, user.country_code) ? (
-          <span className="block truncate text-xs text-muted-foreground">
-            {placeLabel(user.city, user.country_code)}
-          </span>
-        ) : null}
       </span>
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
         {formatCount(plays)} {plays === 1 ? 'play' : 'plays'}
