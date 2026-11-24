@@ -568,7 +568,19 @@ route('GET', '/api/users/:id', async (ctx) => {
   ]);
   if (!user) throw new HttpError(404, 'User not found');
   const flags = await flagsFor(ctx.token);
-  return { ...decorateUser(user, flags), web_profiles: links };
+  /*
+   * api-v2 blanks `created_at` on every public user payload, so an artist's
+   * join date is not readable by anyone. The caller's own /me does carry it,
+   * so the one profile that can show a real date is the signed in account's
+   * own. Everyone else simply has none, which the page leaves out.
+   */
+  const ownJoin =
+    flags.me && String(flags.me.id) === String(user.id) ? flags.me.created_at : null;
+  return {
+    ...decorateUser(user, flags),
+    web_profiles: links,
+    created_at: user.created_at || ownJoin || null,
+  };
 });
 
 route('GET', '/api/users/:id/tab', async (ctx) => {
