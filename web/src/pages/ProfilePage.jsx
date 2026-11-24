@@ -24,15 +24,10 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
 import { Avatar, Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx';
-import { TrackRow, PlaylistCard } from '@/components/Cards.jsx';
+import { PlaylistCard } from '@/components/Cards.jsx';
+import { ArtistTrackRow, ArtistTrackRowSkeleton } from '@/components/ArtistTrackRow.jsx';
 import { FollowButton } from '@/components/Controls.jsx';
-import {
-  Page,
-  CardGrid,
-  TrackList,
-  TrackListSkeleton,
-  LoadMore,
-} from '@/components/layout/Page.jsx';
+import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { useArtworkPalette } from '@/lib/artworkColor.js';
 import { Modal } from '@/components/Modal.jsx';
@@ -396,7 +391,15 @@ export function ProfilePage() {
 
   const renderTab = () => {
     if (tabLoading) {
-      if (!listsTab) return <TrackListSkeleton />;
+      if (!listsTab) {
+        return (
+          <div className="flex flex-col gap-1">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <ArtistTrackRowSkeleton key={i} />
+            ))}
+          </div>
+        );
+      }
       return (
         <CardGrid>
           {Array.from({ length: 8 }).map((_, i) => (
@@ -433,10 +436,11 @@ export function ProfilePage() {
     }
 
     /*
-     * Songs read as a list here, not as covers. An artist page is where a
-     * listener scans a catalogue and decides what to do with each song, so
-     * every row carries the actions: like, repost, add to playlist, add to
-     * queue. A cover grid had room for two of them and hid the rest.
+     * Songs read as entries here, the way SoundCloud lists an artist's work:
+     * the cover, the title over its credits, a small waveform of the song's own
+     * shape, and a footer with the actions and the numbers. A plain row of
+     * thumbs said nothing about the songs themselves, and a cover grid had room
+     * for two actions where a song has four.
      */
     return (
       <div>
@@ -450,17 +454,11 @@ export function ProfilePage() {
             </Button>
           </div>
         ) : null}
-        <TrackList>
+        <div className="flex flex-col gap-1">
           {tracksOnly.map((t, i) => (
-            <TrackRow
-              key={`${t.id}-${i}`}
-              track={t}
-              index={i}
-              context={tracksOnly}
-              showRepost
-            />
+            <ArtistTrackRow key={`${t.id}-${i}`} track={t} context={tracksOnly} />
           ))}
-        </TrackList>
+        </div>
       </div>
     );
   };
@@ -585,43 +583,54 @@ export function ProfilePage() {
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4">
-          {joined || place || profile.description ? (
-            <section className="rounded-xl border bg-card p-4">
-              {/* The same heading style as the Links box below it. */}
-              <h2 className="mb-3 text-sm font-semibold tracking-tight">Details</h2>
-              {/*
-               * The join date leads the column, above the location. It reads
-               * as "Joined ... ago" and lifts the exact day on hover, the way
-               * the song card's upload age does.
-               */}
-              {joined || place ? (
-                <div className="mb-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
-                  {joined ? (
-                    <div className="inline-flex items-center gap-1.5">
-                      <Calendar size={14} />
-                      <time
-                        dateTime={joined}
-                        title={formatDate(joined)}
-                        className="cursor-default"
-                      >
-                        Joined {formatRelativeDate(joined)}
-                      </time>
-                    </div>
-                  ) : null}
-                  {place ? (
-                    <div className="inline-flex items-center gap-1.5">
-                      <MapPin size={14} /> {place}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              {profile.description ? (
-                <ClampedText text={profile.description} lines={6} />
-              ) : null}
-            </section>
-          ) : null}
+          {/*
+           * The box is always here, even for an artist who has filled in
+           * nothing. An empty column read as a page that had failed to load;
+           * the heading and a plain line say the page is complete and the
+           * artist simply has nothing to add.
+           */}
+          <section className="rounded-xl border bg-card p-4">
+            {/* The same heading style as the Links box below it. */}
+            <h2 className="mb-3 text-sm font-semibold tracking-tight">Details</h2>
+            {/*
+             * The join date leads the column, above the location. It reads
+             * as "Joined ... ago" and lifts the exact day on hover, the way
+             * the song card's upload age does.
+             */}
+            {joined || place ? (
+              <div className="mb-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
+                {joined ? (
+                  <div className="inline-flex items-center gap-1.5">
+                    <Calendar size={14} />
+                    <time
+                      dateTime={joined}
+                      title={formatDate(joined)}
+                      className="cursor-default"
+                    >
+                      Joined {formatRelativeDate(joined)}
+                    </time>
+                  </div>
+                ) : null}
+                {place ? (
+                  <div className="inline-flex items-center gap-1.5">
+                    <MapPin size={14} /> {place}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {profile.description ? (
+              <ClampedText text={profile.description} lines={6} />
+            ) : null}
+            {!joined && !place && !profile.description ? (
+              <p className="text-xs text-muted-foreground">
+                This artist has not added any details.
+              </p>
+            ) : null}
+          </section>
 
-          <ProfileLinks links={profile.web_profiles} />
+          {profile.web_profiles && profile.web_profiles.length ? (
+            <ProfileLinks links={profile.web_profiles} />
+          ) : null}
         </aside>
       </div>
 
