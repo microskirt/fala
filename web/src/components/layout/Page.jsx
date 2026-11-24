@@ -21,6 +21,34 @@ export function Page({ children, className, wide = false }) {
   );
 }
 
+/*
+ * The tinted band behind a detail page's top card. SoundCloud reads a colour
+ * out of the cover and lays it across the whole content width, so the card
+ * sits on it instead of in a box. The band is painted by a full width layer
+ * behind the content, which lets it reach the edges of the page while the card
+ * keeps its normal gutters. `tint` is a plain rgb() string; it is mixed toward
+ * the page background so the band stays a tint in every theme.
+ */
+export function DetailHero({ tint, children, className }) {
+  return (
+    /*
+     * `isolate` keeps the band inside this block's own stacking context. Without
+     * it a negative z-index layer drops behind the app shell's opaque page
+     * background and never shows at all.
+     */
+    <div className={cn('relative isolate -mt-6 pb-6 pt-6', className)}>
+      {tint ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 left-1/2 -z-10 w-screen -translate-x-1/2"
+          style={{ backgroundColor: `color-mix(in srgb, ${tint} 30%, var(--background))` }}
+        />
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
 export function Eyebrow({ children, className }) {
   return (
     <div

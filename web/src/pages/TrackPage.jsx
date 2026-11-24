@@ -39,9 +39,16 @@ import {
   AddToQueueButton,
 } from '@/components/Controls.jsx';
 import { TrackCard } from '@/components/Cards.jsx';
-import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
+import { Page, CardGrid, LoadMore, DetailHero } from '@/components/layout/Page.jsx';
+import { useArtworkColor } from '@/lib/artworkColor.js';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { Button } from '@/components/ui/button.jsx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
@@ -1392,6 +1399,14 @@ export function TrackPage() {
     return [...bySecond.values()].sort((a, b) => a.timeMs - b.timeMs);
   }, [comments, track?.full_duration, track?.duration]);
 
+  /*
+   * The band behind the card takes its colour from the cover. SoundCloud does
+   * not send this colour over the API, so it is sampled from the artwork and
+   * falls back to a plain page when the pixels cannot be read.
+   */
+  const cover = useArtworkColor(track?.artwork_url || track?.user?.avatar_url);
+  const tint = cover ? `rgb(${cover[0]} ${cover[1]} ${cover[2]})` : null;
+
   if (loading) {
     return (
       <Page>
@@ -1440,7 +1455,8 @@ export function TrackPage() {
 
   return (
     <Page>
-      <div className={cn('grid gap-8', DETAIL_GRID)}>
+      <DetailHero tint={tint}>
+        <div className={cn('grid gap-8', DETAIL_GRID)}>
         {/*
          * The cover takes the right column at the same width as the boxes under
          * the card, so the page keeps one right edge. It stays first in the
@@ -1566,6 +1582,7 @@ export function TrackPage() {
           </div>
         </div>
       </div>
+      </DetailHero>
 
       {/*
        * Below the player the page splits: the words run down the left, and the

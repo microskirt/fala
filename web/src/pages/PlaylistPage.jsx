@@ -32,7 +32,8 @@ import {
 import { Modal, ConfirmDialog } from '@/components/Modal.jsx';
 import { ClampedText } from '@/components/ClampedText.jsx';
 import { PlaylistArtworkField } from '@/components/PlaylistArtwork.jsx';
-import { Page, TrackList, Eyebrow } from '@/components/layout/Page.jsx';
+import { Page, TrackList, Eyebrow, DetailHero } from '@/components/layout/Page.jsx';
+import { useArtworkColor } from '@/lib/artworkColor.js';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
@@ -164,6 +165,14 @@ export function PlaylistPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, params.artist, params.playlist]);
 
+  /*
+   * The band behind the top card takes its colour from the cover, the same way
+   * the song page does. It stays above the early returns so the hook order
+   * never changes while the playlist loads.
+   */
+  const cover = useArtworkColor(playlist?.artwork_url || playlist?.user?.avatar_url);
+  const tint = cover ? `rgb(${cover[0]} ${cover[1]} ${cover[2]})` : null;
+
   if (loading) {
     return (
       <Page>
@@ -237,8 +246,9 @@ export function PlaylistPage() {
        * at the page edge and the picture anchors the other side. It stays first
        * in the markup, which is the order it should stack in on a phone.
        */}
-      <div className={cn('grid gap-8', DETAIL_GRID)}>
-        <div className="mx-auto w-full max-w-[20rem] lg:order-2 lg:mx-0">
+      <DetailHero tint={tint}>
+        <div className={cn('grid gap-8', DETAIL_GRID)}>
+          <div className="mx-auto w-full max-w-[20rem] lg:order-2 lg:mx-0">
           <Artwork
             src={playlist.artwork_url}
             fallback={playlist.user?.avatar_url}
@@ -367,6 +377,7 @@ export function PlaylistPage() {
           </div>
         </div>
       </div>
+      </DetailHero>
 
       <div className="mt-10">
         {tracks.length === 0 ? (
