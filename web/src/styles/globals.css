@@ -25,6 +25,13 @@
   --primary: #ff5500;
   --primary-foreground: #ffffff;
 
+  /*
+   * The unplayed half of the waveform. It sits close to the played colour on
+   * purpose: SoundCloud's bars read as one shape with a bright head, not as two
+   * strongly different tones.
+   */
+  --waveform-bar: #55565f;
+
   --secondary: #1e1e23;
   --secondary-foreground: #f3f3f4;
 
@@ -75,6 +82,9 @@
   --primary: #f04d00;
   --primary-foreground: #ffffff;
 
+  /* The unplayed bars: a soft grey that keeps the row readable on white. */
+  --waveform-bar: #c9c9d1;
+
   --secondary: #f3f3f5;
   --secondary-foreground: #17171b;
 
@@ -119,6 +129,9 @@
 
   --primary: #cba6f7;
   --primary-foreground: #1e1e2e;
+
+  /* The unplayed bars, kept a step above the page so they stay visible. */
+  --waveform-bar: #585b70;
 
   --secondary: #313244;
   --secondary-foreground: #cdd6f4;
