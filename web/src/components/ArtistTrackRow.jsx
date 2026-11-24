@@ -145,16 +145,90 @@ function useRowData(track) {
 }
 
 /*
- * The current time on its own. It subscribes to the playhead, so it is only
- * rendered for the row that is actually loaded: every other row shows a still
- * 0:00 and never re-renders while the song plays.
+ * A time on the bars, in a small pill so it stays legible over them. The same
+ * shape is used on both sides, so the two clocks read as a pair.
  */
-function LiveCurrentTime() {
-  const time = usePlayerTime();
+function ClockPill({ children, side = 'left', muted = false }) {
   return (
-    <span className="pointer-events-none absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-medium leading-none tabular-nums backdrop-blur-sm">
-      {formatDuration(time)}
+    <span
+      className={cn(
+        'pointer-events-none absolute top-1/2 z-20 -translate-y-1/2 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-medium leading-none tabular-nums backdrop-blur-sm',
+        side === 'left' ? 'left-0' : 'right-0',
+        muted && 'text-muted-foreground'
+      )}
+    >
+      {children}
     </span>
+  );
+}
+
+/*
+ * The played stretch of a small waveform, plus the left clock. It subscribes to
+ * the playhead on its own, so only the row that is actually loaded re-renders
+ * while the song plays. A row that is merely hovered mounts it too, to show the
+ * stretch the click would play, but then the progress is still zero.
+ */
+function MiniPlayed({ samples, width, height, geometry, duration, hoverRatio, active }) {
+  const { currentTime } = usePlayerTime();
+  const canvasRef = useRef(null);
+  const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
+  const progress = active && duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
+  // Under the pointer the edge follows it, so the preview is what would play.
+  const edge = hoverRatio === null ? progress : hoverRatio;
+
+  useEffect(() => {
+    paintBars(canvasRef.current, {
+      norm,
+      width,
+      height,
+      geometry,
+      color: themeColor('--primary', '#ff5500'),
+      minBar: 1,
+    });
+  }, [norm, width, height, geometry]);
+
+  useEffect(() => {
+    const paint = () =>
+      paintBars(canvasRef.current, {
+        norm,
+        width,
+        height,
+        geometry,
+        color: themeColor('--primary', '#ff5500'),
+        minBar: 1,
+      });
+    const observer = new MutationObserver(paint);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme', 'style'],
+    });
+    return () => observer.disconnect();
+  }, [norm, width, height, geometry]);
+
+  /*
+   * While the pointer is on the bars the clock names the spot it is on, for a
+   * playing song and a resting one alike. Off the bars it goes back to the real
+   * playhead.
+   */
+  const label = hoverRatio !== null ? hoverRatio * duration : currentTime;
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        style={{ clipPath: `inset(0 ${(1 - edge) * 100}% 0 0)` }}
+        aria-hidden="true"
+      />
+      {active ? (
+        <div
+          className="pointer-events-none absolute top-0 bottom-0 z-[6] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+          style={{ left: `${progress * 100}%` }}
+          aria-hidden="true"
+        />
+      ) : null}
+      <ClockPill>{formatDuration(label)}</ClockPill>
+    </>
   );
 }
 
@@ -164,8 +238,8 @@ function LiveCurrentTime() {
  * wide rather than one per song in the list.
  */
 function PlayingDriver({ markers, onMarker }) {
-  const time = usePlayerTime();
-  const marker = useMemo(() => markerAtTime(markers, time), [markers, time]);
+  const { currentTime } = usePlayerTime();
+  const marker = useMemo(() => markerAtTime(markers, currentTime), [markers, currentTime]);
   useEffect(() => {
     onMarker(marker);
   }, [marker, onMarker]);
@@ -226,15 +300,17 @@ function MiniTip({ marker, width }) {
 /*
  * The small waveform under an artist's song row. It is the song page's bar shape
  * in miniature, with its comment faces on the same spots and its own clocks at
- * either end. It is not a seek target, so it reads as the song's signature
- * rather than as a control.
+ * either end. The upper half is a seek target, the same as the big waveform, and
+ * a pointer over it previews the stretch a click would play.
  */
-function MiniWaveform({ samples, markers, duration, active, height = 44 }) {
+function MiniWaveform({ samples, markers, duration, active, onSeek, height = 44 }) {
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
+  const dragging = useRef(false);
   const [width, setWidth] = useState(0);
   const [hovered, setHovered] = useState(null);
   const [playing, setPlaying] = useState(null);
+  const [hoverRatio, setHoverRatio] = useState(null);
   const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
   const geometry = useMemo(() => barGeometry(width), [width]);
 
@@ -280,13 +356,82 @@ function MiniWaveform({ samples, markers, duration, active, height = 44 }) {
     if (!active) setPlaying(null);
   }, [active]);
 
+  const ratioAt = (clientX) => {
+    const el = boxRef.current;
+    if (!el) return 0;
+    const rect = el.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(1, rect.width)));
+  };
+
   const tip = hovered || playing;
+  /*
+   * The played layer mounts while the song is loaded, and also while the
+   * pointer is over the bars, so a resting row still lights up under the hand
+   * the way the big waveform does. It brings the left clock with it; without it
+   * a plain pill holds the same spot.
+   */
+  const showPlayed = active || hoverRatio !== null;
 
   return (
     <div className="relative mt-2 w-full" style={{ height }} ref={boxRef}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden="true" />
+
+      {showPlayed ? (
+        <MiniPlayed
+          samples={samples}
+          width={width}
+          height={height}
+          geometry={geometry}
+          duration={duration}
+          hoverRatio={hoverRatio}
+          active={active}
+        />
+      ) : (
+        <ClockPill>{formatDuration(0)}</ClockPill>
+      )}
+
       {/* The same hairline axis the song page runs through its bars. */}
       <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-foreground/25" />
+
+      {/*
+        * The hit area covers the top half only, the part above the axis. The
+        * shaded lower half is where the comment faces hang, so it stays inert:
+        * a pointer there names a comment rather than seeking the song.
+        */}
+      <div
+        className="absolute inset-x-0 top-0 z-[8] h-1/2 cursor-pointer outline-none"
+        onPointerDown={(e) => {
+          dragging.current = true;
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+          setHoverRatio(null);
+          onSeek?.(ratioAt(e.clientX));
+        }}
+        onPointerMove={(e) => {
+          if (dragging.current) {
+            setHoverRatio(null);
+            onSeek?.(ratioAt(e.clientX));
+            return;
+          }
+          setHoverRatio(ratioAt(e.clientX));
+        }}
+        onPointerLeave={() => {
+          if (!dragging.current) setHoverRatio(null);
+        }}
+        onPointerUp={(e) => {
+          dragging.current = false;
+          e.currentTarget.releasePointerCapture?.(e.pointerId);
+        }}
+        role="slider"
+        tabIndex={0}
+        aria-label="Seek within track"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round((hoverRatio || 0) * 100)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') onSeek?.(Math.max(0, (hoverRatio || 0) - 0.01));
+          if (e.key === 'ArrowRight') onSeek?.(Math.min(1, (hoverRatio || 0) + 0.01));
+        }}
+      />
 
       {markers.map((m) => (
         <MiniFace
@@ -302,21 +447,13 @@ function MiniWaveform({ samples, markers, duration, active, height = 44 }) {
       {tip ? <MiniTip marker={tip} width={width} /> : null}
 
       {/*
-        * The clocks read like SoundCloud's own on a list: the playhead on the
-        * left, the length on the right, each in a small dark pill so they stay
-        * legible over the bars. The big song page keeps its two plain times in
-        * the flat strip at the right; this is the list's own shape.
+        * The length on the right, in the same pill as the playhead on the left.
+        * The big song page keeps its two plain times in the flat strip at the
+        * right; this is the list's own shape.
         */}
-      {active ? (
-        <LiveCurrentTime />
-      ) : (
-        <span className="pointer-events-none absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-medium leading-none tabular-nums backdrop-blur-sm">
-          0:00
-        </span>
-      )}
-      <span className="pointer-events-none absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-medium leading-none tabular-nums text-muted-foreground backdrop-blur-sm">
+      <ClockPill side="right" muted>
         {formatDuration(duration)}
-      </span>
+      </ClockPill>
     </div>
   );
 }
@@ -330,7 +467,7 @@ function MiniWaveform({ samples, markers, duration, active, height = 44 }) {
  */
 export function ArtistTrackRow({ track, context }) {
   const { samples, comments, rowRef } = useRowData(track);
-  const { isCurrent } = usePlayer();
+  const { isCurrent, playTrack, seek } = usePlayer();
   const duration = track?.full_duration || track?.duration || 0;
   // Stays above the early return so the hook order never changes.
   const markers = useMemo(
@@ -408,6 +545,15 @@ export function ArtistTrackRow({ track, context }) {
           markers={markers}
           duration={duration}
           active={active}
+          onSeek={(ratio) => {
+            /*
+             * Starting a song and seeking into it happen together here, so the
+             * track id rides along: the player still holds the previous song
+             * for a moment, and the spot has to be parked against this one.
+             */
+            if (!active) playTrack(track, context);
+            seek(ratio * duration, track.id);
+          }}
         />
 
         {/*
