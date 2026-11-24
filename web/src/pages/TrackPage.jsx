@@ -1927,23 +1927,33 @@ function RepostControl({ track }) {
 }
 
 /*
- * One click puts this page's address on the clipboard. The old control was a
- * menu that asked which link to copy, which turned a single action into two
- * decisions; the page address is the one people want.
+ * Two links are worth having. The page address opens this site, and the
+ * SoundCloud address opens the original upload for people who would rather use
+ * the source. The button asks which one instead of guessing.
  */
 function CopyLinkButton({ track, onCopy }) {
   if (!track) return null;
   const here = `${window.location.origin}${trackPath(track)}`;
+  const original = track.permalink_url || null;
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => onCopy(here, 'Song')}
-      title="Copy link"
-      aria-label="Copy link"
-    >
-      <Link2 size={16} />
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" title="Copy link" aria-label="Copy link">
+          <Link2 size={16} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onSelect={() => onCopy(here, 'This host')}>
+          This host
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => original && onCopy(original, 'SoundCloud')}
+          disabled={!original}
+        >
+          SoundCloud
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
