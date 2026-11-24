@@ -303,7 +303,7 @@ function MiniTip({ marker, width }) {
  * either end. The upper half is a seek target, the same as the big waveform, and
  * a pointer over it previews the stretch a click would play.
  */
-function MiniWaveform({ samples, markers, duration, active, onSeek, height = 44 }) {
+function MiniWaveform({ samples, markers, duration, active, onSeek, height = 36 }) {
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const dragging = useRef(false);
@@ -491,8 +491,8 @@ export function ArtistTrackRow({ track, context }) {
           src={track.artwork_url}
           fallback={track.user?.avatar_url}
           alt={track.title}
-          size={72}
-          rounded={6}
+          size={112}
+          rounded={8}
         />
       </Link>
 
@@ -596,7 +596,7 @@ export function ArtistTrackRow({ track, context }) {
 export function ArtistTrackRowSkeleton() {
   return (
     <div className="flex gap-3 rounded-lg px-2 py-2">
-      <Skeleton className="size-[72px] shrink-0 rounded-md" />
+      <Skeleton className="size-28 shrink-0 rounded-lg" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2.5">
           <Skeleton className="size-8 shrink-0 rounded-full" />
@@ -605,7 +605,7 @@ export function ArtistTrackRowSkeleton() {
             <Skeleton className="mt-2 h-2.5 w-1/4" />
           </div>
         </div>
-        <Skeleton className="mt-3 h-11 w-full rounded" />
+        <Skeleton className="mt-3 h-9 w-full rounded" />
         <div className="mt-2 flex items-center justify-between">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-3 w-28" />
