@@ -480,16 +480,19 @@ function WaveformPlayer({ samples, active, onSeek, durationMs, markers }) {
   const [activeMarker, setActiveMarker] = useState(null);
 
   /*
-   * A comment is shown for three seconds from its own moment. Only one shows at
-   * a time: if two comments share a second, the nearest one wins.
+   * A comment is shown for three seconds once the playhead reaches the middle
+   * of its face, not its right edge. The face is centred on the true moment,
+   * so the trigger reads that same moment; the rounded second is only for the
+   * label, because rounding it would start the card up to half a second late.
    */
   const playingMarker = useMemo(() => {
     if (!active || !markers || !markers.length) return null;
     let best = null;
     for (const m of markers) {
-      const delta = time - m.timeMs;
+      const at = m.atMs ?? m.timeMs;
+      const delta = time - at;
       if (delta >= 0 && delta <= 3000) {
-        if (!best || m.timeMs > best.timeMs) best = m;
+        if (!best || at > (best.atMs ?? best.timeMs)) best = m;
       }
     }
     return best;
@@ -1577,7 +1580,10 @@ export function TrackPage() {
       if (!bySecond.has(key)) {
         bySecond.set(key, {
           key,
+          // `timeMs` is the rounded second for the label; `atMs` is the real
+          // moment the face is drawn on, which is where the card should open.
           timeMs: key * 1000,
+          atMs: timeMs,
           ratio: timeMs / total,
           user: c.user,
           body: c.body,
