@@ -1144,21 +1144,40 @@ export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
   }
   const transcodings = data.media?.transcodings || [];
   if (!transcodings.length) throw new ScError(404, 'No audio available for this track');
+  /*
+   * A monetised upload can list DRM variants (`cbc-encrypted-hls` for FairPlay,
+   * `ctr-encrypted-hls` for Widevine) next to a plain `hls` stream, and often
+   * under the same preset name. A DRM playlist points its key at `skd://` or a
+   * PSSH blob, which no audio element can open, so choosing by preset alone can
+   * land on a stream that cannot play. Plain variants are preferred first; the
+   * encrypted ones are never used, because the key is out of reach here.
+   */
+  const plain = transcodings.filter(
+    (t) => !/encrypted/i.test(String(t.format?.protocol || ''))
+  );
+  if (!plain.length) {
+    throw new ScError(
+      403,
+      'This track is protected by SoundCloud and cannot be played here',
+      null,
+      'DRM_PROTECTED'
+    );
+  }
   const presets = QUALITY_PRESETS[quality] || QUALITY_PRESETS.hq;
   let chosen = null;
   for (const preset of presets) {
-    chosen = transcodings.find((t) => t.preset === preset);
+    chosen = plain.find((t) => t.preset === preset);
     if (chosen) break;
   }
   if (!chosen) {
     // Preset names vary between uploads, so fall back to the quality field.
     const wanted = quality === 'lq' ? ['lq'] : quality === 'sq' ? ['sq', 'lq'] : ['hq', 'sq', 'lq'];
     for (const q of wanted) {
-      chosen = transcodings.find((t) => t.quality === q);
+      chosen = plain.find((t) => t.quality === q);
       if (chosen) break;
     }
   }
-  if (!chosen) chosen = transcodings[0];
+  if (!chosen) chosen = plain[0];
   const resolved = await apiGet(chosen.url, { ttl: 60_000, token });
   return {
     url: resolved.url,

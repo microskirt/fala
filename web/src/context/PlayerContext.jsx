@@ -190,8 +190,18 @@ export function PlayerProvider({ children }) {
             else setPlaying(false);
           }
         }
-      } catch {
+      } catch (err) {
         if (cancelled || loadId !== loadIdRef.current) return;
+        /*
+         * A DRM only track is not a stale URL, so retrying it would just ask
+         * the same question twice. Say plainly that it cannot play here.
+         */
+        if (err?.code === 'DRM_PROTECTED') {
+          setBuffering(false);
+          setPlaying(false);
+          toast.error(err.message || 'This track is protected and cannot be played here');
+          return;
+        }
         failRef.current();
       }
     })();
