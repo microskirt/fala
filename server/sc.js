@@ -1797,6 +1797,36 @@ function playlistTrackIds(tracks) {
 }
 
 /*
+ * The PUT answer is a receipt, not the playlist: it comes back without its
+ * tracks and often without a cover. Handing that straight to the caller is what
+ * made a playlist read "0 tracks" and lose its thumbnail after an add, both in
+ * the picker and in the library grid, until the page was opened and fetched
+ * again. So the saved playlist is read back and that is what is returned. When
+ * the read fails the previous record is kept and only the track count is
+ * corrected, which is still better than a hollow card.
+ */
+async function savedPlaylist(token, playlistId, current, ids, artwork, saved) {
+  let fresh = null;
+  try {
+    fresh = await apiGet(`/playlists/${playlistId}`, { token });
+  } catch {}
+  const base = fresh ? slimPlaylist(fresh) : null;
+  const merged = base || {
+    ...slimPlaylist(current),
+    track_count: ids.length,
+  };
+  let coverSaved = null;
+  if (artwork !== undefined) {
+    // SoundCloud answers 200 whether or not it kept the cover, so the record
+    // that came back decides. Removing one counts as saved once it is gone.
+    coverSaved = artwork === null ? !merged.artwork_url : !!merged.artwork_url;
+  } else if (saved !== undefined) {
+    coverSaved = saved;
+  }
+  return { ...merged, artworkSaved: coverSaved };
+}
+
+/*
  * Updating a playlist means PUTting the whole thing back. The full body carries
  * title and sharing, which is what the UI edits. SoundCloud's own client sends
  * only the track ids when it just reorders, so that is the fallback for when the
@@ -1817,14 +1847,7 @@ async function writePlaylist(token, playlistId, current, ids, artwork) {
   try {
     const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: full });
     if (data && data.id) {
-      const slim = slimPlaylist(data);
-      // SoundCloud answers 200 whether or not it kept the cover, so the saved
-      // record decides. Removing one counts as saved once the cover is gone.
-      let saved = null;
-      if (artwork !== undefined) {
-        saved = artwork === null ? !slim.artwork_url : !!slim.artwork_url;
-      }
-      return { ...slim, artworkSaved: saved };
+      return savedPlaylist(token, playlistId, current, ids, artwork);
     }
   } catch (err) {
     if (err?.code === 'captcha' || err?.status === 401 || err?.status === 403) throw err;
@@ -1836,14 +1859,13 @@ async function writePlaylist(token, playlistId, current, ids, artwork) {
   try {
     const data = await apiWrite('PUT', `/playlists/${playlistId}`, { token, body: minimal });
     if (data && data.id) {
-      return { ...slimPlaylist(data), artworkSaved: artwork === undefined ? null : false };
+      return savedPlaylist(token, playlistId, current, ids, artwork, false);
     }
   } catch (err) {
     if (err?.code === 'captcha' || err?.status === 401 || err?.status === 403) throw err;
   }
   // Neither shape answered with the playlist, so read it back to show the truth.
-  const fresh = await apiGet(`/playlists/${playlistId}`, { token });
-  return { ...slimPlaylist(fresh), artworkSaved: artwork === undefined ? null : false };
+  return savedPlaylist(token, playlistId, current, ids, artwork, false);
 }
 
 export async function addTrackToPlaylist(token, playlistId, trackId) {
