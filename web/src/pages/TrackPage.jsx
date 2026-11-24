@@ -58,7 +58,14 @@ import { placeLabel } from '@/lib/places.js';
 import { ClampedText } from '@/components/ClampedText.jsx';
 import { resolveTrackParam, playlistLink, userLink, trackSubLink } from '@/lib/scRoute.js';
 import { DETAIL_GRID } from '@/lib/layout.js';
-import { shapeSamples, themeColor, barGeometry, paintBars } from '@/lib/waveform.js';
+import {
+  shapeSamples,
+  themeColor,
+  barGeometry,
+  paintBars,
+  buildCommentMarkers,
+  markerAtTime,
+} from '@/lib/waveform.js';
 
 /*
  * The waveform is drawn on a canvas rather than as hundreds of spans. The
@@ -436,18 +443,10 @@ function WaveformPlayer({ samples, active, onSeek, durationMs, markers }) {
    * card used to open only once the line was already on it; opening early makes
    * the picture and the card read as the same event.
    */
-  const playingMarker = useMemo(() => {
-    if (!active || !markers || !markers.length) return null;
-    let best = null;
-    for (const m of markers) {
-      const at = m.atMs ?? m.timeMs;
-      const delta = time - at;
-      if (delta >= -500 && delta <= 3000) {
-        if (!best || at > (best.atMs ?? best.timeMs)) best = m;
-      }
-    }
-    return best;
-  }, [active, markers, time]);
+  const playingMarker = useMemo(
+    () => (active ? markerAtTime(markers, time) : null),
+    [active, markers, time]
+  );
 
   // A marker hovering under the pointer beats the timed one.
   const tip = activeMarker || playingMarker;
@@ -1534,31 +1533,10 @@ export function TrackPage() {
    * the tip lists them together rather than stacking avatars on one spot. This
    * stays above the early returns so the hook order never changes.
    */
-  const commentMarkers = useMemo(() => {
-    const total = track?.full_duration || track?.duration || 0;
-    if (!total) return [];
-    const bySecond = new Map();
-    for (const c of comments) {
-      if (c.timestamp_ms == null) continue;
-      const timeMs = Math.max(0, Math.min(total, c.timestamp_ms));
-      const key = Math.round(timeMs / 1000);
-      if (!bySecond.has(key)) {
-        bySecond.set(key, {
-          key,
-          // `timeMs` is the rounded second for the label; `atMs` is the real
-          // moment the face is drawn on, which is where the card should open.
-          timeMs: key * 1000,
-          atMs: timeMs,
-          ratio: timeMs / total,
-          user: c.user,
-          body: c.body,
-          count: 0,
-        });
-      }
-      bySecond.get(key).count += 1;
-    }
-    return [...bySecond.values()].sort((a, b) => a.timeMs - b.timeMs);
-  }, [comments, track?.full_duration, track?.duration]);
+  const commentMarkers = useMemo(
+    () => buildCommentMarkers(comments, track?.full_duration || track?.duration || 0),
+    [comments, track?.full_duration, track?.duration]
+  );
 
   /*
    * The band behind the card takes its colour from the cover. SoundCloud does

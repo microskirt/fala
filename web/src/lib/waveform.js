@@ -58,6 +58,57 @@ export function shade(color, factor) {
 }
 
 /*
+ * Comments that carry a moment in the song become markers over the bars.
+ * Several people can comment on the same second, so they share one marker and
+ * the card names them together rather than stacking faces on one spot. Both the
+ * song page and the small waveform on a list use this, so a comment sits on the
+ * same spot in either one.
+ */
+export function buildCommentMarkers(comments, total) {
+  if (!total) return [];
+  const bySecond = new Map();
+  for (const c of comments || []) {
+    if (c.timestamp_ms == null) continue;
+    const timeMs = Math.max(0, Math.min(total, c.timestamp_ms));
+    const key = Math.round(timeMs / 1000);
+    if (!bySecond.has(key)) {
+      bySecond.set(key, {
+        key,
+        // `timeMs` is the rounded second for the label; `atMs` is the real
+        // moment the face is drawn on, which is where the card should open.
+        timeMs: key * 1000,
+        atMs: timeMs,
+        ratio: timeMs / total,
+        user: c.user,
+        body: c.body,
+        count: 0,
+      });
+    }
+    bySecond.get(key).count += 1;
+  }
+  return [...bySecond.values()].sort((a, b) => a.timeMs - b.timeMs);
+}
+
+/*
+ * The marker the playhead is on, or about to reach. A comment is shown for
+ * three seconds, starting half a second before the playhead reaches its moment,
+ * so the face and its card read as the same event instead of the card arriving
+ * after the line has passed.
+ */
+export function markerAtTime(markers, time, { lead = 500, hold = 3000 } = {}) {
+  if (!markers || !markers.length) return null;
+  let best = null;
+  for (const m of markers) {
+    const at = m.atMs ?? m.timeMs;
+    const delta = time - at;
+    if (delta >= -lead && delta <= hold) {
+      if (!best || at > (best.atMs ?? best.timeMs)) best = m;
+    }
+  }
+  return best;
+}
+
+/*
  * Bar geometry for a box of a given width: 2px bars with a 1px gap, like the
  * reference. The bars stop short of the right edge by `gutter`, which is the
  * flat strip the song page keeps for its two clocks; a small waveform passes
