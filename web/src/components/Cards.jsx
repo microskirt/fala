@@ -35,8 +35,14 @@ export function TrackCard({ track, context, showStats = true }) {
    */
   const active = isCurrent(track);
   return (
-    <div className="group min-w-0">
-      <div className="relative overflow-hidden rounded-lg">
+    <div className="min-w-0">
+      {/*
+       * The action tray belongs to the cover, not the whole card. Hovering the
+       * title, artist or the counts under it used to bring the buttons up too,
+       * which read as if the row were one big control. The named group scopes
+       * the hover to the artwork alone.
+       */}
+      <div className="group/art relative overflow-hidden rounded-lg">
         <Link {...trackLink(track)} aria-label={track.title}>
           <Artwork
             src={track.artwork_url}
@@ -49,7 +55,7 @@ export function TrackCard({ track, context, showStats = true }) {
         {/* The overlay is click-through so the artwork link underneath still works. */}
         <div
           className={cn(
-            'pointer-events-none absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 transition-opacity group-hover:opacity-100 focus-within:opacity-100',
+            'pointer-events-none absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 transition-opacity group-hover/art:opacity-100 focus-within:opacity-100',
             active ? 'opacity-100' : 'opacity-0'
           )}
         >
@@ -184,8 +190,9 @@ export function PlaylistCard({ playlist }) {
   const trackCount = playlist.track_count ?? playlist.tracks?.length ?? 0;
 
   return (
-    <div className="group min-w-0">
-      <div className="relative overflow-hidden rounded-lg">
+    <div className="min-w-0">
+      {/* The hover tray is scoped to the cover, so the title below does not raise it. */}
+      <div className="group/art relative overflow-hidden rounded-lg">
         <Link {...playlistLink(playlist)} className="block" aria-label={playlist.title}>
           {/*
            * A playlist can have no cover of its own. SoundCloud shows the
@@ -213,7 +220,7 @@ export function PlaylistCard({ playlist }) {
          * sibling of the link, never a child, so the two controls cannot
          * swallow each other's clicks.
          */}
-        <div className="pointer-events-none absolute inset-0 flex items-end justify-start bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-start bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 opacity-0 transition-opacity group-hover/art:opacity-100 focus-within:opacity-100">
           <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
             <AddPlaylistToQueueButton playlist={playlist} size={16} />
           </div>
