@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from '@tanstack/react-router';
 import {
   Play,
@@ -15,7 +15,6 @@ import {
   MapPin,
   Users,
   PlayCircle,
-  Timer,
   Send,
   X,
 } from 'lucide-react';
@@ -53,64 +52,267 @@ import { ClampedText } from '@/components/ClampedText.jsx';
 import { resolveTrackParam, playlistLink, userLink, trackSubLink } from '@/lib/scRoute.js';
 import { DETAIL_GRID } from '@/lib/layout.js';
 
-function Waveform({ samples, progress, onSeek, height = 96 }) {
-  const ref = useRef(null);
-  const dragging = useRef(false);
+/*
+ * Turns SoundCloud's 0-255 amplitude into a bar height. A straight division
+ * leaves mastered tracks looking flat, because most samples sit near the top of
+ * the range, and a min-max stretch swings the other way and flattens the peaks.
+ * A gentle power curve lifts the quiet parts into view while keeping the loud
+ * ones apart, which is the shape SoundCloud's own bars have.
+ */
+function shapeSamples(samples) {
+  return samples.map((s) => {
+    const v = Math.pow(Math.min(255, Math.max(0, s)) / 255, 0.6);
+    return Math.min(1, Math.max(0.3, v));
+  });
+}
 
-  if (!samples || samples.length === 0) return null;
+/*
+ * Reads the current colour of a CSS variable so the canvas follows the theme
+ * instead of hard coding one palette. A canvas cannot use Tailwind classes.
+ */
+function themeColor(name, fallback) {
+  if (typeof window === 'undefined') return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+/*
+ * The waveform is drawn on a canvas rather than as hundreds of spans. The
+ * playhead then moves every animation frame without React re-rendering the
+ * bars, which is what made the old version step once per second instead of
+ * sliding. Comment avatars sit above the bars where people wrote them.
+ */
+function Waveform({
+  samples,
+  currentTime,
+  duration,
+  onSeek,
+  height = 120,
+  fill = false,
+  markers = [],
+  activeMarker = null,
+  onMarkerEnter,
+  onMarkerLeave,
+}) {
+  const outerRef = useRef(null);
+  const restRef = useRef(null);
+  const playedRef = useRef(null);
+  const dragging = useRef(false);
+  const [width, setWidth] = useState(0);
+  const [boxHeight, setBoxHeight] = useState(height);
+  const [hover, setHover] = useState(null);
+
+  const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
+  const progress = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
+
+  /*
+   * The comment faces sit in a band of their own above the bars, so a tall bar
+   * never hides someone's avatar. The bars take whatever height is left, which
+   * in fill mode is the rest of the card.
+   */
+  const BAND = markers.length ? 26 : 0;
+  const h = Math.max(24, (fill ? boxHeight : height) - BAND);
+
+  // Track the pixel box so the bar count and heights follow the real size.
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return undefined;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setWidth(entry.contentRect.width);
+        setBoxHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(el);
+    setWidth(el.clientWidth);
+    setBoxHeight(el.clientHeight);
+    return () => observer.disconnect();
+  }, []);
+
+  // Bar geometry: 2px bars with a 1px gap, like the reference.
+  const BAR = 2;
+  const GAP = 1;
+  const barCount = width > 0 ? Math.max(1, Math.floor((width + GAP) / (BAR + GAP))) : 0;
+  const step = barCount > 0 ? (width + GAP) / barCount : 0;
+
+  /*
+   * Both layers are painted with the same bar geometry: one in the resting
+   * colour, one in the played colour. The played layer is clipped to the
+   * playhead, so the boundary is a smooth vertical edge at any fraction of a
+   * pixel instead of a whole bar at a time.
+   */
+  const paint = useCallback(() => {
+    if (!width || !norm.length) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const played = themeColor('--primary', '#ff5500');
+    const rest = themeColor('--waveform-bar', '#55565f');
+    const minBar = 2;
+    const maxBar = h - 2;
+
+    for (const [canvas, colour] of [
+      [restRef.current, rest],
+      [playedRef.current, played],
+    ]) {
+      if (!canvas) continue;
+      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(h * dpr)) {
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, h);
+      ctx.fillStyle = colour;
+      for (let i = 0; i < barCount; i += 1) {
+        const t = barCount === 1 ? 0 : i / (barCount - 1);
+        const v = norm[Math.min(norm.length - 1, Math.floor(t * norm.length))];
+        const bh = Math.max(minBar, Math.round(minBar + v * (maxBar - minBar)));
+        const x = Math.round(i * step);
+        const y = Math.round((h - bh) / 2);
+        ctx.fillRect(x, y, BAR, bh);
+      }
+    }
+  }, [width, h, norm, barCount, step]);
+
+  // Redraw on size, data or theme change. The clip below handles the playhead,
+  // so no repaint happens while the song plays.
+  useEffect(() => {
+    paint();
+  }, [paint]);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => paint());
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme', 'style'],
+    });
+    return () => observer.disconnect();
+  }, [paint]);
 
   const commit = (clientX) => {
-    const el = ref.current;
-    if (!el) return;
+    const el = outerRef.current;
+    if (!el || duration <= 0) return;
     const rect = el.getBoundingClientRect();
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
     onSeek?.(ratio);
   };
 
+  if (!samples || samples.length === 0) return null;
+
+  const tip = hover || activeMarker;
+
   return (
     <div
-      className="group relative flex w-full cursor-pointer items-center gap-[2px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
-      ref={ref}
-      style={{ height }}
-      onPointerDown={(e) => {
-        dragging.current = true;
-        e.currentTarget.setPointerCapture?.(e.pointerId);
-        commit(e.clientX);
-      }}
-      onPointerMove={(e) => {
-        if (dragging.current) commit(e.clientX);
-      }}
-      onPointerUp={(e) => {
-        dragging.current = false;
-        e.currentTarget.releasePointerCapture?.(e.pointerId);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'ArrowLeft') onSeek?.(Math.max(0, progress - 0.01));
-        if (e.key === 'ArrowRight') onSeek?.(Math.min(1, progress + 0.01));
-      }}
-      role="slider"
-      aria-label="Seek within track"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(progress * 100)}
-      tabIndex={0}
+      className={fill ? 'relative h-full w-full' : 'relative w-full'}
+      style={fill ? undefined : { height }}
+      ref={outerRef}
     >
-      {samples.map((s, i) => {
-        const played = i / samples.length <= progress;
-        // A small floor keeps quiet passages visible as a thin baseline.
-        const h = Math.max(3, Math.round((s / 255) * height));
-        return (
-          <span
-            key={i}
-            className={cn(
-              'block w-full rounded-[1px] transition-colors',
-              played ? 'bg-primary' : 'bg-muted-foreground/30 group-hover:bg-muted-foreground/45'
-            )}
-            style={{ height: h }}
-            aria-hidden="true"
-          />
-        );
-      })}
+      <div className="absolute inset-x-0 bottom-0" style={{ top: BAND }}>
+        <canvas
+          ref={restRef}
+          className="absolute inset-0 h-full w-full"
+          aria-hidden="true"
+        />
+        <canvas
+          ref={playedRef}
+          className="absolute inset-0 h-full w-full"
+          style={{ clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)` }}
+          aria-hidden="true"
+        />
+
+        {/*
+          * The hit area sits on top of both layers: the seek target, the drag
+          * handler and the keyboard control in one element.
+          */}
+        <div
+          className="absolute inset-0 cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          onPointerDown={(e) => {
+            dragging.current = true;
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+            commit(e.clientX);
+          }}
+          onPointerMove={(e) => {
+            if (dragging.current) commit(e.clientX);
+          }}
+          onPointerUp={(e) => {
+            dragging.current = false;
+            e.currentTarget.releasePointerCapture?.(e.pointerId);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft') onSeek?.(Math.max(0, progress - 0.01));
+            if (e.key === 'ArrowRight') onSeek?.(Math.min(1, progress + 0.01));
+          }}
+          role="slider"
+          tabIndex={0}
+          aria-label="Seek within track"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progress * 100)}
+        />
+      </div>
+
+      {/* One face per place where someone commented. */}
+      {markers.map((m) => (
+        <MarkerFace
+          key={m.key}
+          marker={m}
+          onSeek={onSeek}
+          onEnter={onMarkerEnter}
+          onLeave={onMarkerLeave}
+        />
+      ))}
+
+      {tip ? <WaveformTip marker={tip} width={width} /> : null}
+    </div>
+  );
+}
+
+/*
+ * One comment face. It is memoised so the per frame playhead update does not
+ * re-render every avatar on the waveform.
+ */
+const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave }) {
+  return (
+    <button
+      type="button"
+      className="absolute top-0 z-10 -translate-x-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      style={{ left: `${marker.ratio * 100}%` }}
+      onMouseEnter={() => onEnter?.(marker)}
+      onMouseLeave={() => onLeave?.(marker)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSeek?.(marker.ratio);
+      }}
+      aria-label={`Comment by ${marker.user?.username || 'a listener'} at ${formatDuration(marker.timeMs)}`}
+    >
+      <Avatar src={marker.user?.avatar_url} name={marker.user?.username} size={22} />
+    </button>
+  );
+});
+
+/*
+ * The little card that names the commenter and quotes them. It sits inside the
+ * waveform, just under the row of faces, so it never spills out of the card.
+ */
+function WaveformTip({ marker, width }) {
+  const TIP = 224;
+  const left = marker.ratio * width;
+  const x = Math.max(0, Math.min(width - TIP, left - TIP / 2));
+  return (
+    <div
+      className="pointer-events-none absolute top-7 z-20 rounded-lg border bg-popover px-3 py-2 text-left shadow-lg"
+      style={{ left: width > 0 ? x : 0, width: TIP }}
+    >
+      <div className="flex items-center gap-1.5 text-xs font-medium">
+        <span className="truncate">{marker.user?.username || 'Listener'}</span>
+        <span className="shrink-0 tabular-nums text-muted-foreground">
+          {formatDuration(marker.timeMs)}
+        </span>
+        {marker.count > 1 ? (
+          <span className="shrink-0 text-muted-foreground">+{marker.count - 1}</span>
+        ) : null}
+      </div>
+      <p className="mt-0.5 line-clamp-3 text-xs text-muted-foreground">{marker.body}</p>
     </div>
   );
 }
@@ -118,69 +320,76 @@ function Waveform({ samples, progress, onSeek, height = 96 }) {
 /*
  * The waveform subscribes to the playhead on its own, so a moving progress
  * line never re-renders the comment list or the related tracks below it.
+ *
+ * Comment markers come from the loaded comment list. Each one is placed by its
+ * own timestamp, and while the song plays through that moment the comment pops
+ * up on its own for a few seconds, the way SoundCloud surfaces it.
  */
-function WaveformPlayer({ track, samples, active, onSeek, durationMs }) {
+function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers }) {
   const { currentTime, duration } = usePlayerTime();
   const total = duration || durationMs || 0;
-  const progress = active && total > 0 ? Math.min(1, currentTime / total) : 0;
+  const time = active ? currentTime : 0;
+  const [activeMarker, setActiveMarker] = useState(null);
+
+  /*
+   * A comment is shown for three seconds from its own moment. Only one shows at
+   * a time: if two comments share a second, the nearest one wins.
+   */
+  const playingMarker = useMemo(() => {
+    if (!active || !markers || !markers.length) return null;
+    let best = null;
+    for (const m of markers) {
+      const delta = time - m.timeMs;
+      if (delta >= 0 && delta <= 3000) {
+        if (!best || m.timeMs > best.timeMs) best = m;
+      }
+    }
+    return best;
+  }, [active, markers, time]);
+
+  // A marker hovering under the pointer beats the timed one.
+  const tip = activeMarker || playingMarker;
 
   /*
    * The clock reads down the right edge the way SoundCloud shows it: where the
-   * playhead is on top, the length of the song under it. The bars keep the
-   * full width of the column.
+   * playhead is on top, the length of the song under it. The bars take the rest
+   * of the card's height, so a taller card means a taller waveform.
    */
   return (
-    <div className="flex items-stretch gap-3">
+    <div className="flex h-full items-stretch gap-3">
       <div className="min-w-0 flex-1">
-        <Waveform samples={samples} progress={progress} onSeek={onSeek} height={120} />
+        <Waveform
+          samples={samples}
+          currentTime={time}
+          duration={total}
+          onSeek={onSeek}
+          fill
+          markers={markers}
+          activeMarker={tip}
+          onMarkerEnter={setActiveMarker}
+          onMarkerLeave={() => setActiveMarker(null)}
+        />
       </div>
       <div className="flex shrink-0 flex-col justify-between py-0.5 text-xs tabular-nums text-muted-foreground">
-        <span>{formatDuration(active ? currentTime : 0)}</span>
+        <span>{formatDuration(time)}</span>
         <span>{formatDuration(track.duration)}</span>
       </div>
     </div>
   );
 }
 
-/* Reads the playhead itself so only this button re-renders while playing. */
-function TimestampToggle({ active, value, onChange, compact = false }) {
-  const { currentTime } = usePlayerTime();
-  if (!active) return null;
-
-  /*
-   * In the top card the control sits beside the comment field, where a full
-   * sentence would take the room the field needs. It becomes an icon there and
-   * keeps its wording in the comments section below.
-   */
-  if (compact) {
-    return (
-      <Button
-        variant={value == null ? 'outline' : 'secondary'}
-        size="icon"
-        onClick={() => onChange(value == null ? currentTime : null)}
-        aria-pressed={value != null}
-        aria-label={value == null ? 'Comment at current time' : `Comment at ${formatDuration(value)}`}
-        title={value == null ? 'Comment at current time' : `Comment at ${formatDuration(value)}`}
-      >
-        <Timer size={16} />
-      </Button>
-    );
-  }
-
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => onChange(value == null ? currentTime : null)}
-    >
-      {value == null ? 'Comment at current time' : `Comment at ${formatDuration(value)}`}
-    </Button>
-  );
-}
-
-function CommentForm({ track, onPosted, timestampMs, replyTo = null, className, compact = false }) {
+function CommentForm({
+  track,
+  onPosted,
+  timestampMs,
+  replyTo = null,
+  className,
+  compact = false,
+  active = false,
+}) {
   const { addComment } = useLibrary();
   const { user } = useAuth();
+  const { currentTime } = usePlayerTime();
   /*
    * SoundCloud has no parent-comment field. A reply is an ordinary comment whose
    * body opens with the other person's @handle, which is also how the thread is
@@ -189,6 +398,12 @@ function CommentForm({ track, onPosted, timestampMs, replyTo = null, className, 
    */
   const [body, setBody] = useState(replyTo?.user?.permalink ? `@${replyTo.user.permalink} ` : '');
   const [busy, setBusy] = useState(false);
+  /*
+   * In the top card the moment is taken when the field is focused. Until then
+   * the placeholder follows the playhead, so the field shows where a comment
+   * would land; on focus it holds still at that second.
+   */
+  const [pinnedAt, setPinnedAt] = useState(null);
 
   if (!user) {
     return (
@@ -209,13 +424,22 @@ function CommentForm({ track, onPosted, timestampMs, replyTo = null, className, 
     );
   }
 
+  /*
+   * Where the comment lands. A reply carries its parent's moment, and the top
+   * card uses the moment it froze on focus, or the live playhead if the field
+   * was never touched. Either way it is the current spot in the song.
+   */
+  const atMs = timestampMs != null ? timestampMs : active ? pinnedAt ?? currentTime : null;
+
   const submit = async (e) => {
     e.preventDefault();
     if (!body.trim() || busy) return;
     setBusy(true);
-    const comment = await addComment(track.id, body.trim(), timestampMs);
+    const comment = await addComment(track.id, body.trim(), atMs);
     if (comment) {
       setBody('');
+      // The next comment starts following the playhead again.
+      setPinnedAt(null);
       onPosted?.(comment);
     }
     setBusy(false);
@@ -227,15 +451,33 @@ function CommentForm({ track, onPosted, timestampMs, replyTo = null, className, 
    * labelled button, since they sit on a line of their own.
    */
   if (compact) {
+    /*
+     * The placeholder is the live spot in the song until the field is focused,
+     * when it stops at that second and stays put. Typing clears it the usual
+     * way, because a placeholder only shows while the field is empty.
+     */
+    const liveMs = pinnedAt ?? currentTime;
+    const placeholder =
+      timestampMs != null
+        ? `Comment at ${formatDuration(timestampMs)}…`
+        : active
+          ? `Comment at ${formatDuration(liveMs)}…`
+          : 'Write a comment…';
+
     return (
       <form className={cn('flex items-center gap-1.5', className)} onSubmit={submit}>
         <Input
           className="h-9 flex-1"
-          placeholder={
-            timestampMs ? `Comment at ${formatDuration(timestampMs)}…` : 'Write a comment…'
-          }
+          placeholder={placeholder}
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onFocus={() => {
+            if (active && pinnedAt == null) setPinnedAt(currentTime);
+          }}
+          onBlur={() => {
+            // An empty field goes back to following the playhead.
+            if (!body.trim()) setPinnedAt(null);
+          }}
           maxLength={1000}
           aria-label="Write a comment"
         />
@@ -965,7 +1207,6 @@ export function TrackPage() {
   const [waveform, setWaveform] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [commentTimestamp, setCommentTimestamp] = useState(null);
   const [counts, setCounts] = useState(null);
   const [alsoLiked, setAlsoLiked] = useState([]);
   /*
@@ -1122,6 +1363,35 @@ export function TrackPage() {
     }
   };
 
+  /*
+   * Comments that carry a moment in the song become faces over the waveform.
+   * Several people can comment on the same second, so they share one marker and
+   * the tip lists them together rather than stacking avatars on one spot. This
+   * stays above the early returns so the hook order never changes.
+   */
+  const commentMarkers = useMemo(() => {
+    const total = track?.full_duration || track?.duration || 0;
+    if (!total) return [];
+    const bySecond = new Map();
+    for (const c of comments) {
+      if (c.timestamp_ms == null) continue;
+      const timeMs = Math.max(0, Math.min(total, c.timestamp_ms));
+      const key = Math.round(timeMs / 1000);
+      if (!bySecond.has(key)) {
+        bySecond.set(key, {
+          key,
+          timeMs: key * 1000,
+          ratio: timeMs / total,
+          user: c.user,
+          body: c.body,
+          count: 0,
+        });
+      }
+      bySecond.get(key).count += 1;
+    }
+    return [...bySecond.values()].sort((a, b) => a.timeMs - b.timeMs);
+  }, [comments, track?.full_duration, track?.duration]);
+
   if (loading) {
     return (
       <Page>
@@ -1191,7 +1461,14 @@ export function TrackPage() {
           />
         </div>
 
-        <div className="min-w-0 lg:order-1">
+        {/*
+         * The card breathes the same amount at the top and the bottom: the title
+         * sits a step below the top edge, and the action row sits the same
+         * distance above the bottom edge, with the waveform taking the room in
+         * between. `mt-auto` pins the actions to the bottom when the artwork is
+         * taller than the text.
+         */}
+        <div className="flex min-w-0 flex-col pb-5 pt-5 lg:order-1">
           {track.policy === 'BLOCK' ? (
             <div className="mb-2">
               <Badge variant="destructive">Unavailable</Badge>
@@ -1243,12 +1520,13 @@ export function TrackPage() {
           </div>
 
           {waveform ? (
-            <div className="mt-6">
+            <div className="mt-5 min-h-[96px] flex-1">
               <WaveformPlayer
                 track={track}
                 samples={waveform}
                 active={active}
                 durationMs={track.full_duration || track.duration || 0}
+                markers={commentMarkers}
                 onSeek={(ratio) => {
                   if (!active) playTrack(track, contextList);
                   seek(ratio * (track.full_duration || track.duration || 0));
@@ -1261,30 +1539,22 @@ export function TrackPage() {
            * The action line, in SoundCloud's order: like, the comment field,
            * copy link, repost, add to playlist and add to queue. The comment
            * field lives here now instead of under the comments heading, so a
-           * listener can say something without scrolling.
+           * listener can say something without scrolling. Its moment comes
+           * from the playhead, so there is no separate timestamp control.
            */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-5 flex flex-wrap items-center gap-2">
             <LikeButton track={track} size={18} />
 
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <TimestampToggle
-                active={active}
-                value={commentTimestamp}
-                onChange={setCommentTimestamp}
-                compact
-              />
-              <CommentForm
-                track={track}
-                timestampMs={commentTimestamp}
-                className="min-w-0 flex-1"
-                compact
-                onPosted={(c) => {
-                  setComments((prev) => [c, ...prev]);
-                  setCommentTotal((n) => n + 1);
-                  setCommentTimestamp(null);
-                }}
-              />
-            </div>
+            <CommentForm
+              track={track}
+              className="min-w-0 flex-1"
+              compact
+              active={active}
+              onPosted={(c) => {
+                setComments((prev) => [c, ...prev]);
+                setCommentTotal((n) => n + 1);
+              }}
+            />
 
             <CopyLinkButton track={track} onCopy={copyLink} />
 
