@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
-import { Search, X, Menu, LogIn } from 'lucide-react';
+import { Search, X, Menu, LogIn, Loader2 } from 'lucide-react';
 import { api } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { NotificationsMenu } from '@/components/layout/NotificationsMenu.jsx';
@@ -19,6 +19,7 @@ export function Topbar({ onToggleSidebar }) {
   const [term, setTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [mine, setMine] = useState(EMPTY_MINE);
+  const [mineLoading, setMineLoading] = useState(false);
   const [showSuggest, setShowSuggest] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const inputRef = useRef(null);
@@ -56,23 +57,43 @@ export function Topbar({ onToggleSidebar }) {
     if (!term.trim()) {
       setSuggestions([]);
       setMine(EMPTY_MINE);
+      setMineLoading(false);
       return;
     }
+    /*
+     * A signed out visitor has no library to search. The plain suggestions are
+     * still worth asking for, so only the library call and its heading are
+     * skipped; drawing the heading and then dropping it would just flicker.
+     */
+    const searchLibrary = !!isAuthed;
+    /*
+     * The library block puts its heading up straight away and fills in below,
+     * so the wait reads as loading rather than as nothing found. The previous
+     * rows are cleared at the same time: showing a stale match under the new
+     * term would be worse than showing the spinner.
+     */
+    setMine(EMPTY_MINE);
+    setMineLoading(searchLibrary);
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       const opts = { signal: controller.signal };
       const q = encodeURIComponent(term);
       /*
-       * Two questions, asked at once: the plain suggestions and what the caller
-       * already has. They are separate calls so a signed out visitor or a
-       * failure in one still leaves the other list working.
+       * Both questions start together so the library answer does not wait on
+       * the suggestions. Each failure is contained: a broken library call still
+       * leaves the plain suggestions working, and the other way round.
        */
       const [sug, own] = await Promise.allSettled([
         api.get(`/api/search/suggest?q=${q}`, opts),
-        api.get(`/api/search/mine?q=${q}`, opts),
+        searchLibrary ? api.get(`/api/search/mine?q=${q}`, opts) : Promise.resolve(null),
       ]);
+      /*
+       * A newer term has already taken over: its own request is in flight and
+       * owns the spinner now, so this answer must not touch the state.
+       */
+      if (controller.signal.aborted) return;
       if (sug.status === 'fulfilled') setSuggestions(sug.value.collection || []);
-      if (own.status === 'fulfilled') {
+      if (own.status === 'fulfilled' && own.value) {
         const res = own.value;
         setMine({
           people: res.people || [],
@@ -80,12 +101,13 @@ export function Topbar({ onToggleSidebar }) {
           playlists: res.playlists || [],
         });
       }
+      setMineLoading(false);
     }, 220);
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [term]);
+  }, [term, isAuthed]);
 
   const submit = useCallback(
     (value) => {
@@ -198,18 +220,38 @@ export function Topbar({ onToggleSidebar }) {
           ) : null}
         </div>
 
-        {showSuggest && term.trim() && total > 0 ? (
+        {showSuggest && term.trim() && (total > 0 || mineLoading) ? (
           <div className="absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-lg border bg-popover p-1 shadow-lg">
-            {mineRows.length > 0 ? (
+            {/*
+             * The heading is up from the first keystroke and the rows fill in
+             * under it, so a slow library reads as loading instead of as an
+             * empty answer. With nothing found the whole block, heading and
+             * all, drops out and the plain suggestions take the space.
+             */}
+            {mineRows.length > 0 || mineLoading ? (
               <>
                 <div className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   In your library
                 </div>
-                {mineRows.map((item, i) => (
-                  <div key={`mine-${item.kind}-${item.id}`} onMouseEnter={() => setActiveIdx(i)}>
-                    <MineRow item={item} active={i === activeIdx} onNavigate={() => goToMatch(item)} />
+                {mineLoading && mineRows.length === 0 ? (
+                  <div className="flex items-center justify-center px-2.5 py-2.5">
+                    <Loader2
+                      size={16}
+                      className="animate-spin text-muted-foreground"
+                      aria-label="Searching your library"
+                    />
                   </div>
-                ))}
+                ) : (
+                  mineRows.map((item, i) => (
+                    <div key={`mine-${item.kind}-${item.id}`} onMouseEnter={() => setActiveIdx(i)}>
+                      <MineRow
+                        item={item}
+                        active={i === activeIdx}
+                        onNavigate={() => goToMatch(item)}
+                      />
+                    </div>
+                  ))
+                )}
                 {suggestions.length > 0 ? <div className="my-1 h-px bg-border" /> : null}
               </>
             ) : null}
