@@ -84,6 +84,34 @@ function themeColor(name, fallback) {
 }
 
 /*
+ * Darkens a colour by a factor. SoundCloud draws each bar in two tones: a lit
+ * upper half and a shaded lower half, so one flat fill per bar is not enough.
+ * The canvas cannot use color-mix, so the darker tone is computed here.
+ */
+function shade(color, factor) {
+  const s = String(color).trim();
+  let r;
+  let g;
+  let b;
+  if (s.startsWith('#')) {
+    let hex = s.slice(1);
+    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+    r = parseInt(hex.slice(0, 2), 16);
+    g = parseInt(hex.slice(2, 4), 16);
+    b = parseInt(hex.slice(4, 6), 16);
+  } else {
+    const m = s.match(/rgba?\(([^)]+)\)/);
+    if (!m) return s;
+    const parts = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    [r, g, b] = parts;
+  }
+  if (![r, g, b].every(Number.isFinite)) return s;
+  const f = Math.max(0, Math.min(1, factor));
+  const to = (v) => Math.round(Math.max(0, Math.min(255, v * f)));
+  return `rgb(${to(r)} ${to(g)} ${to(b)})`;
+}
+
+/*
  * The waveform is drawn on a canvas rather than as hundreds of spans. The
  * playhead then moves every animation frame without React re-rendering the
  * bars, which is what made the old version step once per second instead of
@@ -112,13 +140,8 @@ function Waveform({
   const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
   const progress = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
 
-  /*
-   * The comment faces sit in a band of their own above the bars, so a tall bar
-   * never hides someone's avatar. The bars take whatever height is left, which
-   * in fill mode is the rest of the card.
-   */
-  const BAND = markers.length ? 26 : 0;
-  const h = Math.max(24, (fill ? boxHeight : height) - BAND);
+  // The bars fill the box; the comment faces float over the centre line.
+  const h = Math.max(48, fill ? boxHeight : height);
 
   // Track the pixel box so the bar count and heights follow the real size.
   useEffect(() => {
@@ -155,6 +178,7 @@ function Waveform({
     const rest = themeColor('--waveform-bar', '#55565f');
     const minBar = 2;
     const maxBar = h - 2;
+    const mid = Math.round(h / 2);
 
     for (const [canvas, colour] of [
       [restRef.current, rest],
@@ -169,14 +193,25 @@ function Waveform({
       if (!ctx) continue;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, h);
-      ctx.fillStyle = colour;
+      /*
+       * Each bar is two tones around the centre line: the half above the axis
+       * catches the light, the half below sits in shadow. That is what gives
+       * SoundCloud's waveform its depth, and it reads even at bar heights of
+       * only a few pixels.
+       */
+      const lit = colour;
+      const shaded = shade(colour, 0.55);
       for (let i = 0; i < barCount; i += 1) {
         const t = barCount === 1 ? 0 : i / (barCount - 1);
         const v = norm[Math.min(norm.length - 1, Math.floor(t * norm.length))];
         const bh = Math.max(minBar, Math.round(minBar + v * (maxBar - minBar)));
         const x = Math.round(i * step);
-        const y = Math.round((h - bh) / 2);
-        ctx.fillRect(x, y, BAR, bh);
+        const top = Math.round(mid - bh / 2);
+        const bottom = Math.round(mid + bh / 2);
+        ctx.fillStyle = lit;
+        ctx.fillRect(x, top, BAR, Math.max(1, mid - top));
+        ctx.fillStyle = shaded;
+        ctx.fillRect(x, mid, BAR, Math.max(1, bottom - mid));
       }
     }
   }, [width, h, norm, barCount, step]);
@@ -214,7 +249,7 @@ function Waveform({
       style={fill ? undefined : { height }}
       ref={outerRef}
     >
-      <div className="absolute inset-x-0 bottom-0" style={{ top: BAND }}>
+      <div className="absolute inset-0">
         <canvas
           ref={restRef}
           className="absolute inset-0 h-full w-full"
@@ -224,6 +259,27 @@ function Waveform({
           ref={playedRef}
           className="absolute inset-0 h-full w-full"
           style={{ clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)` }}
+          aria-hidden="true"
+        />
+
+        {/*
+          * The centre axis. SoundCloud draws a hairline through the middle of
+          * the bars, which is what the shaded lower half meets. It is drawn
+          * over the bars so it stays continuous across quiet passages.
+          */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-foreground/25"
+          aria-hidden="true"
+        />
+
+        {/*
+          * The playhead. It is a thin bright line over the bars, positioned by
+          * percentage so it slides with the frame instead of stepping bar by
+          * bar. It stops at the axis rather than running the full height.
+          */}
+        <div
+          className="pointer-events-none absolute top-0 bottom-0 z-[5] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+          style={{ left: `${progress * 100}%` }}
           aria-hidden="true"
         />
 
@@ -258,7 +314,7 @@ function Waveform({
         />
       </div>
 
-      {/* One face per place where someone commented. */}
+      {/* One face per place where someone commented, centred on the axis. */}
       {markers.map((m) => (
         <MarkerFace
           key={m.key}
@@ -282,7 +338,7 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave }
   return (
     <button
       type="button"
-      className="absolute top-0 z-10 -translate-x-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      className="absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
       style={{ left: `${marker.ratio * 100}%` }}
       onMouseEnter={() => onEnter?.(marker)}
       onMouseLeave={() => onLeave?.(marker)}
@@ -358,13 +414,14 @@ function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers })
   const tip = activeMarker || playingMarker;
 
   /*
-   * The clock reads down the right edge the way SoundCloud shows it: where the
-   * playhead is on top, the length of the song under it. The bars take the rest
-   * of the card's height, so a taller card means a taller waveform.
+   * The bars take the full width, and the clock sits under the right end the
+   * way SoundCloud lays it out: where the playhead is, then the length of the
+   * song. Keeping the times out of the bar area lets the waveform reach both
+   * edges of the card.
    */
   return (
-    <div className="flex h-full items-stretch gap-3">
-      <div className="min-w-0 flex-1">
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1">
         <Waveform
           samples={samples}
           currentTime={time}
@@ -377,8 +434,9 @@ function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers })
           onMarkerLeave={() => setActiveMarker(null)}
         />
       </div>
-      <div className="flex shrink-0 flex-col justify-between py-0.5 text-xs tabular-nums text-muted-foreground">
-        <span>{formatDuration(time)}</span>
+      <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1 text-xs tabular-nums text-muted-foreground">
+        <span className="text-foreground">{formatDuration(time)}</span>
+        <span aria-hidden="true">/</span>
         <span>{formatDuration(track.duration)}</span>
       </div>
     </div>
@@ -1536,7 +1594,13 @@ export function TrackPage() {
           </div>
 
           {waveform ? (
-            <div className="mt-5 min-h-[96px] flex-1">
+            /*
+             * Taller than the old strip, because the bars now carry the
+             * two-tone depth and the comment faces sit over the centre line.
+             * The clock lives under the bars instead of beside them, so the
+             * waveform keeps the full width of the card.
+             */
+            <div className="mt-5 min-h-[136px] flex-1">
               <WaveformPlayer
                 track={track}
                 samples={waveform}
