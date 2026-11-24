@@ -1730,7 +1730,7 @@ export function TrackPage() {
    * stays an ordinary arrow so the line does not read as a help link.
    */
   const badgeClass =
-    'inline-flex h-4 items-center rounded-[3px] bg-foreground px-1 text-[10px] font-bold leading-none tracking-wide text-background no-underline';
+    'inline-flex h-4 select-none items-center rounded-[3px] bg-foreground px-1 text-[10px] font-bold leading-none tracking-wide text-background no-underline';
   const badgeParts = [];
   if (track.lossless) {
     badgeParts.push({
