@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
 import { Search, X, Menu, LogIn } from 'lucide-react';
 import { api } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { NotificationsMenu } from '@/components/layout/NotificationsMenu.jsx';
 import { MessagesMenu } from '@/components/layout/MessagesMenu.jsx';
+import { MineRow, libraryMatches, mineLink } from '@/components/LibraryMatch.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
+
+const EMPTY_MINE = { people: [], tracks: [], playlists: [] };
 
 export function Topbar({ onToggleSidebar }) {
   const navigate = useNavigate();
@@ -15,6 +18,7 @@ export function Topbar({ onToggleSidebar }) {
 
   const [term, setTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
+  const [mine, setMine] = useState(EMPTY_MINE);
   const [showSuggest, setShowSuggest] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const inputRef = useRef(null);
@@ -51,16 +55,31 @@ export function Topbar({ onToggleSidebar }) {
   useEffect(() => {
     if (!term.trim()) {
       setSuggestions([]);
+      setMine(EMPTY_MINE);
       return;
     }
     const controller = new AbortController();
     const timer = setTimeout(async () => {
-      try {
-        const res = await api.get(`/api/search/suggest?q=${encodeURIComponent(term)}`, {
-          signal: controller.signal,
+      const opts = { signal: controller.signal };
+      const q = encodeURIComponent(term);
+      /*
+       * Two questions, asked at once: the plain suggestions and what the caller
+       * already has. They are separate calls so a signed out visitor or a
+       * failure in one still leaves the other list working.
+       */
+      const [sug, own] = await Promise.allSettled([
+        api.get(`/api/search/suggest?q=${q}`, opts),
+        api.get(`/api/search/mine?q=${q}`, opts),
+      ]);
+      if (sug.status === 'fulfilled') setSuggestions(sug.value.collection || []);
+      if (own.status === 'fulfilled') {
+        const res = own.value;
+        setMine({
+          people: res.people || [],
+          tracks: res.tracks || [],
+          playlists: res.playlists || [],
         });
-        setSuggestions(res.collection || []);
-      } catch {}
+      }
     }, 220);
     return () => {
       clearTimeout(timer);
@@ -77,14 +96,33 @@ export function Topbar({ onToggleSidebar }) {
     [term, navigate]
   );
 
+  /*
+   * The list is the library matches first, then the plain text suggestions, so
+   * the arrow keys and Enter walk it as one column. The matches are links, the
+   * suggestions fill the search box, so each keeps its own action.
+   */
+  const mineRows = useMemo(() => libraryMatches(mine), [mine]);
+  const total = mineRows.length + suggestions.length;
+
+  const goToMatch = useCallback(
+    (item) => {
+      setShowSuggest(false);
+      setActiveIdx(-1);
+      navigate(mineLink(item));
+    },
+    [navigate]
+  );
+
   const onKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (activeIdx >= 0 && suggestions[activeIdx]) submit(suggestions[activeIdx]);
-      else submit();
+      if (activeIdx >= 0 && activeIdx < mineRows.length) goToMatch(mineRows[activeIdx]);
+      else if (activeIdx >= mineRows.length && suggestions[activeIdx - mineRows.length]) {
+        submit(suggestions[activeIdx - mineRows.length]);
+      } else submit();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1));
+      setActiveIdx((i) => Math.min(i + 1, total - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIdx((i) => Math.max(i - 1, -1));
@@ -160,22 +198,38 @@ export function Topbar({ onToggleSidebar }) {
           ) : null}
         </div>
 
-        {showSuggest && term.trim() && suggestions.length > 0 ? (
+        {showSuggest && term.trim() && total > 0 ? (
           <div className="absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-lg border bg-popover p-1 shadow-lg">
-            {suggestions.map((s, i) => (
-              <button
-                key={s + i}
-                type="button"
-                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
-                  i === activeIdx ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'
-                }`}
-                onMouseEnter={() => setActiveIdx(i)}
-                onClick={() => submit(s)}
-              >
-                <Search size={14} className="shrink-0 text-muted-foreground" />
-                <span className="truncate">{s}</span>
-              </button>
-            ))}
+            {mineRows.length > 0 ? (
+              <>
+                <div className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  In your library
+                </div>
+                {mineRows.map((item, i) => (
+                  <div key={`mine-${item.kind}-${item.id}`} onMouseEnter={() => setActiveIdx(i)}>
+                    <MineRow item={item} active={i === activeIdx} onNavigate={() => goToMatch(item)} />
+                  </div>
+                ))}
+                {suggestions.length > 0 ? <div className="my-1 h-px bg-border" /> : null}
+              </>
+            ) : null}
+            {suggestions.map((s, i) => {
+              const idx = mineRows.length + i;
+              return (
+                <button
+                  key={s + i}
+                  type="button"
+                  className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+                    idx === activeIdx ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'
+                  }`}
+                  onMouseEnter={() => setActiveIdx(idx)}
+                  onClick={() => submit(s)}
+                >
+                  <Search size={14} className="shrink-0 text-muted-foreground" />
+                  <span className="truncate">{s}</span>
+                </button>
+              );
+            })}
           </div>
         ) : null}
       </div>
