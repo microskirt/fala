@@ -344,9 +344,13 @@ function Waveform({
           * does not paint the song as played. Starting a drag in the top half
           * still follows the pointer all the way down, because the element
           * captures the pointer until it is released.
+          *
+          * No focus ring is drawn. The bar stays focusable so the arrow keys
+          * work, but a click used to leave a ring that read as an orange
+          * selection box around the waveform.
           */}
         <div
-          className="absolute inset-x-0 top-0 h-1/2 cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          className="absolute inset-x-0 top-0 h-1/2 cursor-pointer outline-none"
           onPointerDown={(e) => {
             dragging.current = true;
             e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -439,7 +443,7 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, 
          * for the bars and the seek target; the faces live in the shaded band
          * underneath, where SoundCloud keeps them.
          */
-        'absolute top-1/2 z-10 mt-1 -translate-x-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+        'absolute top-1/2 z-10 mt-2 -translate-x-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none',
         /*
          * The face grows the same way it does under the pointer when the
          * playhead reaches its moment and its comment is on screen, so the
@@ -462,26 +466,25 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, 
 });
 
 /*
- * The little card that names the commenter and quotes them. The faces now sit
- * in the band under the axis, so the card opens above them, over the bars: the
- * band it used to occupy is where the pictures live. It only shows while the
- * pointer is on a face, so the shape of the song is still there to go back to.
+ * The little card that names the commenter and quotes them. It opens along the
+ * bottom edge, under the row of faces, so the picture being pointed at sits
+ * directly above its own card. It stays narrow, and only shows while the
+ * pointer is on a face, so the shape of the song is still readable.
  */
 function WaveformTip({ marker, width, barFraction = 1 }) {
-  const TIP = 224;
+  const TIP = 176;
   const barArea = width * barFraction;
   /*
-   * Kept inside the bar area. The card opens along the top edge, which is where
-   * the two clocks sit in the flat strip at the right, so clamping to the full
-   * width would let it cover them. On a narrow card the card itself shrinks
-   * rather than running past the last bar.
+   * Kept inside the bar area, so it never reaches over the clocks in the flat
+   * strip at the right. On a narrow card the card shrinks with it rather than
+   * running past the last bar.
    */
   const tipWidth = barArea > 0 ? Math.min(TIP, barArea) : TIP;
   const left = marker.ratio * barArea;
   const x = Math.max(0, Math.min(barArea - tipWidth, left - tipWidth / 2));
   return (
     <div
-      className="pointer-events-none absolute top-0 z-20 rounded-lg border bg-popover px-3 py-2 text-left shadow-lg"
+      className="pointer-events-none absolute bottom-0 z-20 rounded-lg border bg-popover px-3 py-2 text-left shadow-lg"
       style={{ left: width > 0 ? x : 0, width: tipWidth }}
     >
       <div className="flex items-center gap-1.5 text-xs font-medium">
@@ -513,10 +516,10 @@ function WaveformPlayer({ samples, active, onSeek, durationMs, markers }) {
   const [activeMarker, setActiveMarker] = useState(null);
 
   /*
-   * A comment is shown for three seconds once the playhead reaches the middle
-   * of its face, not its right edge. The face is centred on the true moment,
-   * so the trigger reads that same moment; the rounded second is only for the
-   * label, because rounding it would start the card up to half a second late.
+   * A comment is shown for three seconds, starting half a second before the
+   * playhead reaches its moment. The face is centred on the true moment, so the
+   * card used to open only once the line was already on it; opening early makes
+   * the picture and the card read as the same event.
    */
   const playingMarker = useMemo(() => {
     if (!active || !markers || !markers.length) return null;
@@ -524,7 +527,7 @@ function WaveformPlayer({ samples, active, onSeek, durationMs, markers }) {
     for (const m of markers) {
       const at = m.atMs ?? m.timeMs;
       const delta = time - at;
-      if (delta >= 0 && delta <= 3000) {
+      if (delta >= -500 && delta <= 3000) {
         if (!best || at > (best.atMs ?? best.timeMs)) best = m;
       }
     }
@@ -1858,8 +1861,14 @@ export function TrackPage() {
                 durationMs={track.full_duration || track.duration || 0}
                 markers={commentMarkers}
                 onSeek={(ratio) => {
+                  /*
+                   * The track id rides along because starting a song and
+                   * seeking into it happen together here: the player still
+                   * holds the previous song for a moment, and the spot has to
+                   * be parked against the one being opened.
+                   */
                   if (!active) playTrack(track, contextList);
-                  seek(ratio * (track.full_duration || track.duration || 0));
+                  seek(ratio * (track.full_duration || track.duration || 0), track.id);
                 }}
               />
             </div>
