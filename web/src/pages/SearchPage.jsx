@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { SearchX, Music2, Users, ListMusic, Disc3, Sparkles } from 'lucide-react';
 import { api, formatCount } from '@/api.js';
+import { trackLink, playlistLink } from '@/lib/scRoute.js';
 import { TrackCard, PlaylistCard, ArtistRow } from '@/components/Cards.jsx';
-import { EmptyState } from '@/components/Media.jsx';
+import { Artwork, EmptyState } from '@/components/Media.jsx';
 import {
   Page,
   PageHeader,
@@ -32,13 +33,75 @@ function SeeAll({ onClick }) {
   );
 }
 
+/*
+ * One row of the own-library block: the cover, the title and what it is. The
+ * whole row is the link, so a tap goes straight to the song or playlist, which
+ * is the point of showing these above the generic results.
+ */
+function MineRow({ item }) {
+  const isTrack = item.kind === 'track';
+  const link = isTrack ? trackLink(item) : playlistLink(item);
+  const subtitle = isTrack
+    ? item.user?.username || ''
+    : item.user?.username
+      ? `${item.user.username}${item.is_album ? ' · album' : ''}`
+      : item.is_album
+        ? 'Album'
+        : 'Playlist';
+  return (
+    <Link
+      {...link}
+      className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent/60"
+    >
+      <Artwork
+        src={item.artwork_url}
+        fallback={item.user?.avatar_url}
+        alt={item.title}
+        size={40}
+        rounded={4}
+        kind={isTrack ? 'track' : 'playlist'}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{item.title}</span>
+        <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+      </span>
+    </Link>
+  );
+}
+
 export function SearchPage() {
   const { q = '', filter = 'all' } = useSearch({ from: '/shell/search' });
   const navigate = useNavigate();
   const [data, setData] = useState({ collection: [], next_href: null, total_results: 0 });
+  const [mine, setMine] = useState({ tracks: [], playlists: [] });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+
+  /*
+   * The caller's own songs and playlists are a separate question from the
+   * catalogue search, so they are fetched on their own and shown above the
+   * generic results. A signed out visit answers with nothing and the block
+   * stays out of the way.
+   */
+  useEffect(() => {
+    if (!q.trim()) {
+      setMine({ tracks: [], playlists: [] });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get(`/api/search/mine?q=${encodeURIComponent(q)}`);
+        if (!cancelled) setMine({ tracks: res.tracks || [], playlists: res.playlists || [] });
+      } catch {
+        if (!cancelled) setMine({ tracks: [], playlists: [] });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [q]);
 
   useEffect(() => {
     if (!q.trim()) {
@@ -148,13 +211,36 @@ export function SearchPage() {
         }
       />
 
+      {/*
+       * The caller's own matches lead the page. SoundCloud puts the songs and
+       * playlists you already have at the top, because a search for something
+       * you own is usually a search for that thing, not a browse.
+       */}
+      {filter === 'all' && (mine.tracks.length > 0 || mine.playlists.length > 0) ? (
+        <section className="mb-8">
+          <h2 className="mb-2 text-sm font-semibold tracking-tight text-muted-foreground">
+            In your library
+          </h2>
+          <div className="grid gap-0.5 rounded-xl border bg-card p-1.5 sm:grid-cols-2">
+            {mine.tracks.map((t) => (
+              <MineRow key={`track-${t.id}`} item={t} />
+            ))}
+            {mine.playlists.map((p) => (
+              <MineRow key={`playlist-${p.id}`} item={p} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {loading ? (
         <CardGridSkeleton count={12} />
       ) : error ? (
         <EmptyState icon={SearchX} title="Search failed">
           {error}
         </EmptyState>
-      ) : data.collection.length === 0 ? (
+      ) : data.collection.length === 0 &&
+        mine.tracks.length === 0 &&
+        mine.playlists.length === 0 ? (
         <EmptyState icon={SearchX} title="No results">
           Nothing matched “{q}”. Try a different spelling or a broader term.
         </EmptyState>

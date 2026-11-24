@@ -350,6 +350,22 @@ route('GET', '/api/search', async (ctx) => {
   return { ...data, collection: decorateItems(data.collection, flags) };
 });
 
+/*
+ * Matches in the caller's own library, which SoundCloud prints above the
+ * generic results. Only answers when a token is present, because the lists are
+ * the caller's; a signed out visit simply gets nothing extra.
+ */
+route('GET', '/api/search/mine', async (ctx) => {
+  const q = ctx.query.get('q') || '';
+  if (!ctx.token || !q.trim()) return { tracks: [], playlists: [] };
+  const data = await sc.searchMine(ctx.token, q);
+  const flags = await flagsFor(ctx.token);
+  return {
+    tracks: data.tracks.map((t) => decorateTrack(t, flags)),
+    playlists: data.playlists.map((p) => decoratePlaylist(p, flags)),
+  };
+});
+
 route('GET', '/api/search/suggest', async (ctx) => {
   const q = ctx.query.get('q') || '';
   return { collection: await sc.suggest(q) };

@@ -1555,6 +1555,61 @@ export async function myPlaylists(token, { limit = 200, next } = {}) {
   return mapCollection(data, slimPlaylist);
 }
 
+/*
+ * Matches in the caller's own library. SoundCloud's search has no "mine"
+ * filter, so the query is run against the liked songs and the playlists the
+ * caller owns or likes, and the titles are matched here. The lists are walked
+ * with a page bound so a very large library still answers quickly.
+ */
+export async function searchMine(token, q, { maxPages = 10, pageSize = 200 } = {}) {
+  const needle = String(q || '').trim().toLowerCase();
+  if (!needle) return { tracks: [], playlists: [] };
+
+  const walk = async (first, mapper) => {
+    const found = [];
+    let href = first;
+    let pages = 0;
+    while (href && pages < maxPages) {
+      const data = await apiGet(href, { token });
+      for (const item of data.collection || []) {
+        const mapped = mapper(item);
+        if (mapped) found.push(mapped);
+      }
+      href = data.next_href ? stripClientId(data.next_href) : null;
+      pages += 1;
+    }
+    return found;
+  };
+
+  const id = await meId(token);
+  const asTrack = (item) => slimTrack(item?.track || (item?.kind === 'track' ? item : null));
+  const asLikedPlaylist = (item) =>
+    slimPlaylist(item?.playlist || (item?.kind === 'playlist' ? item : null));
+
+  const [likes, owned, liked] = await Promise.all([
+    walk(`/users/${id}/track_likes?limit=${pageSize}`, asTrack).catch(() => []),
+    walk(`/users/${id}/playlists?limit=${pageSize}`, slimPlaylist).catch(() => []),
+    walk(`/users/${id}/playlist_likes?limit=${pageSize}`, asLikedPlaylist).catch(() => []),
+  ]);
+
+  const matches = (item) => {
+    const title = String(item?.title || '').toLowerCase();
+    const artist = String(item?.user?.username || '').toLowerCase();
+    return title.includes(needle) || artist.includes(needle);
+  };
+
+  // A playlist can be both owned and liked, so the two lists are merged by id.
+  const seen = new Set();
+  const playlists = [];
+  for (const p of [...owned, ...liked]) {
+    if (!p || seen.has(String(p.id))) continue;
+    seen.add(String(p.id));
+    if (matches(p)) playlists.push(p);
+  }
+
+  return { tracks: likes.filter((t) => t && matches(t)), playlists };
+}
+
 export async function myFollowing(token, { limit = 200, next } = {}) {
   const id = await meId(token);
   const data = next
