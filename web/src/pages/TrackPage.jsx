@@ -163,11 +163,14 @@ function Waveform({
   const GAP = 1;
   /*
    * The bars stop short of the right edge, the way SoundCloud leaves a flat
-   * strip for the two clock labels. The strip is wide enough for the longest
-   * time the song can show, so neither label ever sits on a bar.
+   * strip for the two clock labels. The strip is sized off the card so it
+   * stays visible on a wide window instead of shrinking to a few pixels, and
+   * it is never narrower than the longest time the song can show, so neither
+   * label ever sits on a bar.
    */
   const clockLabel = formatDuration(duration);
-  const gutter = width > 0 ? Math.max(32, clockLabel.length * 7 + 8) : 0;
+  const clockWidth = clockLabel.length * 7 + 8;
+  const gutter = width > 0 ? Math.max(clockWidth, Math.min(96, Math.round(width * 0.045))) : 0;
   const barWidth = Math.max(0, width - gutter);
   const barCount = barWidth > 0 ? Math.max(1, Math.floor((barWidth + GAP) / (BAR + GAP))) : 0;
   const step = barCount > 0 ? (barWidth + GAP) / barCount : 0;
@@ -352,20 +355,16 @@ function Waveform({
       {/*
         * The two clocks sit in the flat strip the bars leave at the right, the
         * way SoundCloud places them: where the playhead is on top, the length
-        * of the song underneath. Both are right aligned to the card edge and
-        * never reach over a bar.
+        * of the song underneath. One column holds both so they share a left
+        * edge, it is pinned to the bar area's top and bottom, and it never
+        * reaches over a bar.
         */}
       <div
-        className="pointer-events-none absolute right-0 top-0 z-20 text-right text-xs font-medium tabular-nums text-foreground"
+        className="pointer-events-none absolute right-0 top-0 bottom-0 z-20 flex flex-col justify-between text-right text-xs tabular-nums"
         style={{ width: gutter }}
       >
-        {formatDuration(currentTime)}
-      </div>
-      <div
-        className="pointer-events-none absolute bottom-0 right-0 z-20 text-right text-xs tabular-nums text-muted-foreground"
-        style={{ width: gutter }}
-      >
-        {formatDuration(duration)}
+        <span className="font-medium text-foreground">{formatDuration(currentTime)}</span>
+        <span className="text-muted-foreground">{formatDuration(duration)}</span>
       </div>
     </div>
   );
