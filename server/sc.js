@@ -1516,23 +1516,91 @@ export async function meId(token) {
   return data.id;
 }
 
-async function idSet(href, token) {
+/*
+ * The ids endpoints page like every other list, and one page holds only the
+ * newest handful. Reading just the first page left every older like out of the
+ * set, so a song could sit plainly in the likes list (which walks its pages)
+ * and still show as not liked on its own page and in the player bar. The whole
+ * list is walked here, bounded so a huge library cannot stall a request.
+ */
+async function idSet(href, token, { maxPages = 40 } = {}) {
   const entry = tokenEntry(token);
   entry.sets = entry.sets || new Map();
   const hit = entry.sets.get(href);
   if (hit && hit.exp > Date.now()) return hit.ids;
-  const data = await apiGet(href, { token });
-  const ids = new Set((data.collection || []).map((v) => String(v.id ?? v)));
+  const ids = new Set();
+  let next = href;
+  let pages = 0;
+  while (next && pages < maxPages) {
+    /*
+     * A page that fails mid walk keeps what was already read instead of
+     * throwing the whole set away. The caller treats a short set as a reason to
+     * top up from the list, so a partial answer still moves things forward.
+     */
+    let data;
+    try {
+      data = await apiGet(next, { token });
+    } catch {
+      break;
+    }
+    for (const v of data.collection || []) ids.add(String(v?.id ?? v));
+    next = data.next_href ? stripClientId(data.next_href) : null;
+    pages += 1;
+  }
   entry.sets.set(href, { ids, exp: Date.now() + 30_000 });
   return ids;
 }
 
-export async function likeIds(token) {
+/*
+ * Builds the like set from the likes list itself, which is the same source the
+ * likes page reads, so a song shown there can never disagree with its heart.
+ */
+async function likesFromList(token, ids, expected, maxPages = 25) {
   try {
-    return await idSet('/me/track_likes/ids', token);
+    const id = await meId(token);
+    let next = `/users/${id}/track_likes?limit=200`;
+    let pages = 0;
+    while (next && pages < maxPages && (!expected || ids.size < expected)) {
+      const data = await apiGet(next, { token });
+      for (const item of data.collection || []) {
+        const trackId = item?.track?.id ?? (item?.kind === 'track' ? item.id : null);
+        if (trackId != null) ids.add(String(trackId));
+      }
+      next = data.next_href ? stripClientId(data.next_href) : null;
+      pages += 1;
+    }
+  } catch {}
+  return ids;
+}
+
+export async function likeIds(token) {
+  const entry = tokenEntry(token);
+  entry.sets = entry.sets || new Map();
+  /*
+   * The finished set is cached on its own, so a short or empty ids answer only
+   * costs one walk per token every thirty seconds rather than one per request.
+   */
+  const key = 'likes:full';
+  const hit = entry.sets.get(key);
+  if (hit && hit.exp > Date.now()) return hit.ids;
+  let ids = new Set();
+  try {
+    ids = await idSet('/me/track_likes/ids', token);
+    const account = await me(token).catch(() => null);
+    const expected = Number(account?.likes_count || 0);
+    /*
+     * The ids endpoint can come back empty or capped without saying so, while
+     * the list endpoint is the one the likes page reads. Whenever the set is
+     * empty or short of the account's own count, the list is walked to fill it.
+     */
+    if (ids.size === 0 || (expected && ids.size < expected)) {
+      ids = await likesFromList(token, ids, expected);
+    }
   } catch {
-    return new Set();
+    ids = new Set();
   }
+  entry.sets.set(key, { ids, exp: Date.now() + 30_000 });
+  return ids;
 }
 
 export async function playlistLikeIds(token) {
