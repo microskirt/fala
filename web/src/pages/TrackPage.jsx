@@ -1063,10 +1063,18 @@ const LISTENER_WINDOWS = [
  */
 function ListenerRow({ rank, user, plays, isViewer = false }) {
   return (
+    /*
+     * The highlight for the viewer's own row used to run right up to the plays
+     * count, while the place on the left had room around it. The box itself
+     * still reaches the same distance from the card border on both sides, so
+     * the plays count is what moves inward, giving it the same margin the
+     * place already had. The row is marked by the tint alone; a "You" tag
+     * would only crowd it.
+     */
     <Link
       {...userLink(user)}
       className={cn(
-        'flex items-center gap-2 rounded-md py-1.5 transition-colors hover:bg-accent/60',
+        'flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/60',
         isViewer && 'bg-primary/10'
       )}
     >
@@ -1078,14 +1086,9 @@ function ListenerRow({ rank, user, plays, isViewer = false }) {
         <span className="flex items-center gap-1 truncate text-sm font-medium">
           <span className="truncate">{user.username}</span>
           {user.verified ? <BadgeCheck size={13} className="shrink-0 text-primary" /> : null}
-          {isViewer ? (
-            <span className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-              You
-            </span>
-          ) : null}
         </span>
       </span>
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+      <span className="shrink-0 pr-1 text-xs tabular-nums text-muted-foreground">
         {formatCount(plays)} {plays === 1 ? 'play' : 'plays'}
       </span>
     </Link>
