@@ -1066,9 +1066,10 @@ function ListenerRow({ rank, user, plays, isViewer = false }) {
     /*
      * The highlight for the viewer's own row used to run right up to the plays
      * count, while the place on the left had room around it. The box itself
-     * still reaches the same distance from the card border on both sides, so
-     * the plays count is what moves inward, giving it the same margin the
-     * place already had. The row is marked by the tint alone; a "You" tag
+     * still reaches the same distance from the card border on both sides. The
+     * place is centred in its fixed box: pushed right, a single digit floated
+     * a few pixels further from the border than the plays count did, which read
+     * as a lopsided row. The row is marked by the tint alone; a "You" tag
      * would only crowd it.
      */
     <Link
@@ -1078,7 +1079,12 @@ function ListenerRow({ rank, user, plays, isViewer = false }) {
         isViewer && 'bg-primary/10'
       )}
     >
-      <span className="w-4 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground">
+      {/*
+       * A minimum, not a fixed width: the top rows are single digits and sit
+       * centred in the same box, while the viewer's own rank can run to four
+       * digits and grows the box instead of spilling over the avatar.
+       */}
+      <span className="min-w-4 shrink-0 text-center text-xs font-semibold tabular-nums text-muted-foreground">
         {rank}
       </span>
       <Avatar src={user.avatar_url} name={user.username} size={28} />
