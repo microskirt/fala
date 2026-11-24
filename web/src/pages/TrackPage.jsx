@@ -1812,13 +1812,12 @@ export function TrackPage() {
               </div>
             ) : null}
 
-            {track.description ? (
-              <ClampedText text={track.description} lines={5} />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No description was written for this song.
-              </p>
-            )}
+            {/*
+             * No description means nothing to say. A line explaining that a
+             * description is absent is just noise under the tags, so the block
+             * closes after them.
+             */}
+            {track.description ? <ClampedText text={track.description} lines={5} /> : null}
           </section>
 
           <section className="mt-12">
