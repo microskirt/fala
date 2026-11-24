@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
-import { Search, X, Menu, LogIn, TrendingUp } from 'lucide-react';
+import { Search, X, Menu, LogIn } from 'lucide-react';
 import { api } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { NotificationsMenu } from '@/components/layout/NotificationsMenu.jsx';
@@ -172,7 +172,7 @@ export function Topbar({ onToggleSidebar }) {
                 onMouseEnter={() => setActiveIdx(i)}
                 onClick={() => submit(s)}
               >
-                <TrendingUp size={14} className="shrink-0 text-muted-foreground" />
+                <Search size={14} className="shrink-0 text-muted-foreground" />
                 <span className="truncate">{s}</span>
               </button>
             ))}
