@@ -135,9 +135,17 @@ function Waveform({
   const dragging = useRef(false);
   const [width, setWidth] = useState(0);
   const [boxHeight, setBoxHeight] = useState(height);
+  const [hoverRatio, setHoverRatio] = useState(null);
 
   const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
   const progress = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
+  /*
+   * While the pointer is over the bars the played edge follows it: ahead of
+   * the playhead it previews the stretch that would play, behind it the stretch
+   * that would be skipped. The playhead itself stays on the real position, so
+   * the preview never looks like the song jumped.
+   */
+  const edge = hoverRatio === null ? progress : hoverRatio;
 
   // The bars fill the box; the comment faces float over the centre line.
   const h = Math.max(48, fill ? boxHeight : height);
@@ -244,16 +252,35 @@ function Waveform({
     return () => observer.disconnect();
   }, [paint]);
 
-  const commit = (clientX) => {
+  /*
+   * Where a pointer sits along the bars, as a fraction of the song. Only the
+   * bar area is the track, so a point in the flat clock strip reads as the
+   * last bar rather than past the end of the song.
+   */
+  const ratioAt = (clientX) => {
     const el = outerRef.current;
-    if (!el || duration <= 0) return;
+    if (!el) return 0;
     const rect = el.getBoundingClientRect();
-    /*
-     * Only the bar area is the track. A click in the flat clock strip lands on
-     * the last bar rather than past the end of the song.
-     */
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(1, rect.width * barFraction)));
-    onSeek?.(ratio);
+    return Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(1, rect.width * barFraction)));
+  };
+
+  const commit = (clientX) => {
+    if (duration <= 0) return;
+    onSeek?.(ratioAt(clientX));
+  };
+
+  /*
+   * The preview only belongs to the bars. The flat clock strip is not part of
+   * the track, so a pointer there clears it instead of painting the song as
+   * fully played.
+   */
+  const hoverAt = (clientX) => {
+    const el = outerRef.current;
+    if (!el || duration <= 0) return null;
+    const rect = el.getBoundingClientRect();
+    const boxRatio = (clientX - rect.left) / Math.max(1, rect.width);
+    if (boxRatio < 0 || boxRatio > barFraction) return null;
+    return ratioAt(clientX);
   };
 
   if (!samples || samples.length === 0) return null;
@@ -275,7 +302,7 @@ function Waveform({
         <canvas
           ref={playedRef}
           className="absolute inset-0 h-full w-full"
-          style={{ clipPath: `inset(0 ${(1 - progress * barFraction) * 100}% 0 0)` }}
+          style={{ clipPath: `inset(0 ${(1 - edge * barFraction) * 100}% 0 0)` }}
           aria-hidden="true"
         />
 
@@ -310,10 +337,19 @@ function Waveform({
           onPointerDown={(e) => {
             dragging.current = true;
             e.currentTarget.setPointerCapture?.(e.pointerId);
+            setHoverRatio(null);
             commit(e.clientX);
           }}
           onPointerMove={(e) => {
-            if (dragging.current) commit(e.clientX);
+            if (dragging.current) {
+              setHoverRatio(null);
+              commit(e.clientX);
+              return;
+            }
+            setHoverRatio(hoverAt(e.clientX));
+          }}
+          onPointerLeave={() => {
+            if (!dragging.current) setHoverRatio(null);
           }}
           onPointerUp={(e) => {
             dragging.current = false;
