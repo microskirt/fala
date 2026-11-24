@@ -20,10 +20,19 @@ import {
   FollowButton,
 } from '@/components/Controls.jsx';
 import { formatCount, formatDuration, trackArtistName } from '@/api.js';
+import { usePlayer } from '@/context/PlayerContext.jsx';
+import { cn } from '@/lib/utils.js';
 import { trackLink, userLink, playlistLink } from '@/lib/scRoute.js';
 
 export function TrackCard({ track, context, showStats = true }) {
+  const { isCurrent } = usePlayer();
   if (!track) return null;
+  /*
+   * The button stays on screen for the loaded track, even after the pointer
+   * leaves and even while it is paused. On a fresh page load the player already
+   * knows what is current, so the right card comes up with its button showing.
+   */
+  const active = isCurrent(track);
   return (
     <div className="group min-w-0">
       <div className="relative overflow-hidden rounded-lg">
@@ -37,7 +46,12 @@ export function TrackCard({ track, context, showStats = true }) {
           />
         </Link>
         {/* The overlay is click-through so the artwork link underneath still works. */}
-        <div className="pointer-events-none absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 transition-opacity group-hover:opacity-100 focus-within:opacity-100',
+            active ? 'opacity-100' : 'opacity-0'
+          )}
+        >
           {/*
            * The action tray matches the buttons elsewhere on the page rather
            * than being a pill, so the two shapes do not compete.
@@ -84,18 +98,33 @@ export function TrackCard({ track, context, showStats = true }) {
 }
 
 export function TrackRow({ track, index, context, showIndex = true, showArt = true }) {
+  const { isCurrent } = usePlayer();
   if (!track) return null;
   const isTrack = track.kind === 'track';
   const to = isTrack ? '/track/$id' : '/';
   const params = isTrack ? { id: String(track.id) } : undefined;
+  const active = isCurrent(track);
 
   return (
     <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
       {showIndex ? (
         <div className="relative grid w-7 shrink-0 place-items-center text-xs text-muted-foreground">
-          <span className="group-hover:opacity-0">{typeof index === 'number' ? index + 1 : ''}</span>
+          {/*
+           * The number gives way to the play button while the pointer is over
+           * the row, and stays given way while this is the loaded track, so the
+           * button does not blink out when the pointer leaves or the song is
+           * paused.
+           */}
+          <span className={cn('group-hover:opacity-0', active && 'opacity-0')}>
+            {typeof index === 'number' ? index + 1 : ''}
+          </span>
           {isTrack ? (
-            <span className="absolute opacity-0 group-hover:opacity-100">
+            <span
+              className={cn(
+                'absolute transition-opacity group-hover:opacity-100',
+                active ? 'opacity-100' : 'opacity-0'
+              )}
+            >
               <PlayButton track={track} context={context} size="sm" />
             </span>
           ) : null}

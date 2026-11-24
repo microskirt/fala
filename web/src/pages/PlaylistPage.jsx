@@ -44,11 +44,23 @@ import { cn } from '@/lib/utils.js';
 import { DETAIL_GRID } from '@/lib/layout.js';
 
 function PlaylistTrackRow({ track, index, context }) {
+  const { isCurrent } = usePlayer();
+  /*
+   * The loaded track keeps its play button on screen once the pointer leaves,
+   * and after a reload the player already knows which track that is. Switching
+   * to another track moves the button there.
+   */
+  const active = isCurrent(track);
   return (
     <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
       <div className="relative grid w-7 shrink-0 place-items-center text-xs text-muted-foreground">
-        <span className="group-hover:opacity-0">{index + 1}</span>
-        <span className="absolute opacity-0 group-hover:opacity-100">
+        <span className={cn('group-hover:opacity-0', active && 'opacity-0')}>{index + 1}</span>
+        <span
+          className={cn(
+            'absolute transition-opacity group-hover:opacity-100',
+            active ? 'opacity-100' : 'opacity-0'
+          )}
+        >
           <PlayButton track={track} context={context} size="sm" />
         </span>
       </div>

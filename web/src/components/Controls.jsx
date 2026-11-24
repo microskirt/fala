@@ -34,6 +34,11 @@ import {
 } from '@/components/ui/dropdown-menu.jsx';
 import { cn } from '@/lib/utils.js';
 
+/*
+ * `active` is true while this track is the one loaded in the player, playing or
+ * paused. Lists use it to keep the button on screen after the pointer leaves,
+ * because the song is still the loaded one even when it is paused.
+ */
 export function PlayButton({ track, context, size = 'md', className }) {
   const { playTrack, togglePlay, isCurrent, playing, buffering } = usePlayer();
   const active = isCurrent(track);
