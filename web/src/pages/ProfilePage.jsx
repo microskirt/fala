@@ -12,6 +12,12 @@ import {
   Loader2,
   Play,
   MessageSquare,
+  Youtube,
+  Instagram,
+  Facebook,
+  Twitter,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 import { api, artwork, formatCount, formatDate } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -22,13 +28,15 @@ import { TrackCard, PlaylistCard } from '@/components/Cards.jsx';
 import { FollowButton } from '@/components/Controls.jsx';
 import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
+import { useArtworkPalette } from '@/lib/artworkColor.js';
 import { Modal } from '@/components/Modal.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { cn } from '@/lib/utils.js';
 import { placeLabel } from '@/lib/places.js';
 import { ClampedText } from '@/components/ClampedText.jsx';
-import { resolveUserParam, userSubLink } from '@/lib/scRoute.js';
+import { resolveUserParam, userSubLink, profileLinkTarget } from '@/lib/scRoute.js';
+import { DETAIL_GRID } from '@/lib/layout.js';
 
 const TABS = [
   { id: 'tracks', label: 'Tracks', icon: Music2 },
@@ -38,6 +46,113 @@ const TABS = [
   { id: 'reposts', label: 'Reposts', icon: Repeat2 },
   { id: 'likes', label: 'Likes', icon: Heart },
 ];
+
+/*
+ * The banner for a profile that has not uploaded one. SoundCloud lays soft
+ * colour fields over each other, so this places the picture's four corner
+ * colours as wide radial blobs across the strip and lets them bleed into one
+ * another. Each blob carries its own alpha rather than being mixed toward the
+ * card, so the theme underneath still shows through and the picture stays the
+ * only thing setting the colour. With no palette to work from, a plain wash
+ * keeps the strip from reading as a flat grey band.
+ */
+function generatedBanner(palette) {
+  if (!palette || !palette.length) {
+    return 'linear-gradient(120deg, rgb(0 0 0 / 0.16), transparent 70%)';
+  }
+  const spots = [
+    ['18%', '22%'],
+    ['62%', '78%'],
+    ['88%', '26%'],
+    ['38%', '82%'],
+  ];
+  const layers = palette.slice(0, 4).map((rgb, i) => {
+    const [x, y] = spots[i % spots.length];
+    return `radial-gradient(55% 90% at ${x} ${y}, rgb(${rgb[0]} ${rgb[1]} ${rgb[2]} / 0.62), transparent 72%)`;
+  });
+  return layers.join(', ');
+}
+
+/*
+ * The icon for a link, by the network it names. Anything SoundCloud does not
+ * label with a known network is a personal site, which reads as a globe. The
+ * set is small on purpose: a row with the wrong logo is worse than a plain one.
+ */
+const NETWORK_ICON = {
+  youtube: Youtube,
+  instagram: Instagram,
+  facebook: Facebook,
+  twitter: Twitter,
+  x: Twitter,
+  spotify: Music2,
+  songkick: Calendar,
+  twitch: Play,
+  personal: Globe,
+};
+
+function linkLabel(link) {
+  if (link.title) return link.title;
+  if (link.network && link.network !== 'personal') {
+    return link.network.charAt(0).toUpperCase() + link.network.slice(1);
+  }
+  try {
+    return new URL(link.url).hostname.replace(/^www\./, '');
+  } catch {
+    return link.url;
+  }
+}
+
+/*
+ * The artist's own links, one row each. A SoundCloud address is routed inside
+ * the app rather than handed to the browser, so an artist pointing at another
+ * artist or one of their songs keeps the reader here. Everything else opens in
+ * a new tab, since it leaves the site by design.
+ */
+function ProfileLinks({ links }) {
+  if (!links || !links.length) return null;
+
+  return (
+    <section className="rounded-xl border bg-card p-4">
+      <h2 className="mb-3 text-sm font-semibold tracking-tight">Links</h2>
+      <ul className="flex flex-col gap-1">
+        {links.map((link, i) => {
+          const target = profileLinkTarget(link.url);
+          const Icon = NETWORK_ICON[String(link.network || '').toLowerCase()] || Globe;
+          const body = (
+            <>
+              <Icon size={15} className="shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">{linkLabel(link)}</span>
+              <ExternalLink
+                size={13}
+                className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+              />
+            </>
+          );
+          const row =
+            'group flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent';
+          return (
+            <li key={`${link.url}-${i}`} className="min-w-0">
+              {target?.to ? (
+                <Link to={target.to} params={target.params} className={row}>
+                  {body}
+                </Link>
+              ) : (
+                <a
+                  href={target?.href || link.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className={row}
+                >
+                  {body}
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 function Stat({ value, label, to, params }) {
   const inner = (
@@ -82,6 +197,14 @@ export function ProfilePage() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const toast = useToast();
+
+  /*
+   * A profile with no uploaded banner still gets one. SoundCloud builds it out
+   * of the artist's picture, so the colours come from the same tiny sample the
+   * song band uses. The hook runs before the early returns, as hooks must, and
+   * simply answers nothing until the profile and its picture are known.
+   */
+  const palette = useArtworkPalette(profile?.avatar_url);
 
   const sendMessage = async () => {
     const body = draft.trim();
@@ -225,6 +348,8 @@ export function ProfilePage() {
 
   const isOwn = me && String(me.id) === String(profile.id);
   const tracksOnly = tabData.collection?.filter((i) => i.kind === 'track') || [];
+  // Read once, since both the card and the details column want it.
+  const place = placeLabel(profile.city, profile.country_code);
 
   const renderTab = () => {
     if (tabLoading) {
@@ -309,10 +434,7 @@ export function ProfilePage() {
                   backgroundPosition: '0 0',
                   backgroundRepeat: 'no-repeat',
                 }
-              : {
-                  backgroundImage:
-                    'linear-gradient(120deg, color-mix(in srgb, var(--primary) 28%, var(--card)), var(--card))',
-                }
+              : { backgroundImage: generatedBanner(palette) }
           }
         >
           <button
@@ -375,22 +497,6 @@ export function ProfilePage() {
             />
           </div>
 
-          {/*
-           * Where the artist is from reads as part of who they are, so it sits
-           * above the description rather than after it.
-           */}
-          {placeLabel(profile.city, profile.country_code) ? (
-            <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin size={14} /> {placeLabel(profile.city, profile.country_code)}
-            </div>
-          ) : null}
-
-          {profile.description ? (
-            <div className="mt-3 max-w-3xl">
-              <ClampedText text={profile.description} lines={4} />
-            </div>
-          ) : null}
-
           {profile.created_at ? (
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
@@ -401,25 +507,53 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <div className="scrollbar-thin mt-6 flex gap-1 overflow-x-auto border-b border-border pb-px">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={cn(
-              'shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
-              tab === t.id
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/*
+       * Under the card the page splits the way a song page does: the songs take
+       * the wide left column and the artist's own details take the narrow right
+       * one. The tabs stay with the songs they switch between, so the right
+       * column is steady while the list changes.
+       */}
+      <div className={cn('mt-8 grid gap-8 lg:items-start', DETAIL_GRID)}>
+        <div className="min-w-0">
+          <div className="scrollbar-thin flex gap-1 overflow-x-auto border-b border-border pb-px">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
+                  tab === t.id
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
 
-      <div className="mt-6">{renderTab()}</div>
+          <div className="mt-6">{renderTab()}</div>
+        </div>
+
+        <aside className="flex min-w-0 flex-col gap-4">
+          {place || profile.description ? (
+            <section className="rounded-xl border bg-card p-4">
+              {/* Where the artist is from leads the column, above their words. */}
+              {place ? (
+                <div className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <MapPin size={14} /> {place}
+                </div>
+              ) : null}
+              {profile.description ? (
+                <ClampedText text={profile.description} lines={6} />
+              ) : null}
+            </section>
+          ) : null}
+
+          <ProfileLinks links={profile.web_profiles} />
+        </aside>
+      </div>
 
       <Modal
         open={composeOpen}
