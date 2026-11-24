@@ -161,8 +161,19 @@ function Waveform({
   // Bar geometry: 2px bars with a 1px gap, like the reference.
   const BAR = 2;
   const GAP = 1;
-  const barCount = width > 0 ? Math.max(1, Math.floor((width + GAP) / (BAR + GAP))) : 0;
-  const step = barCount > 0 ? (width + GAP) / barCount : 0;
+  /*
+   * The bars stop short of the right edge, the way SoundCloud leaves a flat
+   * strip for the two clock labels. The strip is wide enough for the longest
+   * time the song can show, so neither label ever sits on a bar.
+   */
+  const clockLabel = formatDuration(duration);
+  const gutter = width > 0 ? Math.max(32, clockLabel.length * 7 + 8) : 0;
+  const barWidth = Math.max(0, width - gutter);
+  const barCount = barWidth > 0 ? Math.max(1, Math.floor((barWidth + GAP) / (BAR + GAP))) : 0;
+  const step = barCount > 0 ? (barWidth + GAP) / barCount : 0;
+  // The played layer and the playhead are placed against the bar area, so they
+  // stop at the last bar rather than running into the clock strip.
+  const barFraction = width > 0 ? barWidth / width : 1;
 
   /*
    * Both layers are painted with the same bar geometry: one in the resting
@@ -234,7 +245,11 @@ function Waveform({
     const el = outerRef.current;
     if (!el || duration <= 0) return;
     const rect = el.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    /*
+     * Only the bar area is the track. A click in the flat clock strip lands on
+     * the last bar rather than past the end of the song.
+     */
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(1, rect.width * barFraction)));
     onSeek?.(ratio);
   };
 
@@ -257,7 +272,7 @@ function Waveform({
         <canvas
           ref={playedRef}
           className="absolute inset-0 h-full w-full"
-          style={{ clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)` }}
+          style={{ clipPath: `inset(0 ${(1 - progress * barFraction) * 100}% 0 0)` }}
           aria-hidden="true"
         />
 
@@ -267,7 +282,8 @@ function Waveform({
           * over the bars so it stays continuous across quiet passages.
           */}
         <div
-          className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-foreground/25"
+          className="pointer-events-none absolute left-0 top-1/2 h-px -translate-y-1/2 bg-foreground/25"
+          style={{ width: `${barFraction * 100}%` }}
           aria-hidden="true"
         />
 
@@ -278,7 +294,7 @@ function Waveform({
           */}
         <div
           className="pointer-events-none absolute top-0 bottom-0 z-[5] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
-          style={{ left: `${progress * 100}%` }}
+          style={{ left: `${progress * barFraction * 100}%` }}
           aria-hidden="true"
         />
 
@@ -319,6 +335,7 @@ function Waveform({
           key={m.key}
           marker={m}
           active={tip?.key === m.key}
+          barFraction={barFraction}
           onSeek={onSeek}
           onEnter={onMarkerEnter}
           onLeave={onMarkerLeave}
@@ -330,7 +347,26 @@ function Waveform({
         * instead of across the middle of the bars. Only the lowest bars pass
         * behind it, so the shape of the song stays readable while it is up.
         */}
-      {tip ? <WaveformTip marker={tip} width={width} /> : null}
+      {tip ? <WaveformTip marker={tip} width={width} barFraction={barFraction} /> : null}
+
+      {/*
+        * The two clocks sit in the flat strip the bars leave at the right, the
+        * way SoundCloud places them: where the playhead is on top, the length
+        * of the song underneath. Both are right aligned to the card edge and
+        * never reach over a bar.
+        */}
+      <div
+        className="pointer-events-none absolute right-0 top-0 z-20 text-right text-xs font-medium tabular-nums text-foreground"
+        style={{ width: gutter }}
+      >
+        {formatDuration(currentTime)}
+      </div>
+      <div
+        className="pointer-events-none absolute bottom-0 right-0 z-20 text-right text-xs tabular-nums text-muted-foreground"
+        style={{ width: gutter }}
+      >
+        {formatDuration(duration)}
+      </div>
     </div>
   );
 }
@@ -339,7 +375,7 @@ function Waveform({
  * One comment face. It is memoised so the per frame playhead update does not
  * re-render every avatar on the waveform.
  */
-const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, active = false }) {
+const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, active = false, barFraction = 1 }) {
   return (
     <button
       type="button"
@@ -352,7 +388,7 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, 
          */
         active && 'scale-110'
       )}
-      style={{ left: `${marker.ratio * 100}%` }}
+      style={{ left: `${marker.ratio * barFraction * 100}%` }}
       onMouseEnter={() => onEnter?.(marker)}
       onMouseLeave={() => onLeave?.(marker)}
       onClick={(e) => {
@@ -371,9 +407,9 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, 
  * faces, outside the bar area, so it never covers the waveform the listener is
  * reading and never gets clipped by it.
  */
-function WaveformTip({ marker, width }) {
+function WaveformTip({ marker, width, barFraction = 1 }) {
   const TIP = 224;
-  const left = marker.ratio * width;
+  const left = marker.ratio * width * barFraction;
   const x = Math.max(0, Math.min(width - TIP, left - TIP / 2));
   return (
     <div
@@ -402,7 +438,7 @@ function WaveformTip({ marker, width }) {
  * own timestamp, and while the song plays through that moment the comment pops
  * up on its own for a few seconds, the way SoundCloud surfaces it.
  */
-function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers }) {
+function WaveformPlayer({ samples, active, onSeek, durationMs, markers }) {
   const { currentTime, duration } = usePlayerTime();
   const total = duration || durationMs || 0;
   const time = active ? currentTime : 0;
@@ -428,10 +464,8 @@ function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers })
   const tip = activeMarker || playingMarker;
 
   /*
-   * The clock is split over the bars the way SoundCloud lays it out: where the
-   * playhead is sits at the top left, the length of the song at the bottom
-   * left. Both float above the bars, so the waveform keeps the full width of
-   * the card and the times never steal a row from it.
+   * The clocks are drawn by the waveform itself, inside the flat strip its bars
+   * leave at the right edge, so they line up with the bar area at any width.
    */
   return (
     <div className="flex h-full flex-col">
@@ -448,12 +482,6 @@ function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers })
           onMarkerEnter={setActiveMarker}
           onMarkerLeave={() => setActiveMarker(null)}
         />
-        <span className="pointer-events-none absolute left-0 top-0 z-20 text-xs font-medium tabular-nums text-foreground">
-          {formatDuration(time)}
-        </span>
-        <span className="pointer-events-none absolute bottom-0 left-0 z-20 text-xs tabular-nums text-muted-foreground">
-          {formatDuration(track.duration)}
-        </span>
       </div>
     </div>
   );
@@ -1714,7 +1742,6 @@ export function TrackPage() {
              */
             <div className="mt-2.5 min-h-[180px] flex-1">
               <WaveformPlayer
-                track={track}
                 samples={waveform}
                 active={active}
                 durationMs={track.full_duration || track.duration || 0}
