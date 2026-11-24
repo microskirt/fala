@@ -1266,9 +1266,12 @@ function StatTile({ label, value, icon: Icon, to, title }) {
  */
 function TrackStats({ track }) {
   return (
+    /*
+     * The tiles say what they are, so the box needs no heading of its own. The
+     * numbers start at the top edge instead of under a label.
+     */
     <section className="rounded-xl border bg-card px-4 py-3.5">
-      <h2 className="text-sm font-semibold tracking-tight">Stats</h2>
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <StatTile label="Plays" value={formatCount(track.playback_count)} icon={PlayCircle} />
         <StatTile
           label="Likes"
