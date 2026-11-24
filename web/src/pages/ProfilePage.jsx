@@ -19,7 +19,7 @@ import {
   Globe,
   ExternalLink,
 } from 'lucide-react';
-import { api, artwork, formatCount, formatDate } from '@/api.js';
+import { api, artwork, formatCount, formatDate, formatRelativeDate } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
@@ -96,6 +96,27 @@ const NETWORK_ICON = {
   personal: Globe,
 };
 
+/*
+ * lucide carries no SoundCloud mark, so the cloud is drawn here at the same
+ * 15px as the other link icons. The path is the plain logo silhouette, which
+ * reads correctly at this size where a detailed version turns to mud.
+ */
+function SoundCloudIcon({ size = 15, className }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      className={className}
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M23.999 14.165c-.052 1.796-1.612 3.169-3.4 3.169h-8.18a.68.68 0 0 1-.675-.683V7.862a.747.747 0 0 1 .452-.724s.75-.513 2.333-.513a5.364 5.364 0 0 1 2.763.755 5.433 5.433 0 0 1 2.57 3.54c.282-.08.574-.121.868-.12.884 0 1.73.358 2.347.992s.948 1.49.922 2.373ZM10.721 8.421c.247 2.98.427 5.697 0 8.672a.264.264 0 0 1-.53 0c-.395-2.946-.22-5.718 0-8.672a.264.264 0 0 1 .53 0ZM9.072 9.448c.285 2.659.37 4.986-.006 7.655a.277.277 0 0 1-.55 0c-.331-2.63-.256-5.02 0-7.655a.277.277 0 0 1 .556 0Zm-1.663-.257c.27 2.726.39 5.171 0 7.904a.266.266 0 0 1-.532 0c-.38-2.69-.257-5.21 0-7.904a.266.266 0 0 1 .532 0Zm-1.647.77a26.108 26.108 0 0 1-.008 7.147.272.272 0 0 1-.542 0 27.955 27.955 0 0 1 0-7.147.275.275 0 0 1 .55 0Zm-1.67 1.769c.421 1.865.228 3.5-.029 5.388a.257.257 0 0 1-.514 0c-.21-1.858-.398-3.549 0-5.389a.272.272 0 0 1 .543 0Zm-1.655-.273c.388 1.897.26 3.508-.01 5.412-.026.28-.514.283-.54 0-.244-1.878-.347-3.54-.01-5.412a.283.283 0 0 1 .56 0Zm-1.668.911c.4 1.268.257 2.292-.026 3.572a.257.257 0 0 1-.514 0c-.241-1.262-.354-2.312-.023-3.572a.283.283 0 0 1 .563 0Z" />
+    </svg>
+  );
+}
+
 function linkLabel(link) {
   if (link.title) return link.title;
   if (link.network && link.network !== 'personal') {
@@ -123,7 +144,14 @@ function ProfileLinks({ links }) {
       <ul className="flex flex-col gap-1">
         {links.map((link, i) => {
           const target = profileLinkTarget(link.url);
-          const Icon = NETWORK_ICON[String(link.network || '').toLowerCase()] || Globe;
+          /*
+           * A SoundCloud address is routed inside Fala, but the row still has
+           * to say where it points, so it keeps the SoundCloud mark rather
+           * than borrowing the generic globe.
+           */
+          const Icon = target?.to
+            ? SoundCloudIcon
+            : NETWORK_ICON[String(link.network || '').toLowerCase()] || Globe;
           const body = (
             <>
               <Icon size={15} className="shrink-0 text-muted-foreground" />
@@ -356,6 +384,12 @@ export function ProfilePage() {
   const tracksOnly = tabData.collection?.filter((i) => i.kind === 'track') || [];
   // Read once, since both the card and the details column want it.
   const place = placeLabel(profile.city, profile.country_code);
+  /*
+   * Only the signed in account's own join date is readable; api-v2 leaves it
+   * blank on everyone else. The server fills it in for the own profile, so this
+   * is empty on every other artist and the line simply does not render.
+   */
+  const joined = profile.created_at || null;
 
   // Albums and playlists are lists of songs, not songs, so they keep cards.
   const listsTab = tab === 'playlists' || tab === 'albums';
@@ -493,12 +527,12 @@ export function ProfilePage() {
                 </Button>
               ) : (
                 <>
-                  <FollowButton target={profile} />
                   {me ? (
                     <Button variant="outline" onClick={() => setComposeOpen(true)}>
                       <MessageSquare size={14} /> Message
                     </Button>
                   ) : null}
+                  <FollowButton target={profile} />
                 </>
               )}
             </div>
@@ -518,14 +552,6 @@ export function ProfilePage() {
               {...userSubLink(profile, 'following')}
             />
           </div>
-
-          {profile.created_at ? (
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar size={14} /> Joined {formatDate(profile.created_at)}
-              </span>
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -559,12 +585,34 @@ export function ProfilePage() {
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4">
-          {place || profile.description ? (
+          {joined || place || profile.description ? (
             <section className="rounded-xl border bg-card p-4">
-              {/* Where the artist is from leads the column, above their words. */}
-              {place ? (
-                <div className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <MapPin size={14} /> {place}
+              {/* The same heading style as the Links box below it. */}
+              <h2 className="mb-3 text-sm font-semibold tracking-tight">Details</h2>
+              {/*
+               * The join date leads the column, above the location. It reads
+               * as "Joined ... ago" and lifts the exact day on hover, the way
+               * the song card's upload age does.
+               */}
+              {joined || place ? (
+                <div className="mb-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
+                  {joined ? (
+                    <div className="inline-flex items-center gap-1.5">
+                      <Calendar size={14} />
+                      <time
+                        dateTime={joined}
+                        title={formatDate(joined)}
+                        className="cursor-default"
+                      >
+                        Joined {formatRelativeDate(joined)}
+                      </time>
+                    </div>
+                  ) : null}
+                  {place ? (
+                    <div className="inline-flex items-center gap-1.5">
+                      <MapPin size={14} /> {place}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {profile.description ? (
