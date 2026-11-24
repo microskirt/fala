@@ -416,10 +416,12 @@ function Waveform({
         * of the song underneath. They gather around the axis rather than being
         * pinned to the very top and bottom of the box, so the pair reads as one
         * label hanging off the line. The axis itself runs on through the strip,
-        * which is what the two times sit against.
+        * which is what the two times sit against. The gap between them is the
+        * room each one leaves around the axis, so widening it pushes both
+        * times a little further off the line without moving the pair itself.
         */}
       <div
-        className="pointer-events-none absolute right-0 top-1/2 z-20 flex -translate-y-1/2 flex-col justify-center gap-1 text-right text-xs leading-none tabular-nums"
+        className="pointer-events-none absolute right-0 top-1/2 z-20 flex -translate-y-1/2 flex-col justify-center gap-2 text-right text-xs leading-none tabular-nums"
         style={{ width: gutter }}
       >
         <span className="font-medium text-foreground">{formatDuration(currentTime)}</span>
