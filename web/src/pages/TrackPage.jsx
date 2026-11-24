@@ -135,7 +135,6 @@ function Waveform({
   const dragging = useRef(false);
   const [width, setWidth] = useState(0);
   const [boxHeight, setBoxHeight] = useState(height);
-  const [hover, setHover] = useState(null);
 
   const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
   const progress = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
@@ -241,7 +240,7 @@ function Waveform({
 
   if (!samples || samples.length === 0) return null;
 
-  const tip = hover || activeMarker;
+  const tip = activeMarker;
 
   return (
     <div
@@ -325,6 +324,11 @@ function Waveform({
         />
       ))}
 
+      {/*
+        * The comment card opens along the bottom edge, under the row of faces,
+        * instead of across the middle of the bars. Only the lowest bars pass
+        * behind it, so the shape of the song stays readable while it is up.
+        */}
       {tip ? <WaveformTip marker={tip} width={width} /> : null}
     </div>
   );
@@ -354,8 +358,9 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave }
 });
 
 /*
- * The little card that names the commenter and quotes them. It sits inside the
- * waveform, just under the row of faces, so it never spills out of the card.
+ * The little card that names the commenter and quotes them. It opens below the
+ * faces, outside the bar area, so it never covers the waveform the listener is
+ * reading and never gets clipped by it.
  */
 function WaveformTip({ marker, width }) {
   const TIP = 224;
@@ -363,7 +368,7 @@ function WaveformTip({ marker, width }) {
   const x = Math.max(0, Math.min(width - TIP, left - TIP / 2));
   return (
     <div
-      className="pointer-events-none absolute top-7 z-20 rounded-lg border bg-popover px-3 py-2 text-left shadow-lg"
+      className="pointer-events-none absolute bottom-0 z-20 rounded-lg border bg-popover px-3 py-2 text-left shadow-lg"
       style={{ left: width > 0 ? x : 0, width: TIP }}
     >
       <div className="flex items-center gap-1.5 text-xs font-medium">
@@ -421,7 +426,8 @@ function WaveformPlayer({ track, samples, active, onSeek, durationMs, markers })
    */
   return (
     <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1">
+      {/* `relative` anchors the comment popup, which opens under the bars. */}
+      <div className="relative min-h-0 flex-1">
         <Waveform
           samples={samples}
           currentTime={time}
@@ -1573,13 +1579,11 @@ export function TrackPage() {
         </div>
 
         {/*
-         * The card breathes the same amount at the top and the bottom: the title
-         * sits a step below the top edge, and the action row sits the same
-         * distance above the bottom edge, with the waveform taking the room in
-         * between. `mt-auto` pins the actions to the bottom when the artwork is
-         * taller than the text.
+         * The title and the action row sit close to the card edges so the
+         * waveform between them gets the room instead. Every pixel taken from
+         * the padding is a pixel the bars can use.
          */}
-        <div className="flex min-w-0 flex-col pb-5 pt-5 lg:order-1">
+        <div className="flex min-w-0 flex-col pb-1.5 pt-1 lg:order-1">
           {track.policy === 'BLOCK' ? (
             <div className="mb-2">
               <Badge variant="destructive">Unavailable</Badge>
@@ -1637,7 +1641,7 @@ export function TrackPage() {
              * The clock lives under the bars instead of beside them, so the
              * waveform keeps the full width of the card.
              */
-            <div className="mt-5 min-h-[136px] flex-1">
+            <div className="mt-2.5 min-h-[180px] flex-1">
               <WaveformPlayer
                 track={track}
                 samples={waveform}
@@ -1659,7 +1663,7 @@ export function TrackPage() {
            * listener can say something without scrolling. Its moment comes
            * from the playhead, so there is no separate timestamp control.
            */}
-          <div className="mt-5 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <LikeButton track={track} size={18} />
 
             <CommentForm
