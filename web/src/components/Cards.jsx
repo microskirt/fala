@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   BadgeCheck,
+  Repeat2,
 } from 'lucide-react';
 import { Artwork, Avatar } from '@/components/Media.jsx';
 import {
@@ -114,6 +115,14 @@ export function TrackCard({ track, context, showStats = true }) {
             </span>
             <span className="inline-flex items-center gap-1" title="Comments">
               <MessageSquare size={14} /> {formatCount(track.comment_count)}
+            </span>
+            {/*
+             * Reposts sit beside the other three counts, so a thumb tells the
+             * whole story of how a song travelled instead of stopping at its
+             * comments.
+             */}
+            <span className="inline-flex items-center gap-1" title="Reposts">
+              <Repeat2 size={14} /> {formatCount(track.reposts_count)}
             </span>
           </div>
         ) : null}
