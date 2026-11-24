@@ -1690,11 +1690,12 @@ export function TrackPage() {
         </div>
 
         {/*
-         * The title and the action row sit close to the card edges so the
-         * waveform between them gets the room instead. Every pixel taken from
-         * the padding is a pixel the bars can use.
+         * The title rides the top edge and the action row rides the bottom
+         * edge. The padding that used to hold them off the border is given to
+         * the gaps around the bars instead, so the waveform keeps exactly the
+         * height it had while the two rows move out to meet the edges.
          */}
-        <div className="flex min-w-0 flex-col pb-1.5 pt-1 lg:order-1">
+        <div className="flex min-w-0 flex-col lg:order-1">
           {track.policy === 'BLOCK' ? (
             <div className="mb-2">
               <Badge variant="destructive">Unavailable</Badge>
@@ -1762,7 +1763,7 @@ export function TrackPage() {
              * The clock lives under the bars instead of beside them, so the
              * waveform keeps the full width of the card.
              */
-            <div className="mt-2.5 min-h-[180px] flex-1">
+            <div className="mt-3.5 min-h-[180px] flex-1">
               <WaveformPlayer
                 samples={waveform}
                 active={active}
@@ -1783,7 +1784,7 @@ export function TrackPage() {
            * listener can say something without scrolling. Its moment comes
            * from the playhead, so there is no separate timestamp control.
            */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
             <LikeButton track={track} size={18} />
 
             <CommentForm
