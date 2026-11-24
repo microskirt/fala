@@ -1609,42 +1609,72 @@ export async function myPlaylists(token, { limit = 200, next } = {}) {
 }
 
 /*
- * Matches in the caller's own library. SoundCloud's search has no "mine"
- * filter, so the query is run against the liked songs and the playlists the
- * caller owns or likes, and the titles are matched here. The lists are walked
- * with a page bound so a very large library still answers quickly.
+ * Pages of the caller's own library, kept for a short while per token. The
+ * search bar asks on every keystroke, and the four lists behind this change
+ * slowly, so a page already walked is reused instead of fetched again. The
+ * entry also remembers where the last walk stopped, which lets the next query
+ * resume from there. Nothing is written to disk.
  */
-export async function searchMine(token, q, { maxPages = 10, pageSize = 200 } = {}) {
+const libraryCache = new Map();
+
+function libraryEntry(token) {
+  const hit = libraryCache.get(token);
+  if (hit && hit.exp > Date.now()) return hit;
+  const entry = { exp: Date.now() + 30_000, lists: new Map() };
+  libraryCache.set(token, entry);
+  if (libraryCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of libraryCache) if (v.exp < now) libraryCache.delete(k);
+  }
+  return entry;
+}
+
+/*
+ * Walk one library list until enough matches are found. The wanted count is
+ * small, and the newest pages hold the things a listener is most likely to be
+ * looking for, so most queries stop after the first page instead of reading the
+ * whole library. Everything walked stays in the per-token cache.
+ */
+async function walkLibrary(token, first, map, match, want, maxPages) {
+  const entry = libraryEntry(token);
+  let state = entry.lists.get(first);
+  if (!state) {
+    state = { items: [], href: first, done: false, pages: 0 };
+    entry.lists.set(first, state);
+  }
+
+  const found = state.items.filter(match);
+  while (!state.done && found.length < want) {
+    const data = await apiGet(state.href, { token });
+    for (const item of data.collection || []) {
+      const mapped = map(item);
+      if (!mapped) continue;
+      state.items.push(mapped);
+      if (match(mapped)) found.push(mapped);
+    }
+    state.href = data.next_href ? stripClientId(data.next_href) : null;
+    state.pages += 1;
+    if (!state.href || state.pages >= maxPages) state.done = true;
+  }
+  return found.slice(0, want);
+}
+
+/*
+ * Matches in the caller's own library. SoundCloud's search has no "mine"
+ * filter, so the query is run against the followed people, the liked songs and
+ * the playlists the caller owns or likes, and the titles are matched here.
+ *
+ * Only a few rows are shown, so only a few are looked for: a listener with
+ * thousands of likes still gets an answer from the first page or two. The page
+ * bound is a backstop for a query that matches nothing at all.
+ */
+export async function searchMine(
+  token,
+  q,
+  { maxPages = 10, pageSize = 200, want = { people: 2, tracks: 2, playlists: 1 } } = {}
+) {
   const needle = String(q || '').trim().toLowerCase();
   if (!needle) return { people: [], tracks: [], playlists: [] };
-
-  const walk = async (first, mapper) => {
-    const found = [];
-    let href = first;
-    let pages = 0;
-    while (href && pages < maxPages) {
-      const data = await apiGet(href, { token });
-      for (const item of data.collection || []) {
-        const mapped = mapper(item);
-        if (mapped) found.push(mapped);
-      }
-      href = data.next_href ? stripClientId(data.next_href) : null;
-      pages += 1;
-    }
-    return found;
-  };
-
-  const id = await meId(token);
-  const asTrack = (item) => slimTrack(item?.track || (item?.kind === 'track' ? item : null));
-  const asLikedPlaylist = (item) =>
-    slimPlaylist(item?.playlist || (item?.kind === 'playlist' ? item : null));
-
-  const [followed, likes, owned, liked] = await Promise.all([
-    walk(`/users/${id}/followings?limit=${pageSize}`, slimUser).catch(() => []),
-    walk(`/users/${id}/track_likes?limit=${pageSize}`, asTrack).catch(() => []),
-    walk(`/users/${id}/playlists?limit=${pageSize}`, slimPlaylist).catch(() => []),
-    walk(`/users/${id}/playlist_likes?limit=${pageSize}`, asLikedPlaylist).catch(() => []),
-  ]);
 
   const matches = (item) => {
     const title = String(item?.title || '').toLowerCase();
@@ -1664,20 +1694,56 @@ export async function searchMine(token, q, { maxPages = 10, pageSize = 200 } = {
     return name.includes(needle) || permalink.includes(needle);
   };
 
+  const id = await meId(token);
+  const asTrack = (item) => slimTrack(item?.track || (item?.kind === 'track' ? item : null));
+  const asLikedPlaylist = (item) =>
+    slimPlaylist(item?.playlist || (item?.kind === 'playlist' ? item : null));
+
+  const [people, tracks, owned, liked] = await Promise.all([
+    walkLibrary(
+      token,
+      `/users/${id}/followings?limit=${pageSize}`,
+      slimUser,
+      matchesPerson,
+      want.people,
+      maxPages
+    ).catch(() => []),
+    walkLibrary(
+      token,
+      `/users/${id}/track_likes?limit=${pageSize}`,
+      asTrack,
+      matches,
+      want.tracks,
+      maxPages
+    ).catch(() => []),
+    walkLibrary(
+      token,
+      `/users/${id}/playlists?limit=${pageSize}`,
+      slimPlaylist,
+      matches,
+      want.playlists,
+      maxPages
+    ).catch(() => []),
+    walkLibrary(
+      token,
+      `/users/${id}/playlist_likes?limit=${pageSize}`,
+      asLikedPlaylist,
+      matches,
+      want.playlists,
+      maxPages
+    ).catch(() => []),
+  ]);
+
   // A playlist can be both owned and liked, so the two lists are merged by id.
   const seen = new Set();
   const playlists = [];
   for (const p of [...owned, ...liked]) {
     if (!p || seen.has(String(p.id))) continue;
     seen.add(String(p.id));
-    if (matches(p)) playlists.push(p);
+    playlists.push(p);
   }
 
-  return {
-    people: followed.filter((u) => u && matchesPerson(u)),
-    tracks: likes.filter((t) => t && matches(t)),
-    playlists,
-  };
+  return { people, tracks, playlists: playlists.slice(0, want.playlists) };
 }
 
 export async function myFollowing(token, { limit = 200, next } = {}) {
