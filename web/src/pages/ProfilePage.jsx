@@ -24,9 +24,15 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
 import { Avatar, Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx';
-import { TrackCard, PlaylistCard } from '@/components/Cards.jsx';
+import { TrackRow, PlaylistCard } from '@/components/Cards.jsx';
 import { FollowButton } from '@/components/Controls.jsx';
-import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
+import {
+  Page,
+  CardGrid,
+  TrackList,
+  TrackListSkeleton,
+  LoadMore,
+} from '@/components/layout/Page.jsx';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { useArtworkPalette } from '@/lib/artworkColor.js';
 import { Modal } from '@/components/Modal.jsx';
@@ -351,8 +357,12 @@ export function ProfilePage() {
   // Read once, since both the card and the details column want it.
   const place = placeLabel(profile.city, profile.country_code);
 
+  // Albums and playlists are lists of songs, not songs, so they keep cards.
+  const listsTab = tab === 'playlists' || tab === 'albums';
+
   const renderTab = () => {
     if (tabLoading) {
+      if (!listsTab) return <TrackListSkeleton />;
       return (
         <CardGrid>
           {Array.from({ length: 8 }).map((_, i) => (
@@ -378,7 +388,7 @@ export function ProfilePage() {
       );
     }
 
-    if (tab === 'playlists' || tab === 'albums') {
+    if (listsTab) {
       return (
         <CardGrid>
           {tabData.collection.map((p) => (
@@ -388,6 +398,12 @@ export function ProfilePage() {
       );
     }
 
+    /*
+     * Songs read as a list here, not as covers. An artist page is where a
+     * listener scans a catalogue and decides what to do with each song, so
+     * every row carries the actions: like, repost, add to playlist, add to
+     * queue. A cover grid had room for two of them and hid the rest.
+     */
     return (
       <div>
         {tracksOnly.length > 1 ? (
@@ -400,11 +416,17 @@ export function ProfilePage() {
             </Button>
           </div>
         ) : null}
-        <CardGrid>
-          {tracksOnly.map((t) => (
-            <TrackCard key={t.id} track={t} context={tracksOnly} />
+        <TrackList>
+          {tracksOnly.map((t, i) => (
+            <TrackRow
+              key={`${t.id}-${i}`}
+              track={t}
+              index={i}
+              context={tracksOnly}
+              showRepost
+            />
           ))}
-        </CardGrid>
+        </TrackList>
       </div>
     );
   };
