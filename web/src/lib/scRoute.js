@@ -49,6 +49,34 @@ export function trackLink(track) {
   return { to: '/track/$id', params: { id: String(track?.id) } };
 }
 
+/*
+ * A profile's own links are mostly off-site, but SoundCloud lets an artist
+ * point at another SoundCloud page. Those read as this app's routes so the
+ * click never leaves the site: one word is an artist, two are a song, and
+ * /artist/sets/name is a playlist. Anything else keeps its own address.
+ */
+export function profileLinkTarget(url) {
+  if (!url) return null;
+  let parsed;
+  try {
+    parsed = new URL(url, 'https://soundcloud.com');
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+  if (host === 'soundcloud.com' || host === 'm.soundcloud.com' || host === 'on.soundcloud.com') {
+    const seg = parsed.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+    if (seg.length === 1) return { to: '/$artist', params: { artist: seg[0] } };
+    if (seg.length === 2) {
+      return { to: '/$artist/$track', params: { artist: seg[0], track: seg[1] } };
+    }
+    if (seg.length === 3 && seg[1] === 'sets') {
+      return { to: '/$artist/sets/$playlist', params: { artist: seg[0], playlist: seg[2] } };
+    }
+  }
+  return { href: parsed.toString() };
+}
+
 export function userLink(user) {
   const seg = scSegments(user);
   if (seg && seg.length === 1) {
