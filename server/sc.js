@@ -553,6 +553,35 @@ export async function user(id) {
   }
 }
 
+/*
+ * The links an artist puts on their profile live at their own endpoint, keyed
+ * by the full urn rather than the plain id, and they are not part of the user
+ * payload. A profile with none answers with an empty list, which is not an
+ * error, so that case is folded into the same empty result.
+ */
+export async function webProfiles(id) {
+  if (!id) return [];
+  const urn = String(id).startsWith('soundcloud:users:')
+    ? String(id)
+    : `soundcloud:users:${id}`;
+  try {
+    const list = await apiGet(`/users/${encodeURIComponent(urn)}/web-profiles`, {
+      ttl: 300_000,
+    });
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((p) => p && p.url)
+      .map((p) => ({
+        url: p.url,
+        network: p.network || 'personal',
+        title: p.title || '',
+        username: p.username || '',
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function resolve(url) {
   const data = await apiGet(`/resolve?url=${encodeURIComponent(url)}`, { ttl: 300_000 });
   if (data.kind === 'track') return fullTrack(data);

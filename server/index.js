@@ -557,10 +557,18 @@ route('PUT', '/api/tracks/:id/repost', async (ctx) => {
 /* --------------------------------- users ---------------------------------- */
 
 route('GET', '/api/users/:id', async (ctx) => {
-  const user = await sc.user(ctx.params.id);
+  /*
+   * The profile links come from a second endpoint, so they are fetched beside
+   * the user rather than after it. A failure there is not a reason to fail the
+   * whole profile: the page renders without the links.
+   */
+  const [user, links] = await Promise.all([
+    sc.user(ctx.params.id),
+    sc.webProfiles(ctx.params.id),
+  ]);
   if (!user) throw new HttpError(404, 'User not found');
   const flags = await flagsFor(ctx.token);
-  return decorateUser(user, flags);
+  return { ...decorateUser(user, flags), web_profiles: links };
 });
 
 route('GET', '/api/users/:id/tab', async (ctx) => {
