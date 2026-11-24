@@ -986,7 +986,7 @@ function AlsoLiked({ people }) {
  */
 const LISTENER_WINDOWS = [
   { id: 'ALL_TIME', label: 'All time' },
-  { id: 'DAYS_7', label: 'First 7 days' },
+  { id: 'DAYS_7', label: 'First week' },
 ];
 
 /*
@@ -1087,7 +1087,12 @@ function TopListeners({ trackId }) {
 
   return (
     <section className="rounded-xl border bg-card px-4 py-3.5">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      {/*
+       * The window tabs open the box on the left, where the title used to sit
+       * before it was removed, so the card starts with its controls instead of
+       * an empty corner.
+       */}
+      <div className="flex flex-wrap items-center justify-start gap-2">
         <div className="flex gap-1">
           {shownWindows.map((w) => (
             <button
@@ -1101,7 +1106,12 @@ function TopListeners({ trackId }) {
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               )}
             >
-              {w.id === 'DAYS_7' ? `First ${days} days` : w.label}
+              {/*
+                * A young track only has a shorter window, and naming the real
+                * number of days is the honest label there. Once the window is
+                * the full seven days it reads as a week.
+                */}
+              {w.id === 'DAYS_7' && days !== 7 ? `First ${days} days` : w.label}
             </button>
           ))}
         </div>
