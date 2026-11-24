@@ -559,24 +559,40 @@ export function PlayerProvider({ children }) {
     }
   }, [muted]);
 
+  /*
+   * Queued songs land directly after the one that is playing, which is where a
+   * listener expects the next thing they added to come up. Appending instead
+   * pushed them behind everything already waiting, so a song added to a long
+   * queue was not heard for an hour. Nothing is inserted twice, and an empty
+   * queue still starts playing.
+   */
   const addToQueue = useCallback(
     (input) => {
       const incoming = (Array.isArray(input) ? input : [input]).filter(Boolean);
       if (incoming.length === 0) return;
       setQueue((prev) => {
         const seen = new Set(prev.map((t) => String(t.id)));
-        const added = incoming.filter((t) => !seen.has(String(t.id)));
+        const added = [];
+        for (const t of incoming) {
+          const key = String(t.id);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          added.push(t);
+        }
         if (added.length === 0) return prev;
         if (prev.length === 0) {
           setIndex(0);
           setPlaying(true);
           playingRef.current = true;
+          return added;
         }
-        return [...prev, ...added];
+        // A queue with nothing loaded yet has no "now playing" to follow.
+        const at = index < 0 ? prev.length : Math.min(prev.length, index + 1);
+        return [...prev.slice(0, at), ...added, ...prev.slice(at)];
       });
       toast.success(incoming.length === 1 ? 'Added to queue' : `Added ${incoming.length} tracks to queue`);
     },
-    [toast]
+    [index, toast]
   );
 
   const playNextInQueue = useCallback(
