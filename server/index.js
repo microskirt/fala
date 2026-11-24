@@ -357,10 +357,11 @@ route('GET', '/api/search', async (ctx) => {
  */
 route('GET', '/api/search/mine', async (ctx) => {
   const q = ctx.query.get('q') || '';
-  if (!ctx.token || !q.trim()) return { tracks: [], playlists: [] };
+  if (!ctx.token || !q.trim()) return { people: [], tracks: [], playlists: [] };
   const data = await sc.searchMine(ctx.token, q);
   const flags = await flagsFor(ctx.token);
   return {
+    people: (data.people || []).map((u) => decorateUser(u, flags)),
     tracks: data.tracks.map((t) => decorateTrack(t, flags)),
     playlists: data.playlists.map((p) => decoratePlaylist(p, flags)),
   };
