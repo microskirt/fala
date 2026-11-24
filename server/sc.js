@@ -864,8 +864,21 @@ export async function topListeners(token, trackId, { window = 'ALL_TIME', limit 
       ? { rank: seen.currentRank, plays: seen.totalPlays ?? 0 }
       : null;
 
+  /*
+   * A young track has no all time ranking yet, and SoundCloud only answers with
+   * the first period. Reporting which windows carry rows lets the card show one
+   * tab instead of two, with the one that has data selected.
+   */
+  const hasAllTime = (block.allTime?.fans || []).length > 0;
+  const hasFirst = (block.firstPeriod?.fans || []).length > 0;
+  const windows = [];
+  if (hasAllTime) windows.push('ALL_TIME');
+  if (hasFirst) windows.push('DAYS_7');
+  if (windows.length === 0) windows.push('ALL_TIME');
+
   return {
     window: which === 'firstPeriod' ? 'DAYS_7' : 'ALL_TIME',
+    windows,
     days: block.firstPeriodDays || 7,
     optedOut: !!block.hasArtistOptedOut,
     fans,

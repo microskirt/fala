@@ -1008,6 +1008,7 @@ function TopListeners({ trackId }) {
   const [fans, setFans] = useState(null);
   const [viewer, setViewer] = useState(null);
   const [days, setDays] = useState(7);
+  const [available, setAvailable] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1020,6 +1021,7 @@ function TopListeners({ trackId }) {
         setFans(r.fans || []);
         setViewer(r.viewer || null);
         if (r.days) setDays(r.days);
+        if (Array.isArray(r.windows)) setAvailable(r.windows);
       })
       .catch(() => {
         if (cancelled) return;
@@ -1031,6 +1033,21 @@ function TopListeners({ trackId }) {
       cancelled = true;
     };
   }, [trackId, window]);
+
+  /*
+   * A young track has no all time ranking yet, so SoundCloud only answers with
+   * the first period. The tabs follow whatever the server reports instead of
+   * always drawing both, and the first window that has rows is the one shown.
+   */
+  const shownWindows = useMemo(() => {
+    if (!available || available.length === 0) return LISTENER_WINDOWS;
+    return LISTENER_WINDOWS.filter((w) => available.includes(w.id));
+  }, [available]);
+
+  useEffect(() => {
+    if (!available || available.length === 0) return;
+    if (!available.includes(window)) setWindow(available[0]);
+  }, [available, window]);
 
   // A track with no plays in the window has no ranking, and an empty box would
   // just be noise under the player.
@@ -1051,7 +1068,7 @@ function TopListeners({ trackId }) {
           Top listeners
         </h3>
         <div className="flex gap-1">
-          {LISTENER_WINDOWS.map((w) => (
+          {shownWindows.map((w) => (
             <button
               key={w.id}
               type="button"
