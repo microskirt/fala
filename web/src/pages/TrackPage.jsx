@@ -961,20 +961,21 @@ const LISTENER_WINDOWS = [
 ];
 
 /*
- * One place in the ranking. The number sits flush against the card padding on
- * the left and the play count flush against it on the right, so the row is
- * inset by the same amount on both sides instead of leaning right.
+ * One place in the ranking. The number is a tight column on the left, the face
+ * and name follow it without a wide gap, and the play count sits flush right.
+ * SoundCloud keeps the name close to the rank, so the gap between them stays
+ * small instead of the number floating on its own.
  */
 function ListenerRow({ rank, user, plays, isViewer = false }) {
   return (
     <Link
       {...userLink(user)}
       className={cn(
-        'flex items-center gap-2.5 rounded-md py-1.5 transition-colors hover:bg-accent/60',
+        'flex items-center gap-2 rounded-md py-1.5 transition-colors hover:bg-accent/60',
         isViewer && 'bg-primary/10'
       )}
     >
-      <span className="w-8 shrink-0 text-left text-xs font-semibold tabular-nums text-muted-foreground">
+      <span className="w-4 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground">
         {rank}
       </span>
       <Avatar src={user.avatar_url} name={user.username} size={28} />
