@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { SearchX, Music2, Users, ListMusic, Disc3, BadgeCheck } from 'lucide-react';
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import { SearchX, Music2, Users, ListMusic, Disc3 } from 'lucide-react';
 import { api, formatCount } from '@/api.js';
-import { trackLink, playlistLink, userLink } from '@/lib/scRoute.js';
 import { TrackCard, PlaylistCard, ArtistRow } from '@/components/Cards.jsx';
-import { Artwork, Avatar, EmptyState } from '@/components/Media.jsx';
+import { MineRow, libraryMatches } from '@/components/LibraryMatch.jsx';
+import { EmptyState } from '@/components/Media.jsx';
 import {
   Page,
   PageHeader,
@@ -31,54 +31,6 @@ function SeeAll({ onClick }) {
     <Button variant="ghost" size="sm" onClick={onClick}>
       See all
     </Button>
-  );
-}
-
-/*
- * One row of the own-library block: the cover, the title and what it is. The
- * whole row is the link, so a tap goes straight to the song, playlist or
- * person, which is the point of showing these above the generic results.
- */
-function MineRow({ item }) {
-  const isPerson = item.kind === 'user';
-  const isTrack = item.kind === 'track';
-  const link = isPerson ? userLink(item) : isTrack ? trackLink(item) : playlistLink(item);
-  const subtitle = isPerson
-    ? `@${item.permalink}`
-    : isTrack
-      ? item.user?.username || ''
-      : item.user?.username
-        ? `${item.user.username}${item.is_album ? ' · album' : ''}`
-        : item.is_album
-          ? 'Album'
-          : 'Playlist';
-  return (
-    <Link
-      {...link}
-      className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent/60"
-    >
-      {isPerson ? (
-        <Avatar src={item.avatar_url} name={item.username} size={40} />
-      ) : (
-        <Artwork
-          src={item.artwork_url}
-          fallback={item.user?.avatar_url}
-          alt={item.title}
-          size={40}
-          rounded={4}
-          kind={isTrack ? 'track' : 'playlist'}
-        />
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1 truncate text-sm font-medium">
-          {isPerson ? item.username : item.title}
-          {isPerson && item.verified ? (
-            <BadgeCheck size={13} className="shrink-0 text-primary" />
-          ) : null}
-        </span>
-        <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
-      </span>
-    </Link>
   );
 }
 
@@ -187,21 +139,8 @@ export function SearchPage() {
     return g;
   }, [data.collection]);
 
-  /*
-   * The own-library block follows the order SoundCloud uses: the people you
-   * follow first, then a couple of songs you liked, then one playlist you own
-   * or liked. The counts are small on purpose, this is a shortcut to something
-   * you already have, not a second result list, so the catalogue below still
-   * gets the page.
-   */
-  const mineRows = useMemo(
-    () => [
-      ...mine.people.slice(0, 3),
-      ...mine.tracks.slice(0, 2),
-      ...mine.playlists.slice(0, 1),
-    ],
-    [mine]
-  );
+  /* The same order and counts the search bar's suggestion list uses. */
+  const mineRows = useMemo(() => libraryMatches(mine), [mine]);
 
   if (!q.trim()) {
     return (
