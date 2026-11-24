@@ -75,9 +75,26 @@ export function PlayerProvider({ children }) {
   const [reloadKey, setReloadKey] = useState(0);
   const retriedRef = useRef(new Set());
   const failRef = useRef(() => {});
+  /*
+   * Clicking a waveform on a song that is not loaded yet asks for a position
+   * the audio element cannot take, because it has no media at that moment. The
+   * spot is parked here, with the song it belongs to, and applied once the
+   * metadata arrives, so the song starts where the listener clicked instead of
+   * at the top.
+   */
+  const pendingSeekRef = useRef(null);
 
   const current = index >= 0 && index < queue.length ? queue[index] : null;
   const quality = prefs.quality || 'hq';
+  /*
+   * The media event listeners are attached once, so they read the loaded track
+   * from a ref instead of from a stale closure. A parked seek is only applied
+   * to the song it was asked for.
+   */
+  const currentIdRef = useRef(null);
+  useEffect(() => {
+    currentIdRef.current = current ? String(current.id) : null;
+  }, [current]);
 
   useEffect(() => {
     playingRef.current = playing;
@@ -320,6 +337,26 @@ export function PlayerProvider({ children }) {
     const onDuration = () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) setDuration(audio.duration * 1000);
     };
+    /*
+     * A click that arrived before the media did is applied here, once the
+     * element knows how long the song is. It is dropped if the queue has since
+     * moved to a different track, so a slow load never drags a stale position
+     * onto the next song.
+     */
+    const applyPendingSeek = () => {
+      const parked = pendingSeekRef.current;
+      if (!parked) return;
+      if (parked.id && currentIdRef.current && parked.id !== currentIdRef.current) {
+        pendingSeekRef.current = null;
+        return;
+      }
+      pendingSeekRef.current = null;
+      const seconds = Math.max(0, parked.ms / 1000);
+      try {
+        audio.currentTime = seconds;
+        setCurrentTime(seconds * 1000);
+      } catch {}
+    };
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => {
       setBuffering(false);
@@ -335,8 +372,19 @@ export function PlayerProvider({ children }) {
       failRef.current();
     };
 
+    /*
+     * `loadedmetadata` is the first moment the element will accept a position.
+     * Both the duration and the parked seek are read there; `durationchange`
+     * also fires when a stream reports its length late, so it gets the same
+     * treatment.
+     */
+    const onMeta = () => {
+      onDuration();
+      applyPendingSeek();
+    };
+
     audio.addEventListener('durationchange', onDuration);
-    audio.addEventListener('loadedmetadata', onDuration);
+    audio.addEventListener('loadedmetadata', onMeta);
     audio.addEventListener('waiting', onWaiting);
     audio.addEventListener('playing', onPlaying);
     audio.addEventListener('canplay', onCanPlay);
@@ -345,7 +393,7 @@ export function PlayerProvider({ children }) {
     audio.addEventListener('seeked', syncTime);
     return () => {
       audio.removeEventListener('durationchange', onDuration);
-      audio.removeEventListener('loadedmetadata', onDuration);
+      audio.removeEventListener('loadedmetadata', onMeta);
       audio.removeEventListener('waiting', onWaiting);
       audio.removeEventListener('playing', onPlaying);
       audio.removeEventListener('canplay', onCanPlay);
@@ -459,10 +507,32 @@ export function PlayerProvider({ children }) {
     playingRef.current = true;
   }, [queue.length, repeat]);
 
-  const seek = useCallback((ms) => {
+  const seek = useCallback((ms, trackId) => {
     const audio = audioRef.current;
     if (!audio) return;
     const seconds = Math.max(0, ms / 1000);
+    /*
+     * A click on a song that has not been loaded yet lands before there is any
+     * media, and the element silently ignores a position it cannot take. The
+     * spot is parked with the track it belongs to and applied as soon as the
+     * metadata is in, so the song starts under the pointer instead of at zero.
+     *
+     * The caller passes the track id when it is starting a song in the same
+     * breath, because the queue state has not landed yet and the current track
+     * is still the previous one at this moment.
+     */
+    const targetId = trackId != null ? String(trackId) : currentIdRef.current;
+    /*
+     * Parked when the media is not there yet, and also when the caller named a
+     * different song than the one loaded: the element still holds the previous
+     * stream at that point, and moving its playhead would seek the wrong song.
+     */
+    const forLoadedSong = !targetId || targetId === currentIdRef.current;
+    if (!forLoadedSong || audio.readyState === 0 || !audio.currentSrc) {
+      pendingSeekRef.current = { id: targetId, ms: seconds * 1000 };
+      setCurrentTime(seconds * 1000);
+      return;
+    }
     try {
       audio.currentTime = seconds;
       setCurrentTime(seconds * 1000);
