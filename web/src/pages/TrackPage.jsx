@@ -668,23 +668,29 @@ function CommentItem({ comment, trackId, onDelete, onReplied, isReply = false })
           >
             {comment.user?.username || 'Listener'}
           </Link>
-          <span>{timeAgo(comment.created_at)}</span>
           {/*
-           * The timestamp used to be a themed pill, which made it read like a
-           * button competing with the comment itself. It now looks like the
-           * "time ago" beside it and only lifts to white on hover, which is
-           * enough to show it can be clicked.
+           * The moment in the song leads the meta line, the way SoundCloud
+           * reads it: "at 0:42 · 3 days ago". Only the time itself lifts on
+           * hover, because only it is the button that seeks; the "at" and the
+           * posted date stay plain text.
            */}
           {comment.timestamp_ms != null ? (
-            <button
-              type="button"
-              className="tabular-nums transition-colors hover:text-foreground"
-              onClick={() => seek(comment.timestamp_ms)}
-              title="Jump to this moment"
-            >
-              {formatDuration(comment.timestamp_ms)}
-            </button>
+            <>
+              <span className="inline-flex items-center gap-1">
+                <span>at</span>
+                <button
+                  type="button"
+                  className="tabular-nums transition-colors hover:text-foreground"
+                  onClick={() => seek(comment.timestamp_ms)}
+                  title="Jump to this moment"
+                >
+                  {formatDuration(comment.timestamp_ms)}
+                </button>
+              </span>
+              <span aria-hidden="true">·</span>
+            </>
           ) : null}
+          <span>{timeAgo(comment.created_at)}</span>
         </div>
         <p className="mt-1 text-sm leading-relaxed break-words">{comment.body}</p>
 
