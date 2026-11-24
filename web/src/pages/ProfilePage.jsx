@@ -317,8 +317,14 @@ export function ProfilePage() {
         const res = await api.get(
           `/api/users/${encodeURIComponent(profile.id)}/tab?tab=${which}&next=${encodeURIComponent(next)}`
         );
+        /*
+         * Later pages carry no total, so the one from the first page is kept.
+         * Without this, loading more rows would blank the pill back to the
+         * loaded count, which is the bug the total exists to fix.
+         */
         setTabData((prev) => ({
           ...res,
+          total: res.total ?? prev.total,
           collection: [...prev.collection, ...(res.collection || [])],
         }));
       } catch {}
@@ -425,13 +431,32 @@ export function ProfilePage() {
       );
     }
 
+    /*
+     * The pill counts what the artist has, not what happens to be loaded. The
+     * server sends the tab's own total with the first page; until it arrives,
+     * or for a tab that reports none, the loaded rows are the honest fallback.
+     * The noun follows the tab, so a likes tab does not call its rows tracks.
+     */
+    const shown = tabData.total ?? tabData.collection.length;
+    const noun =
+      { likes: 'like', reposts: 'repost', playlists: 'playlist', albums: 'album' }[tab] ||
+      'track';
+    const countPill = (
+      <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground">
+        {formatCount(shown)} {shown === 1 ? noun : `${noun}s`}
+      </span>
+    );
+
     if (listsTab) {
       return (
-        <CardGrid>
-          {tabData.collection.map((p) => (
-            <PlaylistCard key={p.id} playlist={p} />
-          ))}
-        </CardGrid>
+        <div>
+          {shown > 1 ? <div className="mb-4">{countPill}</div> : null}
+          <CardGrid>
+            {tabData.collection.map((p) => (
+              <PlaylistCard key={p.id} playlist={p} />
+            ))}
+          </CardGrid>
+        </div>
       );
     }
 
@@ -444,11 +469,9 @@ export function ProfilePage() {
      */
     return (
       <div>
-        {tracksOnly.length > 1 ? (
+        {shown > 1 || tracksOnly.length > 1 ? (
           <div className="mb-4 flex items-center justify-between gap-3">
-            <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground">
-              {tracksOnly.length} tracks
-            </span>
+            {countPill}
             <Button size="sm" onClick={() => playQueue(tracksOnly, 0)}>
               <Play size={14} fill="currentColor" /> Play all
             </Button>
