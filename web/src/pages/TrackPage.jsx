@@ -1147,11 +1147,16 @@ function TopListeners({ trackId }) {
   if (!loading && (!fans || fans.length === 0)) return null;
 
   /*
-   * When the account is already in the shown ranks, that row is marked instead
-   * of repeating it underneath. Otherwise the standing gets its own row at the
-   * bottom, set apart by a rule so it does not read as the next place.
+   * The viewer is found by account, not by the rank the ranking reports. The
+   * reported rank counts the whole ranking, while this box shows only the top
+   * few rows, so the two drift apart and the rank lit up whichever stranger
+   * happened to sit in that slot. Matching the id marks the real account.
    */
-  const inList = viewer != null && viewer.rank <= fans.length;
+  const viewerId = me && me.id != null ? String(me.id) : null;
+  const inList =
+    !!viewerId &&
+    Array.isArray(fans) &&
+    fans.some((entry) => String(entry.user?.id) === viewerId);
   const ownRow = viewer != null && !inList && me ? viewer : null;
 
   return (
@@ -1200,7 +1205,7 @@ function TopListeners({ trackId }) {
                 rank={i + 1}
                 user={entry.user}
                 plays={entry.plays}
-                isViewer={inList && viewer.rank === i + 1}
+                isViewer={viewerId != null && String(entry.user?.id) === viewerId}
               />
             </li>
           ))}
