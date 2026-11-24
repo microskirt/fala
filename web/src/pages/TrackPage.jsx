@@ -318,6 +318,7 @@ function Waveform({
         <MarkerFace
           key={m.key}
           marker={m}
+          active={tip?.key === m.key}
           onSeek={onSeek}
           onEnter={onMarkerEnter}
           onLeave={onMarkerLeave}
@@ -338,11 +339,19 @@ function Waveform({
  * One comment face. It is memoised so the per frame playhead update does not
  * re-render every avatar on the waveform.
  */
-const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave }) {
+const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, active = false }) {
   return (
     <button
       type="button"
-      className="absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      className={cn(
+        'absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+        /*
+         * The face grows the same way it does under the pointer when the
+         * playhead reaches its moment and its comment is on screen, so the
+         * picture that belongs to the card is the one that reads as active.
+         */
+        active && 'scale-110'
+      )}
       style={{ left: `${marker.ratio * 100}%` }}
       onMouseEnter={() => onEnter?.(marker)}
       onMouseLeave={() => onLeave?.(marker)}
