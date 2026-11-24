@@ -178,7 +178,12 @@ function Waveform({
    */
   const clockLabel = formatDuration(duration);
   const clockWidth = clockLabel.length * 7 + 8;
-  const gutter = width > 0 ? Math.max(clockWidth, Math.min(96, Math.round(width * 0.045))) : 0;
+  /*
+   * The strip is a touch wider than the labels need, so the two clocks sit in
+   * open space instead of touching the last bar. It grows with the card up to a
+   * point, and never drops below the longest label the song can show.
+   */
+  const gutter = width > 0 ? Math.max(clockWidth + 6, Math.min(112, Math.round(width * 0.055))) : 0;
   const barWidth = Math.max(0, width - gutter);
   const barCount = barWidth > 0 ? Math.max(1, Math.floor((barWidth + GAP) / (BAR + GAP))) : 0;
   const step = barCount > 0 ? (barWidth + GAP) / barCount : 0;
@@ -309,11 +314,12 @@ function Waveform({
         {/*
           * The centre axis. SoundCloud draws a hairline through the middle of
           * the bars, which is what the shaded lower half meets. It is drawn
-          * over the bars so it stays continuous across quiet passages.
+          * over the bars so it stays continuous across quiet passages, and it
+          * runs on through the flat clock strip at the right, where the bars
+          * stop, so the two clocks hang off the same line as the song.
           */}
         <div
-          className="pointer-events-none absolute left-0 top-1/2 h-px -translate-y-1/2 bg-foreground/25"
-          style={{ width: `${barFraction * 100}%` }}
+          className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-foreground/25"
           aria-hidden="true"
         />
 
@@ -331,9 +337,16 @@ function Waveform({
         {/*
           * The hit area sits on top of both layers: the seek target, the drag
           * handler and the keyboard control in one element.
+          *
+          * It covers the top half only, the part above the centre axis. The
+          * shaded lower half is where the comment faces hang, and SoundCloud
+          * leaves it inert: a click there is not a seek, and moving over it
+          * does not paint the song as played. Starting a drag in the top half
+          * still follows the pointer all the way down, because the element
+          * captures the pointer until it is released.
           */}
         <div
-          className="absolute inset-0 cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          className="absolute inset-x-0 top-0 h-1/2 cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
           onPointerDown={(e) => {
             dragging.current = true;
             e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -368,7 +381,12 @@ function Waveform({
         />
       </div>
 
-      {/* One face per place where someone commented, centred on the axis. */}
+      {/*
+        * One face per place where someone commented, hung under the axis in
+        * the shaded half rather than straddling it. SoundCloud keeps the upper
+        * half clear for the bars and the seek, so the pictures read as notes on
+        * the song instead of as controls over it.
+        */}
       {markers.map((m) => (
         <MarkerFace
           key={m.key}
@@ -391,12 +409,13 @@ function Waveform({
       {/*
         * The two clocks sit in the flat strip the bars leave at the right, the
         * way SoundCloud places them: where the playhead is on top, the length
-        * of the song underneath. One column holds both so they share a left
-        * edge, it is pinned to the bar area's top and bottom, and it never
-        * reaches over a bar.
+        * of the song underneath. They gather around the axis rather than being
+        * pinned to the very top and bottom of the box, so the pair reads as one
+        * label hanging off the line. The axis itself runs on through the strip,
+        * which is what the two times sit against.
         */}
       <div
-        className="pointer-events-none absolute right-0 top-0 bottom-0 z-20 flex flex-col justify-between text-right text-xs tabular-nums"
+        className="pointer-events-none absolute right-0 top-1/2 z-20 flex -translate-y-1/2 flex-col justify-center gap-1 text-right text-xs leading-none tabular-nums"
         style={{ width: gutter }}
       >
         <span className="font-medium text-foreground">{formatDuration(currentTime)}</span>
@@ -415,7 +434,12 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, 
     <button
       type="button"
       className={cn(
-        'absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+        /*
+         * Hung below the axis, not centred on it. The upper half stays clear
+         * for the bars and the seek target; the faces live in the shaded band
+         * underneath, where SoundCloud keeps them.
+         */
+        'absolute top-1/2 z-10 mt-1 -translate-x-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
         /*
          * The face grows the same way it does under the pointer when the
          * playhead reaches its moment and its comment is on screen, so the
@@ -438,18 +462,27 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, 
 });
 
 /*
- * The little card that names the commenter and quotes them. It opens below the
- * faces, outside the bar area, so it never covers the waveform the listener is
- * reading and never gets clipped by it.
+ * The little card that names the commenter and quotes them. The faces now sit
+ * in the band under the axis, so the card opens above them, over the bars: the
+ * band it used to occupy is where the pictures live. It only shows while the
+ * pointer is on a face, so the shape of the song is still there to go back to.
  */
 function WaveformTip({ marker, width, barFraction = 1 }) {
   const TIP = 224;
-  const left = marker.ratio * width * barFraction;
-  const x = Math.max(0, Math.min(width - TIP, left - TIP / 2));
+  const barArea = width * barFraction;
+  /*
+   * Kept inside the bar area. The card opens along the top edge, which is where
+   * the two clocks sit in the flat strip at the right, so clamping to the full
+   * width would let it cover them. On a narrow card the card itself shrinks
+   * rather than running past the last bar.
+   */
+  const tipWidth = barArea > 0 ? Math.min(TIP, barArea) : TIP;
+  const left = marker.ratio * barArea;
+  const x = Math.max(0, Math.min(barArea - tipWidth, left - tipWidth / 2));
   return (
     <div
-      className="pointer-events-none absolute bottom-0 z-20 rounded-lg border bg-popover px-3 py-2 text-left shadow-lg"
-      style={{ left: width > 0 ? x : 0, width: TIP }}
+      className="pointer-events-none absolute top-0 z-20 rounded-lg border bg-popover px-3 py-2 text-left shadow-lg"
+      style={{ left: width > 0 ? x : 0, width: tipWidth }}
     >
       <div className="flex items-center gap-1.5 text-xs font-medium">
         <span className="truncate">{marker.user?.username || 'Listener'}</span>
