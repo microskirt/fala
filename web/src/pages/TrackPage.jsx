@@ -421,7 +421,7 @@ function Waveform({
         * times a little further off the line without moving the pair itself.
         */}
       <div
-        className="pointer-events-none absolute right-0 top-1/2 z-20 flex -translate-y-1/2 flex-col justify-center gap-2 text-right text-xs leading-none tabular-nums"
+        className="pointer-events-none absolute right-0 top-1/2 z-20 flex -translate-y-1/2 flex-col justify-center gap-3 text-right text-xs leading-none tabular-nums"
         style={{ width: gutter }}
       >
         <span className="font-medium text-foreground">{formatDuration(currentTime)}</span>
