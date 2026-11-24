@@ -294,17 +294,25 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
           />
         </div>
 
-        <div className="max-h-[30rem] space-y-1 overflow-y-auto pr-1">
-          {playlists.length === 0 && !loading ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              You have no playlists yet.
-            </p>
-          ) : null}
-
-          {playlists.length > 0 && shown.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No playlist matches that name.
-            </p>
+        {/*
+          * A fixed height, not one that grows with the list. The window looks
+          * the same whether the account has one playlist or fifty, so opening
+          * it never jumps the layout around; the entries scroll inside it.
+          * The cap keeps it on screen on a short laptop display.
+          */}
+        <div className="h-[36rem] max-h-[72vh] space-y-1 overflow-y-auto pr-1">
+          {/*
+            * Nothing to list means the message sits in the middle of the tall
+            * box instead of floating at the top of an otherwise empty area.
+            */}
+          {!loading && shown.length === 0 ? (
+            <div className="grid h-full place-items-center">
+              <p className="text-center text-sm text-muted-foreground">
+                {playlists.length === 0
+                  ? 'You have no playlists yet.'
+                  : 'No playlist matches that name.'}
+              </p>
+            </div>
           ) : null}
 
           {shown.map((pl) => {
