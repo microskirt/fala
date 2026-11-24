@@ -35,7 +35,13 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onToggleSidebar={() => setSidebarOpen((v) => !v)} />
-        <main className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+        {/*
+         * `overflow-x-hidden` is a guard, not decoration. Setting only the y
+         * axis to auto computes the x axis to auto as well, so any child that
+         * reaches past the column (a full bleed band, a wide tooltip) becomes
+         * sideways scroll into empty space.
+         */}
+        <main className="scrollbar-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
           <Outlet />
         </main>
         <Player />

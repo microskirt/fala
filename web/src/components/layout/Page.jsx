@@ -40,7 +40,7 @@ export function DetailHero({ tint, children, className }) {
       {tint ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 left-1/2 -z-10 w-screen -translate-x-1/2"
+          className="pointer-events-none absolute inset-y-0 -right-4 -left-4 -z-10 sm:-right-6 sm:-left-6 lg:-right-8 lg:-left-8"
           style={{ backgroundColor: `color-mix(in srgb, ${tint} 30%, var(--background))` }}
         />
       ) : null}

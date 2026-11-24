@@ -322,7 +322,7 @@ export function PlaylistPage() {
                 <span className="opacity-40">·</span>
                 <Link
                   {...playlistSubLink(playlist, 'likes')}
-                  className="rounded-sm transition-colors hover:text-foreground hover:underline"
+                  className="rounded-sm transition-colors hover:text-foreground"
                   title="See who liked this playlist"
                 >
                   {formatCount(likesCount)} {likesCount === 1 ? 'like' : 'likes'}
