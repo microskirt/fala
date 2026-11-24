@@ -266,15 +266,11 @@ export function ProfilePage() {
     return (
       <div>
         {tracksOnly.length > 1 ? (
-          <div className="mb-4 grid grid-cols-3 items-center gap-3">
-            <span className="justify-self-start rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground">
               {tracksOnly.length} tracks
             </span>
-            <Button
-              size="sm"
-              className="justify-self-center"
-              onClick={() => playQueue(tracksOnly, 0)}
-            >
+            <Button size="sm" onClick={() => playQueue(tracksOnly, 0)}>
               <Play size={14} fill="currentColor" /> Play all
             </Button>
           </div>
@@ -357,13 +353,6 @@ export function ProfilePage() {
                   {me ? (
                     <Button variant="outline" onClick={() => setComposeOpen(true)}>
                       <MessageSquare size={14} /> Message
-                    </Button>
-                  ) : null}
-                  {profile.permalink_url ? (
-                    <Button variant="ghost" asChild>
-                      <a href={profile.permalink_url} target="_blank" rel="noreferrer">
-                        SoundCloud
-                      </a>
                     </Button>
                   ) : null}
                 </>
