@@ -397,7 +397,6 @@ function Waveform({
           marker={m}
           active={tip?.key === m.key}
           barFraction={barFraction}
-          onSeek={onSeek}
           onEnter={onMarkerEnter}
           onLeave={onMarkerLeave}
         />
@@ -434,18 +433,25 @@ function Waveform({
 /*
  * One comment face. It is memoised so the per frame playhead update does not
  * re-render every avatar on the waveform.
+ *
+ * The face is a note on the song, not a control over it. Pointing at it names
+ * the comment, but clicking it does nothing: a picture sitting in the shaded
+ * band is too easy to hit by accident while reaching for the bars, and a seek
+ * from there would jump the song without the pointer ever touching the bars.
+ * It is a span rather than a button for the same reason, so it takes no focus
+ * and offers no press that goes nowhere.
  */
-const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, active = false, barFraction = 1 }) {
+const MarkerFace = memo(function MarkerFace({ marker, onEnter, onLeave, active = false, barFraction = 1 }) {
   return (
-    <button
-      type="button"
+    <span
+      role="img"
       className={cn(
         /*
          * Hung below the axis, not centred on it. The upper half stays clear
          * for the bars and the seek target; the faces live in the shaded band
          * underneath, where SoundCloud keeps them.
          */
-        'absolute top-1/2 z-10 mt-2 -translate-x-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110 focus-visible:outline-none',
+        'absolute top-1/2 z-10 mt-2 -translate-x-1/2 rounded-full ring-2 ring-background transition-transform hover:scale-110',
         /*
          * The face grows the same way it does under the pointer when the
          * playhead reaches its moment and its comment is on screen, so the
@@ -456,14 +462,10 @@ const MarkerFace = memo(function MarkerFace({ marker, onSeek, onEnter, onLeave, 
       style={{ left: `${marker.ratio * barFraction * 100}%` }}
       onMouseEnter={() => onEnter?.(marker)}
       onMouseLeave={() => onLeave?.(marker)}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSeek?.(marker.ratio);
-      }}
       aria-label={`Comment by ${marker.user?.username || 'a listener'} at ${formatDuration(marker.timeMs)}`}
     >
       <Avatar src={marker.user?.avatar_url} name={marker.user?.username} size={22} />
-    </button>
+    </span>
   );
 });
 
