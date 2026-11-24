@@ -1083,10 +1083,7 @@ function TopListeners({ trackId }) {
 
   return (
     <section className="rounded-xl border bg-card px-4 py-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          Top listeners
-        </h3>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex gap-1">
           {shownWindows.map((w) => (
             <button
@@ -1152,9 +1149,7 @@ function ArtistCard({ user }) {
 
   return (
     <section className="rounded-xl border bg-card p-4">
-      <h2 className="text-sm font-semibold tracking-tight">Artist</h2>
-
-      <div className="mt-3 flex items-center gap-3">
+      <div className="flex items-center gap-3">
         <Link {...userLink(user)} className="shrink-0">
           <Avatar src={user.avatar_url} name={user.username} size={56} />
         </Link>
