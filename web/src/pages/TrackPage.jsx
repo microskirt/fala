@@ -1202,11 +1202,16 @@ function StatTile({ label, value, icon: Icon, to, title }) {
   );
 }
 
-function TrackStats({ track, commentCount }) {
+/*
+ * Plays, likes and reposts are the numbers people actually scan for, so they
+ * share one row. The comment count is left to the comment box itself, where
+ * it already appears as the heading.
+ */
+function TrackStats({ track }) {
   return (
     <section className="rounded-xl border bg-card px-4 py-3.5">
       <h2 className="text-sm font-semibold tracking-tight">Stats</h2>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <StatTile label="Plays" value={formatCount(track.playback_count)} icon={PlayCircle} />
         <StatTile
           label="Likes"
@@ -1221,11 +1226,6 @@ function TrackStats({ track, commentCount }) {
           icon={Repeat2}
           to={trackSubLink(track, 'reposts')}
           title="See who reposted this song"
-        />
-        <StatTile
-          label="Comments"
-          value={formatCount(commentCount ?? track.comment_count)}
-          icon={MessageSquare}
         />
       </div>
     </section>
@@ -1781,7 +1781,7 @@ export function TrackPage() {
 
         <aside className="flex min-w-0 flex-col gap-4">
           <ArtistCard user={artist || track.user} />
-          <TrackStats track={track} commentCount={commentTotal} />
+          <TrackStats track={track} />
           {isAuthed ? <TopListeners trackId={track.id} /> : null}
           <AlsoLiked people={alsoLiked} />
           <TrackCollections counts={counts} track={track} />
