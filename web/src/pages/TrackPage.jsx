@@ -1605,10 +1605,11 @@ export function TrackPage() {
   // account that uploaded it.
   const metaArtist = String(track.publisher_metadata?.artist || '').trim();
   /*
-   * The credit line reads "artist · date · HD · E", with each part dropped when
-   * the song has nothing to say about it. Building it as a list keeps the
+   * The credit line reads "artist · date", with each part dropped when the
+   * song has nothing to say about it. Building it as a list keeps the
    * separators between the parts that exist instead of leaving a gap where a
-   * missing one would have been.
+   * missing one would have been. The quality marks are not credits, so they
+   * are kept apart and follow a single separator of their own.
    */
   const creditParts = [];
   if (metaArtist) {
@@ -1631,27 +1632,30 @@ export function TrackPage() {
       ),
     });
   }
+  /*
+   * The quality marks are little light blocks, the way SoundCloud draws them:
+   * a filled chip with the letter knocked out of it. They sit together after
+   * one separator instead of each carrying a dot of its own, and the pointer
+   * stays an ordinary arrow so the line does not read as a help link.
+   */
+  const badgeClass =
+    'inline-flex h-4 items-center rounded-[3px] bg-foreground px-1 text-[10px] font-bold leading-none tracking-wide text-background no-underline';
+  const badgeParts = [];
   if (track.lossless) {
-    creditParts.push({
+    badgeParts.push({
       key: 'hd',
       node: (
-        <abbr
-          title="Uploaded in lossless quality"
-          className="cursor-help font-semibold tracking-wide text-foreground no-underline"
-        >
+        <abbr title="Uploaded in lossless quality" className={badgeClass}>
           HD
         </abbr>
       ),
     });
   }
   if (track.explicit) {
-    creditParts.push({
+    badgeParts.push({
       key: 'explicit',
       node: (
-        <abbr
-          title="Explicit"
-          className="cursor-help font-semibold text-foreground no-underline"
-        >
+        <abbr title="Explicit" className={badgeClass}>
           E
         </abbr>
       ),
@@ -1720,7 +1724,7 @@ export function TrackPage() {
                * that posted the file. The date sits next to them, relative at first
                * glance and spelled out in full on hover.
                */}
-              {creditParts.length > 0 ? (
+              {creditParts.length > 0 || badgeParts.length > 0 ? (
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
                   {creditParts.map((part, i) => (
                     <span key={part.key} className="inline-flex min-w-0 items-center gap-x-1.5">
@@ -1728,6 +1732,21 @@ export function TrackPage() {
                       {part.node}
                     </span>
                   ))}
+                  {/*
+                    * One dot borders the credits off from the quality marks,
+                    * and the marks then sit next to each other with no dot
+                    * between them.
+                    */}
+                  {badgeParts.length > 0 ? (
+                    <span className="inline-flex items-center gap-x-1.5">
+                      {creditParts.length > 0 ? <span aria-hidden="true">·</span> : null}
+                      {badgeParts.map((part) => (
+                        <span key={part.key} className="inline-flex items-center">
+                          {part.node}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
             </div>
