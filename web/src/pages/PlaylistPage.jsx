@@ -52,7 +52,12 @@ function PlaylistTrackRow({ track, index, context }) {
    */
   const active = isCurrent(track);
   return (
-    <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
+    /*
+     * The negative margin and matching padding let the hover band bleed into
+     * the page gutter while the row number itself sits on the same left edge
+     * as the title above. Without it every entry reads a step too far right.
+     */
+    <div className="group -mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
       <div className="relative grid w-7 shrink-0 place-items-center text-xs text-muted-foreground">
         <span className={cn('group-hover:opacity-0', active && 'opacity-0')}>{index + 1}</span>
         <span
@@ -289,12 +294,6 @@ export function PlaylistPage() {
             {playlist.title}
           </h1>
 
-          {description ? (
-            <div className="mt-2.5 max-w-2xl">
-              <ClampedText text={description} lines={4} />
-            </div>
-          ) : null}
-
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {owner ? (
               <>
@@ -387,6 +386,18 @@ export function PlaylistPage() {
               </>
             ) : null}
           </div>
+
+          {/*
+           * The description closes the left column. It used to sit between the
+           * title and the credits, which pushed the meta row and the buttons
+           * down and left a ragged edge. Reading it last keeps every page on
+           * the same rhythm: eyebrow, title, credits, actions, notes.
+           */}
+          {description ? (
+            <div className="mt-5 max-w-2xl">
+              <ClampedText text={description} lines={6} />
+            </div>
+          ) : null}
         </div>
       </div>
       </DetailHero>

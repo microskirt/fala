@@ -107,7 +107,12 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
   const active = isCurrent(track);
 
   return (
-    <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
+    /*
+     * The hover band bleeds into the page gutter while the row number stays on
+     * the same left edge as the heading above it, so list entries never read a
+     * step too far right.
+     */
+    <div className="group -mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
       {showIndex ? (
         <div className="relative grid w-7 shrink-0 place-items-center text-xs text-muted-foreground">
           {/*
