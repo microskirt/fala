@@ -14,6 +14,7 @@ import { Artwork, Avatar } from '@/components/Media.jsx';
 import {
   PlayButton,
   LikeButton,
+  RepostButton,
   AddToPlaylistButton,
   AddToQueueButton,
   AddPlaylistToQueueButton,
@@ -121,7 +122,19 @@ export function TrackCard({ track, context, showStats = true }) {
   );
 }
 
-export function TrackRow({ track, index, context, showIndex = true, showArt = true }) {
+export function TrackRow({
+  track,
+  index,
+  context,
+  showIndex = true,
+  showArt = true,
+  /*
+   * An artist's own song list offers the full set of song actions on every row,
+   * since that is where a listener decides what to do with a song. A history
+   * row only needs the queue, so the wider set is opt in.
+   */
+  showRepost = false,
+}) {
   const { isCurrent } = usePlayer();
   if (!track) return null;
   const isTrack = track.kind === 'track';
@@ -193,9 +206,19 @@ export function TrackRow({ track, index, context, showIndex = true, showArt = tr
        */}
       <div className="pointer-events-none flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
         <LikeButton track={track} size={16} />
-        <AddToQueueButton track={track} size={16} />
-        <AddToPlaylistButton track={track} size={16} />
-        <QueueMenuButton track={track} size={16} />
+        {showRepost ? (
+          <>
+            <RepostButton track={track} size={16} iconOnly />
+            <AddToPlaylistButton track={track} size={16} />
+            <AddToQueueButton track={track} size={16} />
+          </>
+        ) : (
+          <>
+            <AddToQueueButton track={track} size={16} />
+            <AddToPlaylistButton track={track} size={16} />
+            <QueueMenuButton track={track} size={16} />
+          </>
+        )}
       </div>
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
         {formatDuration(track.duration)}

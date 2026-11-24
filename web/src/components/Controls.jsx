@@ -109,9 +109,34 @@ export function LikeButton({ track, showCount = false, size = 18, className }) {
   );
 }
 
-export function RepostButton({ track, size = 18, className }) {
+export function RepostButton({ track, size = 18, className, iconOnly = false }) {
   const { isReposted, toggleRepost } = useLibrary();
   const reposted = isReposted(track);
+
+  /*
+   * A list row has no space for a word, so the same action also comes as a
+   * bare icon there. The label moves to the tooltip and the accessible name,
+   * which keeps the row narrow without hiding what the button does.
+   */
+  if (iconOnly) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className={cn(reposted && 'text-primary hover:text-primary', className)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleRepost(track);
+        }}
+        aria-pressed={reposted}
+        aria-label={reposted ? 'Undo repost' : 'Repost'}
+        title={reposted ? 'Undo repost' : 'Repost'}
+      >
+        <Repeat2 size={size} />
+      </Button>
+    );
+  }
 
   return (
     <Button
