@@ -347,6 +347,16 @@ export function slimTrack(t) {
      * so it has to travel with every track, not just the full song page.
      */
     publisher_metadata: t.publisher_metadata || null,
+    /*
+     * The two marks SoundCloud prints beside a song's credits. Explicit is a
+     * plain flag in publisher_metadata. Lossless has no field of its own: a
+     * lossless upload is the only thing that earns the 256k AAC preset, so the
+     * transcoding list is the signal.
+     */
+    explicit: !!t.publisher_metadata?.explicit,
+    lossless: (t.media?.transcodings || []).some(
+      (x) => x.preset === 'aac_256k' || x.preset === 'abr_hq'
+    ),
     user: slimUser(t.user),
   };
 }

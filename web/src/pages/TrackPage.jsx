@@ -1562,6 +1562,59 @@ export function TrackPage() {
   // The credits for the song itself, which SoundCloud stores apart from the
   // account that uploaded it.
   const metaArtist = String(track.publisher_metadata?.artist || '').trim();
+  /*
+   * The credit line reads "artist · date · HD · E", with each part dropped when
+   * the song has nothing to say about it. Building it as a list keeps the
+   * separators between the parts that exist instead of leaving a gap where a
+   * missing one would have been.
+   */
+  const creditParts = [];
+  if (metaArtist) {
+    creditParts.push({
+      key: 'artist',
+      node: <span className="min-w-0 break-words">{metaArtist}</span>,
+    });
+  }
+  if (track.display_date) {
+    creditParts.push({
+      key: 'date',
+      node: (
+        <time
+          dateTime={track.display_date}
+          title={formatDate(track.display_date)}
+          className="cursor-default"
+        >
+          {formatRelativeDate(track.display_date)}
+        </time>
+      ),
+    });
+  }
+  if (track.lossless) {
+    creditParts.push({
+      key: 'hd',
+      node: (
+        <abbr
+          title="Uploaded in lossless quality"
+          className="cursor-help font-semibold tracking-wide text-foreground no-underline"
+        >
+          HD
+        </abbr>
+      ),
+    });
+  }
+  if (track.explicit) {
+    creditParts.push({
+      key: 'explicit',
+      node: (
+        <abbr
+          title="Explicit"
+          className="cursor-help font-semibold text-foreground no-underline"
+        >
+          E
+        </abbr>
+      ),
+    });
+  }
 
   return (
     <Page>
@@ -1625,19 +1678,14 @@ export function TrackPage() {
                * that posted the file. The date sits next to them, relative at first
                * glance and spelled out in full on hover.
                */}
-              {metaArtist || track.display_date ? (
+              {creditParts.length > 0 ? (
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
-                  {metaArtist ? <span className="min-w-0 break-words">{metaArtist}</span> : null}
-                  {metaArtist && track.display_date ? <span aria-hidden="true">-</span> : null}
-                  {track.display_date ? (
-                    <time
-                      dateTime={track.display_date}
-                      title={formatDate(track.display_date)}
-                      className="cursor-default"
-                    >
-                      {formatRelativeDate(track.display_date)}
-                    </time>
-                  ) : null}
+                  {creditParts.map((part, i) => (
+                    <span key={part.key} className="inline-flex min-w-0 items-center gap-x-1.5">
+                      {i > 0 ? <span aria-hidden="true">·</span> : null}
+                      {part.node}
+                    </span>
+                  ))}
                 </div>
               ) : null}
             </div>
