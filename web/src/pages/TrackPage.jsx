@@ -539,7 +539,7 @@ function CommentForm({
     return (
       <form className={cn('flex items-center gap-1.5', className)} onSubmit={submit}>
         <Input
-          className="h-9 flex-1"
+          className="h-9 flex-1 border-2 border-muted-foreground/50"
           placeholder={placeholder}
           value={body}
           onChange={(e) => setBody(e.target.value)}
