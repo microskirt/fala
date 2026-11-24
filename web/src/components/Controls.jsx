@@ -356,6 +356,65 @@ export function AddToQueueButton({ track, size = 18, className }) {
   );
 }
 
+/*
+ * A mix is queued as a whole, so this has to read its track list first. Cards
+ * only carry a summary of the mix, and the playlist page carries the full
+ * thing, so fetching here keeps every surface behaving the same way.
+ */
+export function AddPlaylistToQueueButton({ playlist, size = 16, className }) {
+  const { addToQueue } = usePlayer();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const add = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const raw = playlist?.id != null ? String(playlist.id) : '';
+    if (!raw || busy) return;
+    setBusy(true);
+    try {
+      /*
+       * Generated mixes arrive as `soundcloud:system-playlists:...` with the
+       * kind set, and older callers pass the same id behind a `system:` prefix.
+       * Both read through the system playlist route; a normal playlist reads
+       * through the sc-playlist one.
+       */
+      const isSystem =
+        playlist?.kind === 'system-playlist' ||
+        raw.startsWith('system:') ||
+        raw.startsWith('soundcloud:system-playlists:');
+      const path = isSystem
+        ? `/api/playlists/system:${encodeURIComponent(raw.replace(/^system:/, ''))}`
+        : `/api/playlists/sc-playlist:${encodeURIComponent(raw.replace(/^sc:/, ''))}`;
+      const res = await api.get(path);
+      const tracks = (res.tracks || []).filter((t) => t && t.id);
+      if (!tracks.length) {
+        toast.error('This mix has no tracks to queue');
+        return;
+      }
+      addToQueue(tracks);
+    } catch {
+      toast.error('Could not add this mix to the queue');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className={className}
+      aria-label="Add mix to queue"
+      title="Add mix to queue"
+      disabled={busy}
+      onClick={add}
+    >
+      {busy ? <Loader2 size={size} className="animate-spin" /> : <ListEnd size={size} />}
+    </Button>
+  );
+}
+
 export function QueueMenuButton({ track, size = 18 }) {
   const { addToQueue, playNextInQueue } = usePlayer();
   const toast = useToast();

@@ -16,6 +16,7 @@ import {
   LikeButton,
   AddToPlaylistButton,
   AddToQueueButton,
+  AddPlaylistToQueueButton,
   QueueMenuButton,
   FollowButton,
 } from '@/components/Controls.jsx';
@@ -179,26 +180,40 @@ export function PlaylistCard({ playlist }) {
 
   return (
     <div className="group min-w-0">
-      <Link {...playlistLink(playlist)} className="relative block overflow-hidden rounded-lg" aria-label={playlist.title}>
-        {/*
-         * A playlist can have no cover of its own. SoundCloud shows the owner's
-         * avatar in that case, so pass it as the fallback rather than leaving
-         * an empty tile with a music note.
-         */}
-        <Artwork
-          src={playlist.artwork_url}
-          fallback={playlist.user?.avatar_url}
-          alt={playlist.title}
-          size="100%"
-          rounded={0}
-          kind="playlist"
-        />
+      <div className="relative overflow-hidden rounded-lg">
+        <Link {...playlistLink(playlist)} className="block" aria-label={playlist.title}>
+          {/*
+           * A playlist can have no cover of its own. SoundCloud shows the
+           * owner's avatar in that case, so pass it as the fallback rather
+           * than leaving an empty tile with a music note.
+           */}
+          <Artwork
+            src={playlist.artwork_url}
+            fallback={playlist.user?.avatar_url}
+            alt={playlist.title}
+            size="100%"
+            rounded={0}
+            kind="playlist"
+          />
+        </Link>
         {trackCount > 0 ? (
-          <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
+          <span className="pointer-events-none absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
             <ListMusic size={14} /> {trackCount}
           </span>
         ) : null}
-      </Link>
+        {/*
+         * A mix can be queued without opening it. The tray matches the one on
+         * song cards, so the two shapes do not compete, and it sits on the
+         * cover where the pointer already goes to open the mix. It is a
+         * sibling of the link, never a child, so the two controls cannot
+         * swallow each other's clicks.
+         */}
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-start bg-gradient-to-t from-black/60 via-transparent to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
+            <AddPlaylistToQueueButton playlist={playlist} size={16} />
+          </div>
+        </div>
+      </div>
       <div className="mt-2.5 min-w-0">
         <Link
           {...playlistLink(playlist)}

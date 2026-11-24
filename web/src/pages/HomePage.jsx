@@ -11,6 +11,7 @@ import {
   LikeButton,
   AddToQueueButton,
   AddToPlaylistButton,
+  AddPlaylistToQueueButton,
 } from '@/components/Controls.jsx';
 import { Page, PageHeader, Section, CardGridSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -75,6 +76,9 @@ function FeedItem({ item }) {
               <div className="text-xs text-muted-foreground">
                 {playlist.track_count} track{playlist.track_count === 1 ? '' : 's'}
               </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <AddPlaylistToQueueButton playlist={playlist} size={16} />
             </div>
           </div>
         ) : track ? (
