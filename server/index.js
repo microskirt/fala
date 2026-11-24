@@ -587,9 +587,17 @@ route('GET', '/api/users/:id/tab', async (ctx) => {
   const tab = ctx.query.get('tab') || 'tracks';
   const next = ctx.query.get('next');
   const limit = pageLimit(ctx.query, 24);
-  const data = await sc.userTab(ctx.params.id, tab, { limit, next, token: ctx.token || null });
+  /*
+   * The first page also carries the tab's real total, so the page can say how
+   * much the artist has rather than how much of it is loaded. Later pages skip
+   * it: the number does not change while scrolling.
+   */
+  const [data, total] = await Promise.all([
+    sc.userTab(ctx.params.id, tab, { limit, next, token: ctx.token || null }),
+    next ? null : sc.userTabTotal(ctx.params.id, tab).catch(() => null),
+  ]);
   const flags = await flagsFor(ctx.token);
-  return { ...data, collection: decorateItems(data.collection, flags) };
+  return { ...data, total, collection: decorateItems(data.collection, flags) };
 });
 
 route('GET', '/api/users/:id/activity', async (ctx) => {

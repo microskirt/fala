@@ -606,6 +606,59 @@ export async function userTab(id, tab, { limit = 24, next, token = null } = {}) 
   return mapCollection(data, (item) => mapUserTabItem(tab, item));
 }
 
+/*
+ * A tab's own counter, so the page can say how much the artist really has
+ * instead of how much of it happens to be loaded. Three tabs carry an official
+ * counter on the user object; albums and reposts have none at all, so those
+ * two are counted by walking their list. The walk is cached, so switching back
+ * and forth between tabs costs nothing.
+ */
+export async function userTabTotal(id, tab) {
+  const counter = {
+    tracks: 'track_count',
+    likes: 'likes_count',
+    playlists: 'playlist_count',
+  }[tab];
+  if (counter) {
+    const account = await user(id);
+    return account ? Number(account[counter] || 0) : null;
+  }
+  const listPath =
+    tab === 'albums'
+      ? `/users/${id}/albums?limit=200`
+      : tab === 'reposts'
+        ? `/stream/users/${id}/reposts?limit=200`
+        : null;
+  if (!listPath) return null;
+  /*
+   * The repost stream mixes songs and playlists, but the tab lists only the
+   * songs. Counting both would print a number larger than the list can ever
+   * reach, so only the rows this tab renders are counted.
+   */
+  const countsRow = (item) =>
+    tab === 'reposts' ? !!(item?.track || item?.kind === 'track') : true;
+  const key = `tabtotal:${tab}:${id}`;
+  const hit = cacheGet(key);
+  if (hit !== undefined) return hit;
+  let total = 0;
+  let next = listPath;
+  let pages = 0;
+  try {
+    while (next && pages < 60) {
+      const data = await apiGet(next, { ttl: 120_000 });
+      total += (data.collection || []).filter(countsRow).length;
+      next = stripClientId(data.next_href);
+      pages += 1;
+    }
+  } catch {
+    // A page that fails mid walk keeps the count so far rather than blanking
+    // the pill; the cache only holds a finished walk.
+    return total || null;
+  }
+  cacheSet(key, total, 300_000);
+  return total;
+}
+
 function mapUserTabItem(tab, item) {
   if (!item) return null;
   if (tab === 'followers' || tab === 'followings') return slimUser(item);
