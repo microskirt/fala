@@ -1668,18 +1668,61 @@ async function walkLibrary(token, first, map, match, want, maxPages) {
   const entry = libraryEntry(token);
   let state = entry.lists.get(first);
   if (!state) {
-    state = { items: [], href: first, done: false, pages: 0 };
+    state = {
+      items: [],
+      seen: new Set(),
+      href: first,
+      done: false,
+      pages: 0,
+      queue: Promise.resolve(),
+    };
     entry.lists.set(first, state);
   }
 
-  const found = state.items.filter(match);
+  /*
+   * Walks of one list take turns. Two searches can arrive together, the bar
+   * and the page both asking as the term settles, and a walk is not atomic:
+   * if both read the same page they each add its rows, and the next search
+   * then answers with the same person twice. Queued one behind the other, the
+   * second walk usually finds its answer in what the first already read and
+   * never fetches at all.
+   */
+  const run = state.queue.then(() => walkOnce(token, state, map, match, want, maxPages));
+  state.queue = run.catch(() => {});
+  return run;
+}
+
+async function walkOnce(token, state, map, match, want, maxPages) {
+  /*
+   * Rows are kept by id. Paginating a list that is still being written can
+   * hand the same row back on two pages, which would otherwise show twice.
+   */
+  const keyOf = (item) => `${item.kind || ''}:${item.id}`;
+  const found = [];
+  const foundSeen = new Set();
+  const take = (item) => {
+    const key = keyOf(item);
+    if (foundSeen.has(key)) return;
+    foundSeen.add(key);
+    found.push(item);
+  };
+  for (const item of state.items) if (match(item)) take(item);
+
   while (!state.done && found.length < want) {
-    const data = await apiGet(state.href, { token });
+    const href = state.href;
+    if (!href) {
+      state.done = true;
+      break;
+    }
+    const data = await apiGet(href, { token });
     for (const item of data.collection || []) {
       const mapped = map(item);
       if (!mapped) continue;
+      const key = keyOf(mapped);
+      if (state.seen.has(key)) continue;
+      state.seen.add(key);
       state.items.push(mapped);
-      if (match(mapped)) found.push(mapped);
+      if (match(mapped)) take(mapped);
     }
     state.href = data.next_href ? stripClientId(data.next_href) : null;
     state.pages += 1;
