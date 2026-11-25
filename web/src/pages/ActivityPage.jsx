@@ -156,7 +156,14 @@ function SortedEntry({ entry, context, onPlay }) {
 function AuthorGroup({ author, context, onPlay }) {
   const count = author.entries.length;
   return (
-    <div className="overflow-hidden rounded-xl border bg-card/60">
+    /*
+     * No `overflow-hidden` here. A comment card on the small waveform hangs
+     * below its row, and the last song in a group had that card cut off by the
+     * card's own bottom edge. Nothing inside paints out to the rounded corners:
+     * the header has no background and the song rows are inset by the padding,
+     * so the corner still reads clean while the card is free to show.
+     */
+    <div className="rounded-xl border bg-card/60">
       <div className="flex items-center gap-3 px-3 py-2.5">
         <Link {...userLink(author.user)} className="shrink-0">
           <Avatar src={author.user?.avatar_url} name={author.user?.username} size={48} />
