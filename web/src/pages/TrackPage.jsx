@@ -1619,7 +1619,7 @@ export function TrackPage() {
         <Link
           {...userLink(track.user)}
           title={`Open ${track.user.username || 'the artist'}'s page`}
-          className="min-w-0 break-words underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline focus-visible:outline-hidden"
+          className="min-w-0 break-words transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-hidden"
         >
           {metaArtist}
         </Link>
