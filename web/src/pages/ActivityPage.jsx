@@ -66,23 +66,38 @@ function SortedEntry({ entry, context, onPlay }) {
       </Link>
 
       <div className="min-w-0 flex-1">
+        {/*
+         * A long title wraps onto a second line instead of being cut off at the
+         * bar. Two lines is the limit: past that the row would grow taller than
+         * its own cover, so the clamp adds the ellipsis there. A title that fits
+         * on one line keeps the exact place it had, because the block only takes
+         * the height its text needs.
+         */}
         <Link
           {...trackLink(track)}
-          className="block truncate text-sm font-medium hover:underline"
+          className="line-clamp-2 text-sm font-medium hover:underline"
         >
           {track.title}
         </Link>
-        <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-          <Link {...userLink(track.user)} className="truncate hover:text-foreground">
+        {/*
+         * The credit is one flowing line of text rather than three boxes in a
+         * row: the name can wrap, and the separator and the time then follow it
+         * at the end of that last line instead of being pinned to the right of a
+         * truncated name. It is not clamped, because a clamp would swallow the
+         * time along with the overflow, and the time is the part that has to stay
+         * readable. The time itself never breaks, so "2 days ago" stays one unit.
+         */}
+        <div className="text-xs text-muted-foreground">
+          <Link {...userLink(track.user)} className="hover:text-foreground">
             {trackArtistName(track)}
           </Link>
-          <span aria-hidden="true" className="shrink-0 opacity-60">
-            ·
+          <span aria-hidden="true" className="opacity-60">
+            {' · '}
           </span>
           <time
             dateTime={entry.created_at}
             title={formatDate(entry.created_at)}
-            className="shrink-0 cursor-default opacity-60"
+            className="cursor-default whitespace-nowrap opacity-60"
           >
             {timeAgo(entry.created_at)}
           </time>
