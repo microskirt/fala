@@ -65,34 +65,6 @@ function SortedEntry({ entry, context, onPlay }) {
         </span>
       </Link>
 
-      {/*
-       * A fixed width, because a bar squeezed by a long title would stop
-       * showing where its comments sit. The height sits just under the cover's
-       * so the two read as a pair.
-       */}
-      <div className="w-32 shrink-0 sm:w-44">
-        <MiniWaveform
-          samples={samples}
-          markers={markers}
-          duration={duration}
-          active={active}
-          height={56}
-          showTip={false}
-          onSeek={(ratio) => {
-            /*
-             * Starting a song and seeking into it happen together, so the
-             * track id rides along: the player still holds the previous song
-             * for a moment, and the spot has to be parked against this one.
-             */
-            if (!active) {
-              playTrack(track, context);
-              onPlay?.(track);
-            }
-            seek(ratio * duration, track.id);
-          }}
-        />
-      </div>
-
       <div className="min-w-0 flex-1">
         <Link
           {...trackLink(track)}
@@ -115,6 +87,36 @@ function SortedEntry({ entry, context, onPlay }) {
             {timeAgo(entry.created_at)}
           </time>
         </div>
+      </div>
+
+      {/*
+       * A fixed width, because a bar squeezed by a long title would stop
+       * showing where its comments sit. It sits between the song and the
+       * buttons rather than beside the cover, so the title stays next to its
+       * picture and the bar is read as a detail of the song, not of the cover.
+       */}
+      <div className="w-28 shrink-0 sm:w-40 lg:w-56">
+        <MiniWaveform
+          samples={samples}
+          markers={markers}
+          duration={duration}
+          active={active}
+          height={64}
+          hoverTip
+          playingTip={false}
+          onSeek={(ratio) => {
+            /*
+             * Starting a song and seeking into it happen together, so the
+             * track id rides along: the player still holds the previous song
+             * for a moment, and the spot has to be parked against this one.
+             */
+            if (!active) {
+              playTrack(track, context);
+              onPlay?.(track);
+            }
+            seek(ratio * duration, track.id);
+          }}
+        />
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5">

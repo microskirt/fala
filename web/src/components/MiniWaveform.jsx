@@ -25,22 +25,36 @@ function cap(map, max) {
   if (map.size > max) map.delete(map.keys().next().value);
 }
 
+/*
+ * A song's shape is asked for by id, not just by its stored url. The url in a
+ * feed payload can be stale or point at a picture SoundCloud has since dropped,
+ * and a song that answered with nothing used to be remembered as having no
+ * shape at all, so its bar stayed blank for the rest of the visit even after a
+ * reload. An empty answer is now treated as a failure: it is retried once and
+ * never cached.
+ */
 function loadWaveform(track) {
-  const url = track?.waveform_url;
-  if (!url) return Promise.resolve([]);
-  if (waveformCache.has(url)) return Promise.resolve(waveformCache.get(url));
-  if (waveformPending.has(url)) return waveformPending.get(url);
-  const request = api
-    .get(`/api/tracks/${track.id}/waveform?url=${encodeURIComponent(url)}`)
-    .then((res) => {
-      const samples = res?.samples || [];
-      waveformCache.set(url, samples);
-      cap(waveformCache, 400);
+  const url = track?.waveform_url || '';
+  const id = track?.id;
+  if (!id) return Promise.resolve([]);
+  if (url && waveformCache.has(url)) return Promise.resolve(waveformCache.get(url));
+  if (waveformPending.has(id)) return waveformPending.get(id);
+  const ask = () =>
+    api
+      .get(`/api/tracks/${id}/waveform${url ? `?url=${encodeURIComponent(url)}` : ''}`)
+      .then((res) => res?.samples || [])
+      .catch(() => []);
+  const request = ask()
+    .then((samples) => (samples.length ? samples : ask()))
+    .then((samples) => {
+      if (samples.length && url) {
+        waveformCache.set(url, samples);
+        cap(waveformCache, 400);
+      }
       return samples;
     })
-    .catch(() => [])
-    .finally(() => waveformPending.delete(url));
-  waveformPending.set(url, request);
+    .finally(() => waveformPending.delete(id));
+  waveformPending.set(id, request);
   return request;
 }
 
@@ -107,7 +121,11 @@ export function useRowData(track) {
   useEffect(() => {
     if (!near) return undefined;
     let cancelled = false;
-    if (url && !waveformCache.has(url)) {
+    /*
+     * Asked for by id, so a song whose stored url is missing or dead still gets
+     * its shape: the server falls back to the song's own current url.
+     */
+    if (id && !(url && waveformCache.has(url))) {
       loadWaveform(track).then((next) => {
         if (!cancelled) setSamples(next);
       });
@@ -279,7 +297,7 @@ function MiniTip({ marker, width }) {
   );
 }
 
-// A face that answers the pointer must not change state on a page that is read only.
+// A face that must not answer the pointer at all gets this instead of a handler.
 const ignoreFace = () => {};
 
 /*
@@ -295,7 +313,8 @@ export function MiniWaveform({
   active,
   onSeek,
   height = 72,
-  showTip = true,
+  hoverTip = true,
+  playingTip = true,
   seekable = true,
 }) {
   const boxRef = useRef(null);
@@ -357,7 +376,13 @@ export function MiniWaveform({
     return Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(1, rect.width)));
   };
 
-  const tip = showTip ? hovered || playing : null;
+  /*
+   * The two ways a card opens are separate. A pointer on a face is a deliberate
+   * question about one comment, so a compact list still answers it. A card that
+   * opens by itself as the playhead passes is a reading of the song, which
+   * belongs on the big page and not in a list you are scanning.
+   */
+  const tip = (hoverTip && hovered) || (playingTip && playing) || null;
   /*
    * The played layer mounts while the song is loaded, and also while the
    * pointer is over the bars, so a resting row still lights up under the hand
@@ -434,12 +459,12 @@ export function MiniWaveform({
           key={m.key}
           marker={m}
           active={tip?.key === m.key}
-          onEnter={showTip ? setHovered : ignoreFace}
-          onLeave={showTip ? () => setHovered(null) : ignoreFace}
+          onEnter={hoverTip ? setHovered : ignoreFace}
+          onLeave={hoverTip ? () => setHovered(null) : ignoreFace}
         />
       ))}
 
-      {active && showTip ? <PlayingDriver markers={markers} onMarker={setPlaying} /> : null}
+      {active && playingTip ? <PlayingDriver markers={markers} onMarker={setPlaying} /> : null}
       {tip ? <MiniTip marker={tip} width={width} /> : null}
 
       {/*
