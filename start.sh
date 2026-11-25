@@ -85,6 +85,14 @@ fi
 
 # ------------------------------------------------------------------- run it
 echo "==> Fala is starting"
-echo "    http://${HOST}:${PORT}"
+#
+# The server binds every interface, but the address to open is localhost.
+# Browsers treat localhost and 127.0.0.1 as secure even over plain http, and
+# the key system that protected tracks need only exists on a secure origin.
+# Opening 0.0.0.0 or a LAN IP instead makes those tracks fail to play.
+echo "    http://localhost:${PORT}"
+if [ "$HOST" = "0.0.0.0" ]; then
+  echo "    (reachable on the LAN too, but protected tracks need localhost or https)"
+fi
 echo
 exec env PORT="$PORT" HOST="$HOST" node server/index.js
