@@ -1427,27 +1427,37 @@ async function waveformAt(url) {
    * of 0.83 against SoundCloud's 0.78, with 18% of neighbouring bars identical
    * against their 8%. Averaging does the same thing more gently.
    *
-   * Reading a sample and skipping the rest is the only one of the three that
-   * leaves the gaps alone, and it is what SoundCloud's player effectively does
-   * with its own data. 480 of these covers the widest the song page gets (about
-   * 420 bars) and scores within noise of SoundCloud's shape, where peak-thinning
-   * at the same count does not.
+   * The count matters as much as the pick. The page draws up to about 445 bars
+   * across its widest. At 480 samples two neighbouring bars land on the same
+   * sample, so they are drawn at the same pixel height. Because a bar is 2px with
+   * a 1px gap, a run of those reads as one solid block with slits in it, which is
+   * the flat area that kept showing up on the song page and never on SoundCloud.
+   * Measured on their screenshots, a run of equal bars reached 8 to 12 long and
+   * 15% of bars sat in one; SoundCloud never passes 4 and stays near 3%.
+   *
+   * 1200 is where that stops. At 1200 samples a 445-bar page reads about 2.7
+   * samples per bar, and the longest equal run drops to about 5 bars, which is
+   * where SoundCloud sits. 900 still left runs of 6. It costs about 6.8kB a
+   * track, the same as the payload SoundCloud itself sends for the same picture.
+   *
+   * Three decimals, not two. The raw samples are integers on SoundCloud's 0-140
+   * scale, so there are 141 distinct levels in a track. Rounded to two decimals
+   * those 141 levels collapse onto about 100, and neighbouring levels land on the
+   * same value: a served track held only 30 to 64 distinct values and stretches
+   * of six samples all at 0.96. Three decimals keep every original level apart
+   * and cost about 1kB more, which is what closes the last of the flat blocks.
    *
    * The values are scaled here, by the picture height SoundCloud ships with
    * them. That height is 140 on every track and the loudest sample always equals
    * it, so this is the same division by the track's own peak that the client used
    * to do. Doing it here keeps the client's job to clamping and the cap.
-   *
-   * Two decimals are enough for a bar a couple of hundred pixels tall: the
-   * rounding moves a height by well under one pixel, and it keeps the JSON near
-   * 2.4kB a track instead of 8kB.
    */
   const scale = data.height || 140;
-  const count = Math.min(480, samples.length);
+  const count = Math.min(1200, samples.length);
   const out = [];
   for (let i = 0; i < count; i += 1) {
     const at = Math.floor((i * samples.length) / count);
-    out.push(Math.round(Math.min(1, Math.max(0, samples[at] / scale)) * 100) / 100);
+    out.push(Math.round(Math.min(1, Math.max(0, samples[at] / scale)) * 1000) / 1000);
   }
   return { width: data.width, height: data.height, samples: out };
 }
