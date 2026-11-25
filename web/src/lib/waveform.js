@@ -60,6 +60,21 @@
 const CURVE_POWER = 2 / 3;
 
 /*
+ * The tallest bar stops short of the top of the box.
+ *
+ * The curve turns the loudest sample into a bar that fills the whole canvas. That
+ * is what their renderer does, and it is correct for the shape, but it makes the
+ * wave read taller than the strip it sits in: with the cap removed the loudest
+ * bars touched the top and bottom edge of the box and the whole waveform looked
+ * stretched. The cap only scales every bar by the same number, so it moves the
+ * wave's height without touching its shape, its dips or the gap between bars.
+ *
+ * The value is the one this had before the cap was dropped, so this restores the
+ * height that was there then and changes nothing else.
+ */
+const PEAK_FILL = 0.72;
+
+/*
  * The 1px column between two bars is not painted with the bar brush.
  *
  * SoundCloud gives it its own brush, a vertical gradient, in the theme their
@@ -148,7 +163,8 @@ export function normalizeSamples(payload) {
 export function shapeSamples(samples, scale = 140) {
   return samples.map((s) => {
     const x = Math.min(1, Math.max(0, s));
-    return 1 - Math.round(scale * Math.pow(1 - x, CURVE_POWER)) / scale;
+    const bar = 1 - Math.round(scale * Math.pow(1 - x, CURVE_POWER)) / scale;
+    return bar * PEAK_FILL;
   });
 }
 
