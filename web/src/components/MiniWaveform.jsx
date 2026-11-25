@@ -126,21 +126,39 @@ export function useRowData(track) {
   }, [near]);
 
   useEffect(() => {
-    if (!near) return undefined;
+    if (!near || !id) return undefined;
     let cancelled = false;
     /*
-     * Asked for by id, so a song whose stored url is missing or dead still gets
-     * its shape: the server falls back to the song's own current url.
+     * The cache is read here, not only in the initial state, because the two
+     * moments are not the same one. A row mounts first and is asked to load
+     * later, once it comes near the viewport, so a song posted twice can mount
+     * both rows before either has a shape, let the first row's request land, and
+     * only then run this row's effect. Checking the cache here without using it
+     * left that second row with no samples at all and a flat bar, which is what
+     * made a repeated song show a shape on its first row and nothing on the
+     * rest. So whatever the cache already holds is taken now.
      */
-    if (id && !(url && waveformCache.has(url))) {
+    const cached = url ? waveformCache.get(url) : null;
+    if (cached) {
+      setSamples(cached);
+    } else {
+      /*
+       * Asked for by id, so a song whose stored url is missing or dead still
+       * gets its shape: the server falls back to the song's own current url.
+       */
       loadWaveform(track).then((next) => {
-        if (!cancelled) setSamples(next);
+        if (!cancelled && next.length) setSamples(next);
       });
     }
-    if (wantsComments && id && !commentsCache.has(id)) {
-      loadComments(track).then((next) => {
-        if (!cancelled) setComments(next);
-      });
+    if (wantsComments) {
+      const known = commentsCache.get(id);
+      if (known) {
+        setComments(known);
+      } else {
+        loadComments(track).then((next) => {
+          if (!cancelled) setComments(next);
+        });
+      }
     }
     return () => {
       cancelled = true;
