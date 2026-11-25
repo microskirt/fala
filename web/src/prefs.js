@@ -11,6 +11,12 @@ const KEY = KEYS.prefs;
 const DEFAULTS = {
   quality: 'hq',
   autoplay: true,
+  /*
+   * How far back the Sorted view of Activity looks for each author. It is a
+   * preference because "what did people put out lately" means a different
+   * span to different listeners, and SoundCloud has nowhere to store it.
+   */
+  sortedDays: 7,
 };
 
 function read() {

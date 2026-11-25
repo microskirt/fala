@@ -475,6 +475,48 @@ export function SettingsPage() {
                   />
                 </Row>
               </Group>
+
+              {/*
+                * How far back the Sorted view of Activity looks. Three spans,
+                * because that is the whole range worth choosing between: a day
+                * misses most people, and a month is no longer "lately".
+                */}
+              <Group
+                title="Activity"
+                description="How far back the Sorted view looks for each person you follow."
+              >
+                <Row
+                  title="Sorted window"
+                  description="Songs posted or reposted within this many days."
+                >
+                  <div
+                    role="radiogroup"
+                    aria-label="Sorted window"
+                    className="inline-flex items-center rounded-full border bg-card p-0.5"
+                  >
+                    {[5, 7, 10].map((d) => {
+                      const active = (Number(prefs.sortedDays) || 7) === d;
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          onClick={() => setPrefs({ sortedDays: d })}
+                          className={cn(
+                            'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                            active
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          {d} days
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Row>
+              </Group>
             </>
           ) : null}
         </div>
