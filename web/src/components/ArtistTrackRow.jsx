@@ -303,7 +303,7 @@ function MiniTip({ marker, width }) {
  * either end. The upper half is a seek target, the same as the big waveform, and
  * a pointer over it previews the stretch a click would play.
  */
-function MiniWaveform({ samples, markers, duration, active, onSeek, height = 36 }) {
+function MiniWaveform({ samples, markers, duration, active, onSeek, height = 64 }) {
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const dragging = useRef(false);
@@ -491,12 +491,17 @@ export function ArtistTrackRow({ track, context }) {
           src={track.artwork_url}
           fallback={track.user?.avatar_url}
           alt={track.title}
-          size={144}
+          size={160}
           rounded={8}
         />
       </Link>
 
-      <div className="min-w-0 flex-1">
+      {/*
+       * The content is a column so the footer can be pushed to the bottom of
+       * the row. That gives the waveform the room between the title and the
+       * footer, so it grows tall without the actions crowding it.
+       */}
+      <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             {/*
@@ -561,7 +566,7 @@ export function ArtistTrackRow({ track, context }) {
          * its four buttons makes the listener hunt for them, and on a list this
          * is where the song is dealt with.
          */}
-        <div className="mt-2 flex items-center justify-between gap-3">
+        <div className="mt-auto flex items-center justify-between gap-3 pt-2">
           <div className="flex items-center gap-0.5">
             <LikeButton track={track} size={16} />
             <RepostButton track={track} size={16} iconOnly />
@@ -596,8 +601,8 @@ export function ArtistTrackRow({ track, context }) {
 export function ArtistTrackRowSkeleton() {
   return (
     <div className="flex gap-3 rounded-lg px-2 py-2">
-      <Skeleton className="size-36 shrink-0 rounded-lg" />
-      <div className="min-w-0 flex-1">
+      <Skeleton className="size-40 shrink-0 rounded-lg" />
+      <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2.5">
           <Skeleton className="size-8 shrink-0 rounded-full" />
           <div className="min-w-0 flex-1">
@@ -605,8 +610,8 @@ export function ArtistTrackRowSkeleton() {
             <Skeleton className="mt-2 h-2.5 w-1/4" />
           </div>
         </div>
-        <Skeleton className="mt-3 h-9 w-full rounded" />
-        <div className="mt-2 flex items-center justify-between">
+        <Skeleton className="mt-2 h-16 w-full rounded" />
+        <div className="mt-auto flex items-center justify-between pt-2">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-3 w-28" />
         </div>
