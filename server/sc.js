@@ -4,6 +4,8 @@ import path from 'node:path';
 const UA =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 const API = 'https://api-v2.soundcloud.com';
+// How long one upstream request may take before it is treated as unreachable.
+const UPSTREAM_TIMEOUT = 12_000;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || 'data');
 const CLIENT_ID_FILE = path.join(DATA_DIR, 'client_id.txt');
 
@@ -100,11 +102,31 @@ function parseJsonBody(text) {
   }
 }
 
-async function rawGet(href, { refresh = true, token = null } = {}) {
+/*
+ * A single upstream read. The fetch is bounded by a timeout because api-v2
+ * occasionally accepts a connection and then says nothing, and a request that
+ * hangs would hold the whole response open. A transport failure is retried
+ * once: a dropped DNS lookup or a refused connection is usually a blip, and
+ * asking again immediately often succeeds.
+ */
+async function rawGet(href, { refresh = true, token = null, attempt = 0 } = {}) {
   const url = withClientId(href);
   const headers = { 'User-Agent': UA, Accept: 'application/json' };
   if (token) headers.Authorization = `OAuth ${token}`;
-  const res = await fetch(url, { headers });
+  let res;
+  try {
+    res = await fetch(url, { headers, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
+  } catch (err) {
+    if (attempt === 0) {
+      return rawGet(href, { refresh, token, attempt: 1 });
+    }
+    throw new ScError(
+      503,
+      'SoundCloud could not be reached. Check the connection and try again.',
+      null,
+      'UPSTREAM_UNREACHABLE'
+    );
+  }
   if (!token && (res.status === 401 || res.status === 403) && refresh) {
     const next = await refreshClientId();
     if (next && next !== clientId) return rawGet(href, { refresh: false });
@@ -120,11 +142,43 @@ async function rawGet(href, { refresh = true, token = null } = {}) {
   return parseJsonBody(text);
 }
 
+/*
+ * Personalised responses depend on the caller's token, so they can never share
+ * the process-wide cache above. They still repeat a lot within a page render:
+ * the Sorted view asks for the same follow list and the same per-person streams
+ * on every visit. This second cache is keyed by token and path, holds only
+ * reads, and is dropped for a token as soon as that token writes anything.
+ */
+const tokenReadCache = new Map();
+const TOKEN_KEYS_MAX = 120;
+
+function tokenKey(token, href) {
+  return `${token}\n${href.replace(/([?&])client_id=[^&]*/g, '$1')}`;
+}
+
+function rememberTokenKey(token, key) {
+  let keys = tokenReadCache.get(token);
+  if (!keys) {
+    keys = new Set();
+    tokenReadCache.set(token, keys);
+  }
+  keys.add(key);
+  // Keep one token's cached reads bounded without touching anyone else's.
+  if (keys.size > TOKEN_KEYS_MAX) {
+    const oldest = keys.values().next().value;
+    keys.delete(oldest);
+    cache.delete(oldest);
+  }
+}
+
 export async function apiGet(href, { ttl = 60_000, token = null } = {}) {
-  // Personalised responses depend on the caller's token, so never share them
-  // through the process-wide cache.
   if (token) {
+    const key = tokenKey(token, href);
+    const hit = cacheGet(key);
+    if (hit !== undefined) return hit;
     const data = await rawGet(href, { token });
+    cacheSet(key, data, ttl);
+    rememberTokenKey(token, key);
     rememberUsers(data);
     return data;
   }
@@ -231,6 +285,12 @@ export async function apiWrite(method, href, { token, body } = {}) {
     } catch {}
     throw new ScError(res.status, writeErrorMessage(text, parsed, res.status), parsed);
   }
+  /*
+   * A write changes what this token's reads would return, so its cached reads
+   * are dropped here, once, rather than at every call site. Doing it after the
+   * response means a failed write keeps the cache it did not invalidate.
+   */
+  invalidateToken(token);
   if (!text) return {};
   try {
     return JSON.parse(text);
@@ -1682,7 +1742,15 @@ export async function followIds(token) {
 }
 
 export function invalidateToken(token) {
-  if (token) tokenCache.delete(token);
+  if (!token) return;
+  tokenCache.delete(token);
+  // A write changes what the reads would return, so drop every cached read
+  // that belongs to this token and let the next page render fetch it again.
+  const keys = tokenReadCache.get(token);
+  if (keys) {
+    for (const key of keys) cache.delete(key);
+    tokenReadCache.delete(token);
+  }
 }
 
 /* ------------------------------- library reads ------------------------------ */
@@ -2035,7 +2103,7 @@ export function groupActivity(results, cutoff) {
   return [...authors.values()].sort((a, b) => new Date(b.latest) - new Date(a.latest));
 }
 
-export async function sortedActivity(token, { days = 7, maxPeople = 60 } = {}) {
+export async function sortedActivity(token, { days = 7, maxPeople = 60, maxTopUp = 24 } = {}) {
   const windowMs = Math.max(1, Number(days) || 7) * 24 * 60 * 60 * 1000;
   const cutoff = Date.now() - windowMs;
 
@@ -2044,22 +2112,66 @@ export async function sortedActivity(token, { days = 7, maxPeople = 60 } = {}) {
   const people = (follows.collection || []).map(slimUser).filter(Boolean);
 
   /*
-   * One stream per followed account, because the feed as a whole only reaches
-   * so far back. They are fetched a few at a time rather than all at once: a
-   * listener following a hundred people would otherwise open a hundred sockets
-   * in the same instant. A failure for one account leaves that account out
-   * instead of blanking the view.
+   * The aggregate feed is one request and already covers the busiest people,
+   * so it seeds the grouping. Each followed account is then topped up with its
+   * own stream only if the feed did not mention it: walking every follow on
+   * every visit was dozens of sockets for a handful of authors, and the first
+   * one to fail took the whole view down with it.
    */
   const results = [];
+  const seen = new Set();
+  // Kept so an unreachable SoundCloud is reported as such. Without it, every
+  // failed request was swallowed and the view claimed nobody had posted.
+  let upstreamError = null;
+  try {
+    const feed = await apiGet('/stream?limit=200', { token, ttl: 120_000 });
+    const byAuthor = new Map();
+    for (const event of feed.collection || []) {
+      const actor = event?.user;
+      if (!actor?.id) continue;
+      const key = String(actor.id);
+      if (!byAuthor.has(key)) {
+        // The actor can be a partial object with no username; skipping it is
+        // better than rendering an author row with nothing to name it.
+        const person = slimUser(actor);
+        if (!person) continue;
+        byAuthor.set(key, { person, collection: [] });
+      }
+      byAuthor.get(key).collection.push(event);
+    }
+    for (const [key, group] of byAuthor) {
+      seen.add(key);
+      results.push(group);
+    }
+  } catch (err) {
+    // The per-person streams below can still fill the view on their own.
+    upstreamError = err;
+  }
+
+  /*
+   * The top-up covers the quieter follows the feed never reached. It is capped
+   * and fetched a few at a time so a long follow list cannot turn one page
+   * load into a hundred simultaneous requests. A failure for one account
+   * leaves that account out instead of blanking the view.
+   */
+  const missing = people.filter((p) => !seen.has(String(p.id))).slice(0, maxTopUp);
   const POOL = 6;
-  for (let i = 0; i < people.length; i += POOL) {
-    const batch = people.slice(i, i + POOL);
+  let attempted = 0;
+  let failed = 0;
+  for (let i = 0; i < missing.length; i += POOL) {
+    const batch = missing.slice(i, i + POOL);
     const settled = await Promise.all(
       batch.map(async (person) => {
+        attempted += 1;
         try {
-          const data = await apiGet(`/stream/users/${person.id}?limit=50`, { token });
+          const data = await apiGet(`/stream/users/${person.id}?limit=50`, {
+            token,
+            ttl: 120_000,
+          });
           return { person, collection: data.collection || [] };
-        } catch {
+        } catch (err) {
+          failed += 1;
+          upstreamError = upstreamError || err;
           return { person, collection: [] };
         }
       })
@@ -2067,8 +2179,18 @@ export async function sortedActivity(token, { days = 7, maxPeople = 60 } = {}) {
     results.push(...settled);
   }
 
+  const collection = groupActivity(results, cutoff);
+  /*
+   * If the feed failed and so did every top-up, an empty list would read as
+   * "nobody posted" when the truth is that SoundCloud was not reachable. Report
+   * the upstream problem so the page can show it and offer a retry.
+   */
+  if (!collection.length && upstreamError && failed > 0 && failed === attempted) {
+    throw upstreamError;
+  }
+
   return {
-    collection: groupActivity(results, cutoff),
+    collection,
     days,
     cutoff: new Date(cutoff).toISOString(),
   };
@@ -2079,14 +2201,12 @@ export async function sortedActivity(token, { days = 7, maxPeople = 60 } = {}) {
 export async function like(token, trackId, on) {
   const id = await meId(token);
   await apiWrite(on ? 'PUT' : 'DELETE', `/users/${id}/track_likes/${trackId}`, { token });
-  invalidateToken(token);
   return { liked: !!on };
 }
 
 export async function likePlaylist(token, playlistId, on) {
   const id = await meId(token);
   await apiWrite(on ? 'PUT' : 'DELETE', `/users/${id}/playlist_likes/${playlistId}`, { token });
-  invalidateToken(token);
   return { liked: !!on };
 }
 
@@ -2098,7 +2218,6 @@ export async function likePlaylist(token, playlistId, on) {
  */
 export async function repost(token, trackId, on, caption) {
   await apiWrite(on ? 'PUT' : 'DELETE', `/me/track_reposts/${trackId}`, { token });
-  invalidateToken(token);
 
   const text = typeof caption === 'string' ? caption.trim() : '';
   if (!on || !text) return { reposted: !!on, captionSaved: null };
@@ -2116,7 +2235,6 @@ export async function repost(token, trackId, on, caption) {
 
 export async function follow(token, userId, on) {
   await apiWrite(on ? 'POST' : 'DELETE', `/me/followings/${userId}`, { token });
-  invalidateToken(token);
   return { following: !!on };
 }
 
