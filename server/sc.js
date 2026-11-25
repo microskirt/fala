@@ -1389,17 +1389,54 @@ export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
   throw new ScError(404, 'No audio available for this track');
 }
 
-export async function waveform(url) {
+/*
+ * One waveform picture, thinned to a bar count the bars can actually draw. A url
+ * from a feed can be stale or already gone, and SoundCloud answers those with a
+ * 404 or a body with no samples; both come back as null so the caller can try
+ * the song's current url instead.
+ */
+async function waveformAt(url) {
   if (!url) return null;
-  const res = await fetch(url, { headers: { 'User-Agent': UA } });
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: { 'User-Agent': UA },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT),
+    });
+  } catch {
+    return null;
+  }
   if (!res.ok) return null;
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    return null;
+  }
   const samples = data.samples || [];
+  if (!samples.length) return null;
   // More bars than a coarse 200 keeps the shape readable at SoundCloud's width.
   const step = Math.max(1, Math.floor(samples.length / 280));
   const out = [];
   for (let i = 0; i < samples.length; i += step) out.push(samples[i]);
   return { width: data.width, height: data.height, samples: out };
+}
+
+/*
+ * The shape for a song, tried against the url the caller handed over first and
+ * then against the song's own current url. Lists hand over a url they were given
+ * when the feed was fetched, and that copy can be dead by the time the row is
+ * drawn, which is how a bar used to stay empty on every visit.
+ */
+export async function waveform(url, trackId = null) {
+  const first = await waveformAt(url);
+  if (first) return first;
+  if (!trackId) return null;
+  try {
+    const t = await apiGet(`/tracks/${trackId}`, { ttl: 120_000 });
+    if (t?.waveform_url && t.waveform_url !== url) return waveformAt(t.waveform_url);
+  } catch {}
+  return null;
 }
 
 export async function proxyHref(href) {

@@ -443,7 +443,9 @@ route('GET', '/api/tracks/:id/stream', async (ctx) => {
 
 route('GET', '/api/tracks/:id/waveform', async (ctx) => {
   const url = ctx.query.get('url');
-  return (await sc.waveform(url)) || { samples: [] };
+  // The id lets the server retry with the song's current url when the one the
+  // list kept has gone stale, which is what left some bars empty for good.
+  return (await sc.waveform(url, ctx.params.id)) || { samples: [] };
 });
 
 route('GET', '/api/tracks/:id/comments', async (ctx) => {
