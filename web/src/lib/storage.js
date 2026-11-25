@@ -12,6 +12,7 @@ export const KEYS = {
   prefs: `${PREFIX}prefs`,
   volume: `${PREFIX}volume`,
   notificationsSeen: `${PREFIX}notifications_seen`,
+  played: `${PREFIX}played`,
 };
 
 export function readKey(key) {

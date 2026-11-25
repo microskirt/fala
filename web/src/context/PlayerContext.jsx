@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { api, artwork } from '../api.js';
 import { KEYS, readKey, writeKey } from '../lib/storage.js';
+import { markPlayed } from '../lib/played.js';
 import { usePrefs } from '../prefs.js';
 import { useToast } from './ToastContext.jsx';
 
@@ -101,6 +102,14 @@ export function PlayerProvider({ children }) {
 
   const current = index >= 0 && index < queue.length ? queue[index] : null;
   const quality = prefs.quality || 'hq';
+  /*
+   * A song counts as played once it becomes the loaded one, which is the moment
+   * the listener asked for it. The mark is written here rather than in each
+   * list, so every way of starting a song records it the same way.
+   */
+  useEffect(() => {
+    if (current?.id) markPlayed(current.id);
+  }, [current?.id]);
   /*
    * The media event listeners are attached once, so they read the loaded track
    * from a ref instead of from a stale closure. A parked seek is only applied
