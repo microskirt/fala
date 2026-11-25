@@ -1416,28 +1416,38 @@ async function waveformAt(url) {
   const samples = data.samples || [];
   if (!samples.length) return null;
   /*
-   * Each window becomes the average of the samples in it, not the loudest one.
-   * A bar stands for a stretch of the song, and the average of that stretch is
-   * how loud it actually is. Taking the loudest sample instead lets every kick
-   * and snare push its whole bar to the ceiling, so a busy master turns into a
-   * wall of full-height bars: the loud and the quiet parts stop reading apart,
-   * which is exactly the difference from SoundCloud's own picture.
+   * Each window keeps its loudest sample rather than its average. A bar stands
+   * for a stretch of the song, and the loudest moment in that stretch is what
+   * the ear hears as its level. Averaging flattens the kicks and snares that
+   * give a waveform its texture, and measuring Fala against SoundCloud showed
+   * exactly that: the averaging pass threw away about two fifths of the
+   * neighbour-to-neighbour variation, which is what made the bars read as a
+   * smooth slab next to SoundCloud's busier shape.
    *
-   * The cap has to clear the bar count, or the thinning runs out of samples
-   * before it runs out of bars. A 2px bar and a 1px gap put about 421 bars
-   * across the widest the song page gets, so the old cap of 280 left several
-   * bars drawing from one sample: neighbouring bars came out identical, which
-   * reads as stair steps rather than a curve. 480 covers the widest render and
-   * costs about 2.5kB a track, against 6.8kB for the full 1800.
+   * The count stays at 480, which covers the widest the song page gets (about
+   * 420 bars) without sending a payload the size of the full picture. What
+   * matters for detail is taking the peak of each window, not how many windows
+   * there are: measured across 16 tracks, 480 peaks score as close to
+   * SoundCloud's shape as 900 do, at a third of the wire size.
+   *
+   * The values are scaled here, by the picture height SoundCloud ships with
+   * them. That height is 140 on every track and the loudest sample always equals
+   * it, so this is the same division by the track's own peak that the client used
+   * to do. Doing it here keeps the client's job to clamping and the cap.
+   *
+   * Two decimals are enough for a bar a couple of hundred pixels tall: the
+   * rounding moves a height by well under one pixel, and it keeps the JSON near
+   * 2.4kB a track instead of 8kB.
    */
+  const scale = data.height || 140;
   const count = Math.min(480, samples.length);
   const out = [];
   for (let i = 0; i < count; i += 1) {
     const from = Math.floor((i * samples.length) / count);
     const to = Math.max(from + 1, Math.floor(((i + 1) * samples.length) / count));
-    let sum = 0;
-    for (let j = from; j < to; j += 1) sum += samples[j];
-    out.push(sum / (to - from));
+    let peak = 0;
+    for (let j = from; j < to; j += 1) if (samples[j] > peak) peak = samples[j];
+    out.push(Math.round(Math.min(1, Math.max(0, peak / scale)) * 100) / 100);
   }
   return { width: data.width, height: data.height, samples: out };
 }

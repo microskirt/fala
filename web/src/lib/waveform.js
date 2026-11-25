@@ -16,28 +16,19 @@
 const PEAK_FILL = 0.72;
 
 /*
- * Turns SoundCloud's sample amplitudes into bar heights between 0 and 1.
+ * Turns the server's sample values into bar heights between 0 and 1.
  *
- * The samples are not on a 0-255 scale. SoundCloud scales every track so its
- * loudest moment equals the picture's own `height`, which is 140 on every track
- * sampled, so dividing by 255 leaves a mastered song reaching only 55% of the
- * range. Dividing by the array's own peak instead puts the loudest moment at the
- * top of the scale and lets the quiet passages fall away, which is how
- * SoundCloud's own player reads.
+ * The server has already divided each sample by the track's own peak, which is
+ * the picture height SoundCloud ships with the samples. So these values arrive
+ * on a 0-1 scale and there is no second stretch to apply here; doing it twice
+ * would be a no-op at best and would hide a bad payload at worst.
  *
- * A gentle curve above 1 pushes the quiet passages down a little further. A
- * straight reading still comes out flatter than SoundCloud's bars, whose dips
- * drop well below the body of the wave. The floor keeps a near-silent bar
- * visible rather than letting it vanish.
+ * The only work left is the clamp, the cap and the floor. The cap keeps the
+ * loudest bar short of the box edge so the waveform keeps the air around it, and
+ * the floor keeps a near-silent bar visible rather than letting it vanish.
  */
 export function shapeSamples(samples) {
-  let peak = 0;
-  for (const s of samples) if (s > peak) peak = s;
-  if (peak <= 0) peak = 1;
-  return samples.map((s) => {
-    const v = Math.pow(Math.min(1, Math.max(0, s) / peak), 1.1);
-    return Math.min(PEAK_FILL, Math.max(0.04, v * PEAK_FILL));
-  });
+  return samples.map((s) => Math.min(PEAK_FILL, Math.max(0.04, Math.min(1, Math.max(0, s)) * PEAK_FILL)));
 }
 
 /*
