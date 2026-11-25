@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Activity, Check, Repeat2, Upload } from 'lucide-react';
+import { Activity, Repeat2, Upload } from 'lucide-react';
 import { api, timeAgo, formatDate, trackArtistName } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
+import { usePlayer } from '@/context/PlayerContext.jsx';
 import { usePrefs } from '@/prefs.js';
 import { Avatar, Artwork, EmptyState, ErrorState } from '@/components/Media.jsx';
 import {
@@ -143,10 +144,9 @@ function LogEntry({ item, context }) {
  * author put it out. The badge on the cover says whether that was an upload or
  * a repost, because the same song can arrive either way.
  */
-function SortedEntry({ entry, context, played }) {
+function SortedEntry({ entry, context }) {
   const track = entry.track;
   const isRepost = entry.type === 'repost';
-  const wasPlayed = !!played[String(track.id)];
   return (
     <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
       <Link {...trackLink(track)} className="relative shrink-0" aria-label={track.title}>
@@ -191,20 +191,6 @@ function SortedEntry({ entry, context, played }) {
           >
             {timeAgo(entry.created_at)}
           </time>
-          {/*
-            * This browser has played the song before. The mark is small and
-            * quiet: it is a hint about where the listener left off, not a
-            * status that should compete with the title.
-            */}
-          {wasPlayed ? (
-            <span
-              title="Played in this browser"
-              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-muted-foreground/80"
-            >
-              <Check size={11} aria-hidden="true" />
-              <span className="sr-only">Played</span>
-            </span>
-          ) : null}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
@@ -224,7 +210,7 @@ function SortedEntry({ entry, context, played }) {
  * and indented past the avatar, so the list reads as one author with their
  * tracks beneath them rather than as a set of folds to open one by one.
  */
-function AuthorGroup({ author, context, played }) {
+function AuthorGroup({ author, context }) {
   const count = author.entries.length;
   return (
     <div className="overflow-hidden rounded-xl border bg-card/60">
@@ -251,12 +237,7 @@ function AuthorGroup({ author, context, played }) {
       <div className="ml-[3.75rem] border-l border-border/60 px-2 pb-2">
         <div className="flex flex-col gap-0.5">
           {author.entries.map((entry, i) => (
-            <SortedEntry
-              key={`${entry.track.id}-${i}`}
-              entry={entry}
-              context={context}
-              played={played}
-            />
+            <SortedEntry key={`${entry.track.id}-${i}`} entry={entry} context={context} />
           ))}
         </div>
       </div>
@@ -268,6 +249,8 @@ export function ActivityPage() {
   const { isAuthed } = useAuth();
   const [prefs] = usePrefs();
   const played = usePlayed();
+  const { current } = usePlayer();
+  const currentId = current?.id ? String(current.id) : null;
   // Sorted is the default: what each person put out lately is the question
   // this page is usually opened to answer, and the plain log is one click away.
   const [view, setView] = useState('sorted');
@@ -321,9 +304,31 @@ export function ActivityPage() {
   }, [isAuthed, view, days]);
 
   const logTracks = useMemo(() => items.map((x) => x.track).filter(Boolean), [items]);
+
+  /*
+   * A song leaves the Sorted view once this browser has played it, so the list
+   * only carries what is still unheard. The song loaded in the player is the
+   * exception: it stays until the listener moves to another song, because a row
+   * vanishing under the button that was just pressed would be a jolt. That also
+   * covers a return visit, since nothing is loaded when the page opens again.
+   * An author whose songs have all gone drops out with them.
+   */
+  const visibleAuthors = useMemo(
+    () =>
+      authors
+        .map((author) => {
+          const entries = author.entries.filter(
+            (e) => !played[String(e.track?.id)] || String(e.track?.id) === currentId
+          );
+          return { ...author, entries, latest: entries[0]?.created_at ?? author.latest };
+        })
+        .filter((author) => author.entries.length > 0),
+    [authors, played, currentId]
+  );
+
   const sortedTracks = useMemo(
-    () => authors.flatMap((a) => a.entries.map((e) => e.track)).filter(Boolean),
-    [authors]
+    () => visibleAuthors.flatMap((a) => a.entries.map((e) => e.track)).filter(Boolean),
+    [visibleAuthors]
   );
 
   if (!isAuthed) {
@@ -393,15 +398,14 @@ export function ActivityPage() {
           The people you follow have not posted or reposted in that window. A longer span is in
           Settings.
         </EmptyState>
+      ) : visibleAuthors.length === 0 ? (
+        <EmptyState icon={Activity} title="You have heard everything here">
+          Songs drop out once you play them. New ones appear as people post.
+        </EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
-          {authors.map((author) => (
-            <AuthorGroup
-              key={author.user?.id}
-              author={author}
-              context={sortedTracks}
-              played={played}
-            />
+          {visibleAuthors.map((author) => (
+            <AuthorGroup key={author.user?.id} author={author} context={sortedTracks} />
           ))}
         </div>
       )}
