@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Activity, Repeat2, Upload } from 'lucide-react';
 import { api, timeAgo, formatDate, trackArtistName } from '@/api.js';
@@ -26,7 +26,7 @@ import { buildCommentMarkers } from '@/lib/waveform.js';
  * form: same shape, same comment faces, same two clocks, but it never opens a
  * comment card, because a compact list is not where a comment is read.
  */
-function SortedEntry({ entry, context }) {
+function SortedEntry({ entry, context, onPlay }) {
   const track = entry.track;
   const isRepost = entry.type === 'repost';
   const { samples, comments, rowRef } = useRowData(track);
@@ -84,7 +84,10 @@ function SortedEntry({ entry, context }) {
              * track id rides along: the player still holds the previous song
              * for a moment, and the spot has to be parked against this one.
              */
-            if (!active) playTrack(track, context);
+            if (!active) {
+              playTrack(track, context);
+              onPlay?.(track);
+            }
             seek(ratio * duration, track.id);
           }}
         />
@@ -119,7 +122,7 @@ function SortedEntry({ entry, context }) {
         <RepostButton track={track} size={16} iconOnly />
         <AddToPlaylistButton track={track} size={16} />
         <AddToQueueButton track={track} size={16} />
-        <PlayButton track={track} context={context} size="sm" />
+        <PlayButton track={track} context={context} size="sm" onPlay={onPlay} />
       </div>
     </div>
   );
@@ -131,7 +134,7 @@ function SortedEntry({ entry, context }) {
  * and indented past the avatar, so the list reads as one author with their
  * tracks beneath them rather than as a set of folds to open one by one.
  */
-function AuthorGroup({ author, context }) {
+function AuthorGroup({ author, context, onPlay }) {
   const count = author.entries.length;
   return (
     <div className="overflow-hidden rounded-xl border bg-card/60">
@@ -158,7 +161,12 @@ function AuthorGroup({ author, context }) {
       <div className="ml-[3.75rem] border-l border-border/60 px-2 pb-2">
         <div className="flex flex-col gap-0.5">
           {author.entries.map((entry, i) => (
-            <SortedEntry key={`${entry.track.id}-${i}`} entry={entry} context={context} />
+            <SortedEntry
+              key={`${entry.track.id}-${i}`}
+              entry={entry}
+              context={context}
+              onPlay={onPlay}
+            />
           ))}
         </div>
       </div>
@@ -172,6 +180,22 @@ export function ActivityPage() {
   const played = usePlayed();
   const { current } = usePlayer();
   const currentId = current?.id ? String(current.id) : null;
+  /*
+   * The song just started from this list. It is the only played song allowed to
+   * stay on screen, and only while the player is still on it: the row would
+   * otherwise vanish under the button that was just pressed. The pin is dropped
+   * the moment the player holds any other song, so stepping back through the
+   * queue to a played song cannot bring its row back.
+   */
+  const [pinnedId, setPinnedId] = useState(null);
+
+  useEffect(() => {
+    if (pinnedId && currentId !== pinnedId) setPinnedId(null);
+  }, [pinnedId, currentId]);
+
+  const onPlay = useCallback((track) => {
+    if (track?.id) setPinnedId(String(track.id));
+  }, []);
 
   const [authors, setAuthors] = useState([]);
   const [sortedLoading, setSortedLoading] = useState(false);
@@ -200,10 +224,9 @@ export function ActivityPage() {
 
   /*
    * A song leaves the view once this browser has played it, so the list only
-   * carries what is still unheard. The song loaded in the player is the
-   * exception: it stays until the listener moves to another song, because a row
-   * vanishing under the button that was just pressed would be a jolt. That also
-   * covers a return visit, since nothing is loaded when the page opens again.
+   * carries what is still unheard. The one exception is the song pinned above,
+   * and only while the player is still on it. Filtering on the loaded song
+   * instead would resurrect every played song the listener stepped back to.
    * An author whose songs have all gone drops out with them.
    */
   const visibleAuthors = useMemo(
@@ -211,12 +234,12 @@ export function ActivityPage() {
       authors
         .map((author) => {
           const entries = author.entries.filter(
-            (e) => !played[String(e.track?.id)] || String(e.track?.id) === currentId
+            (e) => !played[String(e.track?.id)] || String(e.track?.id) === pinnedId
           );
           return { ...author, entries, latest: entries[0]?.created_at ?? author.latest };
         })
         .filter((author) => author.entries.length > 0),
-    [authors, played, currentId]
+    [authors, played, pinnedId]
   );
 
   const sortedTracks = useMemo(
@@ -270,7 +293,12 @@ export function ActivityPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {visibleAuthors.map((author) => (
-            <AuthorGroup key={author.user?.id} author={author} context={sortedTracks} />
+            <AuthorGroup
+              key={author.user?.id}
+              author={author}
+              context={sortedTracks}
+              onPlay={onPlay}
+            />
           ))}
         </div>
       )}

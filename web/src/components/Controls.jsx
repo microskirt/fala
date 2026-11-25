@@ -40,7 +40,7 @@ import { cn } from '@/lib/utils.js';
  * paused. Lists use it to keep the button on screen after the pointer leaves,
  * because the song is still the loaded one even when it is paused.
  */
-export function PlayButton({ track, context, size = 'md', className }) {
+export function PlayButton({ track, context, size = 'md', className, onPlay }) {
   const { playTrack, togglePlay, isCurrent, playing, buffering } = usePlayer();
   const active = isCurrent(track);
   const isPlaying = active && playing;
@@ -57,8 +57,17 @@ export function PlayButton({ track, context, size = 'md', className }) {
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (active) togglePlay();
-        else playTrack(track, context);
+        if (active) {
+          togglePlay();
+        } else {
+          playTrack(track, context);
+          /*
+           * Only a song this button starts counts as chosen here. Pausing and
+           * resuming the loaded one is not a new choice, and a list that hides
+           * heard songs needs to know which one the listener just picked.
+           */
+          onPlay?.(track);
+        }
       }}
       aria-label={isPlaying ? 'Pause' : `Play ${track?.title || 'track'}`}
     >
