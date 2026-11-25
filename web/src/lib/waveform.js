@@ -332,6 +332,16 @@ export function barGeometry(width, { bar = 2, gap = 1, gutter = 0 } = {}) {
  * track is a visibly different bar. Taking the pixel makes the read exact at every
  * width.
  *
+ * The denominator is the BAR AREA, not the canvas. Their canvas holds nothing but
+ * bars, so their `width` and their bar area are the same number. Fala's song page
+ * leaves a flat strip at the right for the two clocks, and that strip is part of
+ * the canvas but not part of the bars. Dividing by the canvas there made every
+ * sample land further right than it should: on a 1040px card with a 57px strip the
+ * drift reached 33px by the middle of the song, so a dip in the data was drawn a
+ * third of a screen-inch away from the comment that marks it, and the last 102
+ * samples (5.7% of the song) were never drawn at all. Dividing by the bar area puts
+ * every sample back under its own time and reaches the final sample.
+ *
  * When there are more bars than samples the same read repeats a sample, and no
  * mapping can avoid that, so the guard is simply to stay inside the array.
  */
@@ -362,7 +372,7 @@ export function paintBars(canvas, { norm, width, height, geometry, color, surfac
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
 
-  const { bar, gap, barCount, step } = geometry;
+  const { bar, gap, barCount, step, barWidth } = geometry;
   const mid = Math.round(height / 2);
   /*
    * The two edges come from SoundCloud's own draw, not from a height rounded
@@ -468,7 +478,7 @@ export function paintBars(canvas, { norm, width, height, geometry, color, surfac
      * position SoundCloud samples at; see `barValue`.
      */
     const x = Math.round(i * step);
-    const v = barValue(norm, x, width);
+    const v = barValue(norm, x, barWidth || width);
     /*
      * Both edges are floored from the box, exactly as their draw does, so a bar
      * of a given value lands on the same pixel here as it does there. The minimum
