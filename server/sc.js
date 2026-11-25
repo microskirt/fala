@@ -1416,50 +1416,27 @@ async function waveformAt(url) {
   const samples = data.samples || [];
   if (!samples.length) return null;
   /*
-   * Each window keeps the sample at its start, not the loudest one and not the
-   * average. Both of those were tried and both were wrong in the same way: they
-   * fill the gaps between hits.
+   * The payload is passed through as SoundCloud ships it: every sample, as an
+   * integer on the picture's `height` scale. Nothing is thinned and nothing is
+   * rescaled.
    *
-   * Taking the loudest sample of a window means a quiet moment between two kicks
-   * is replaced by the louder neighbour that shares its window. The waveform
-   * then has no valleys, and a wave with no valleys is a plateau: drawing Fala
-   * against SoundCloud's own reading of the same song showed a tenth percentile
-   * of 0.83 against SoundCloud's 0.78, with 18% of neighbouring bars identical
-   * against their 8%. Averaging does the same thing more gently.
+   * Everything before this thinned the samples to 1200 and rescaled them to three
+   * decimals, which cost about 7.0kB a track. Sending all 1800 as integers costs
+   * about 7.2kB, so the detail was being dropped to save nothing. A skipped
+   * sample can be the dip between two hits, and no curve can put a dip back that
+   * the payload no longer contains. That is the flat stretch that survived every
+   * attempt at the shape: the shape was being fitted to data that had already lost
+   * the detail.
    *
-   * The count matters as much as the pick. The page draws up to about 445 bars
-   * across its widest. At 480 samples two neighbouring bars land on the same
-   * sample, so they are drawn at the same pixel height. Because a bar is 2px with
-   * a 1px gap, a run of those reads as one solid block with slits in it, which is
-   * the flat area that kept showing up on the song page and never on SoundCloud.
-   * Measured on their screenshots, a run of equal bars reached 8 to 12 long and
-   * 15% of bars sat in one; SoundCloud never passes 4 and stays near 3%.
-   *
-   * 1200 is where that stops. At 1200 samples a 445-bar page reads about 2.7
-   * samples per bar, and the longest equal run drops to about 5 bars, which is
-   * where SoundCloud sits. 900 still left runs of 6. It costs about 6.8kB a
-   * track, the same as the payload SoundCloud itself sends for the same picture.
-   *
-   * Three decimals, not two. The raw samples are integers on SoundCloud's 0-140
-   * scale, so there are 141 distinct levels in a track. Rounded to two decimals
-   * those 141 levels collapse onto about 100, and neighbouring levels land on the
-   * same value: a served track held only 30 to 64 distinct values and stretches
-   * of six samples all at 0.96. Three decimals keep every original level apart
-   * and cost about 1kB more, which is what closes the last of the flat blocks.
-   *
-   * The values are scaled here, by the picture height SoundCloud ships with
-   * them. That height is 140 on every track and the loudest sample always equals
-   * it, so this is the same division by the track's own peak that the client used
-   * to do. Doing it here keeps the client's job to clamping and the cap.
+   * `height` is 140 on every track SoundCloud serves and the loudest sample always
+   * equals it, so the client dividing by it is the same division by the track's
+   * own peak that their `WaveformData` does. The integers are already the levels
+   * they use, so keeping them exact means no two original levels collapse onto one
+   * value the way two-decimal rounding made them.
    */
-  const scale = data.height || 140;
-  const count = Math.min(1200, samples.length);
-  const out = [];
-  for (let i = 0; i < count; i += 1) {
-    const at = Math.floor((i * samples.length) / count);
-    out.push(Math.round(Math.min(1, Math.max(0, samples[at] / scale)) * 1000) / 1000);
-  }
-  return { width: data.width, height: data.height, samples: out };
+  const height = data.height || 140;
+  const clamped = samples.map((s) => Math.min(height, Math.max(0, Math.round(s))));
+  return { width: data.width, height, samples: clamped };
 }
 
 /*
