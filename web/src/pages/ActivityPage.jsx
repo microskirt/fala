@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Activity, ChevronDown, Repeat2, Upload } from 'lucide-react';
+import { Activity, Check, Repeat2, Upload } from 'lucide-react';
 import { api, timeAgo, formatDate, trackArtistName } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { usePrefs } from '@/prefs.js';
@@ -15,6 +15,7 @@ import {
 import { Page, TrackList, TrackListSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { trackLink, userLink } from '@/lib/scRoute.js';
+import { usePlayed } from '@/lib/played.js';
 import { cn } from '@/lib/utils.js';
 
 /*
@@ -142,9 +143,10 @@ function LogEntry({ item, context }) {
  * author put it out. The badge on the cover says whether that was an upload or
  * a repost, because the same song can arrive either way.
  */
-function SortedEntry({ entry, context }) {
+function SortedEntry({ entry, context, played }) {
   const track = entry.track;
   const isRepost = entry.type === 'repost';
+  const wasPlayed = !!played[String(track.id)];
   return (
     <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
       <Link {...trackLink(track)} className="relative shrink-0" aria-label={track.title}>
@@ -189,6 +191,20 @@ function SortedEntry({ entry, context }) {
           >
             {timeAgo(entry.created_at)}
           </time>
+          {/*
+            * This browser has played the song before. The mark is small and
+            * quiet: it is a hint about where the listener left off, not a
+            * status that should compete with the title.
+            */}
+          {wasPlayed ? (
+            <span
+              title="Played in this browser"
+              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-muted-foreground/80"
+            >
+              <Check size={11} aria-hidden="true" />
+              <span className="sr-only">Played</span>
+            </span>
+          ) : null}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
@@ -196,6 +212,7 @@ function SortedEntry({ entry, context }) {
         <RepostButton track={track} size={16} iconOnly />
         <AddToPlaylistButton track={track} size={16} />
         <AddToQueueButton track={track} size={16} />
+        <PlayButton track={track} context={context} size="sm" />
       </div>
     </div>
   );
@@ -203,11 +220,11 @@ function SortedEntry({ entry, context }) {
 
 /*
  * One author and their recent songs. The header is taller than a log row
- * because it is the thing you scan first, and the songs stay folded away until
- * asked for, so a long follow list does not become a wall of covers.
+ * because it is the thing you scan first. The songs sit under it, always open
+ * and indented past the avatar, so the list reads as one author with their
+ * tracks beneath them rather than as a set of folds to open one by one.
  */
-function AuthorGroup({ author, context }) {
-  const [open, setOpen] = useState(false);
+function AuthorGroup({ author, context, played }) {
   const count = author.entries.length;
   return (
     <div className="overflow-hidden rounded-xl border bg-card/60">
@@ -215,38 +232,34 @@ function AuthorGroup({ author, context }) {
         <Link {...userLink(author.user)} className="shrink-0">
           <Avatar src={author.user?.avatar_url} name={author.user?.username} size={48} />
         </Link>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
-        >
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">
-              {author.user?.username || 'Someone'}
-            </div>
-            <div className="truncate text-xs text-muted-foreground">
-              {count} {count === 1 ? 'song' : 'songs'} · latest {timeAgo(author.latest)}
-            </div>
-          </div>
-          <ChevronDown
-            size={18}
-            className={cn(
-              'shrink-0 text-muted-foreground transition-transform',
-              open && 'rotate-180'
-            )}
-          />
-        </button>
-      </div>
-      {open ? (
-        <div className="border-t px-2 py-2">
-          <div className="flex flex-col gap-0.5">
-            {author.entries.map((entry, i) => (
-              <SortedEntry key={`${entry.track.id}-${i}`} entry={entry} context={context} />
-            ))}
+        <div className="min-w-0 flex-1">
+          <Link
+            {...userLink(author.user)}
+            className="block truncate text-sm font-semibold hover:underline"
+          >
+            {author.user?.username || 'Someone'}
+          </Link>
+          <div className="truncate text-xs text-muted-foreground">
+            {count} {count === 1 ? 'song' : 'songs'} · latest {timeAgo(author.latest)}
           </div>
         </div>
-      ) : null}
+      </div>
+      {/*
+        * The rule and the left inset are what make the songs read as belonging
+        * to the author above them instead of as the next row in one flat list.
+        */}
+      <div className="ml-[3.75rem] border-l border-border/60 px-2 pb-2">
+        <div className="flex flex-col gap-0.5">
+          {author.entries.map((entry, i) => (
+            <SortedEntry
+              key={`${entry.track.id}-${i}`}
+              entry={entry}
+              context={context}
+              played={played}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -254,6 +267,7 @@ function AuthorGroup({ author, context }) {
 export function ActivityPage() {
   const { isAuthed } = useAuth();
   const [prefs] = usePrefs();
+  const played = usePlayed();
   // Sorted is the default: what each person put out lately is the question
   // this page is usually opened to answer, and the plain log is one click away.
   const [view, setView] = useState('sorted');
@@ -336,14 +350,16 @@ export function ActivityPage() {
   return (
     <Page>
       {/*
-       * The switch is centred on the page and sits on the title's own line, so
-       * it reads as part of the heading rather than as another toolbar. On a
-       * narrow screen there is no room beside the title, so it drops below it.
+       * The switch shares the title's row and is pushed to the right edge, the
+       * way a page's main action sits on a list page. On a narrow screen there
+       * is no room beside the title, so it drops below instead of crowding it.
        */}
-      <div className="relative mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Activity</h1>
-        <div className="mt-3 sm:absolute sm:top-1/2 sm:left-1/2 sm:mt-0 sm:-translate-x-1/2 sm:-translate-y-1/2">
-          <ViewSwitch view={view} onChange={setView} />
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <h1 className="min-w-0 text-2xl font-semibold tracking-tight sm:text-3xl">Activity</h1>
+          <div className="shrink-0">
+            <ViewSwitch view={view} onChange={setView} />
+          </div>
         </div>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           {view === 'log'
@@ -384,6 +400,7 @@ export function ActivityPage() {
               key={author.user?.id}
               author={author}
               context={sortedTracks}
+              played={played}
             />
           ))}
         </div>

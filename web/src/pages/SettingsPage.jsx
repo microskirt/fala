@@ -504,7 +504,7 @@ export function SettingsPage() {
                           aria-checked={active}
                           onClick={() => setPrefs({ sortedDays: d })}
                           className={cn(
-                            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                            'rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors',
                             active
                               ? 'bg-primary text-primary-foreground shadow-xs'
                               : 'text-muted-foreground hover:bg-accent hover:text-foreground'
