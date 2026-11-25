@@ -26,6 +26,7 @@ import {
   formatDate,
   formatRelativeDate,
   trackPath,
+  trackArtistName,
 } from '@/api.js';
 import { usePlayer, usePlayerTime } from '@/context/PlayerContext.jsx';
 import { useLibrary } from '@/context/LibraryContext.jsx';
@@ -1596,9 +1597,14 @@ export function TrackPage() {
     .filter(Boolean)
     .filter((t) => t.toLowerCase() !== mainKey)
     .slice(0, 12);
-  // The credits for the song itself, which SoundCloud stores apart from the
-  // account that uploaded it.
-  const metaArtist = String(track.publisher_metadata?.artist || '').trim();
+  /*
+   * The credits for the song itself, which SoundCloud stores apart from the
+   * account that uploaded it. Not every upload fills that field in, and an
+   * empty one used to leave the line with only the date: the player bar showed
+   * a name while the card above it showed none. Falling back to the uploader
+   * keeps the two in step, which is what SoundCloud itself does.
+   */
+  const metaArtist = trackArtistName(track);
   /*
    * The credit line reads "artist · date", with each part dropped when the
    * song has nothing to say about it. Building it as a list keeps the
@@ -1718,10 +1724,16 @@ export function TrackPage() {
               onClick={() => (active ? togglePlay() : playTrack(track, contextList))}
               aria-label={active && playing ? 'Pause' : 'Play'}
             >
+              {/*
+                * The glyph keeps the same share of its button as the transport
+                * button in the player bar: 15px inside 36px is a little over
+                * two fifths, which on this 56px button is 23px. At 22 the icon
+                * sat a touch small for the circle it fills.
+                */}
               {active && playing ? (
-                <Pause size={22} fill="currentColor" />
+                <Pause size={23} fill="currentColor" />
               ) : (
-                <Play size={22} fill="currentColor" className="ml-0.5" />
+                <Play size={23} fill="currentColor" className="ml-0.5" />
               )}
             </button>
 
