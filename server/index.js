@@ -289,6 +289,19 @@ route('GET', '/api/me/stream', async (ctx) => {
   return sc.myStream(token, { limit: pageLimit(ctx.query, 20) });
 });
 
+/*
+ * The Sorted view: the same events as the stream, grouped by the person who
+ * posted or reposted them, and only for the last few days. The window is a
+ * preference, so it arrives as a query value and is clamped to the three the
+ * settings offer rather than trusting an arbitrary number.
+ */
+route('GET', '/api/me/stream/sorted', async (ctx) => {
+  const token = requireToken(ctx);
+  const asked = Number(ctx.query.get('days'));
+  const days = [5, 7, 10].includes(asked) ? asked : 7;
+  return sc.sortedActivity(token, { days });
+});
+
 route('GET', '/api/me/notifications', async (ctx) => {
   const token = requireToken(ctx);
   const data = await sc.notifications(token, {

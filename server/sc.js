@@ -1975,6 +1975,105 @@ export async function myStream(token, { limit = 50 } = {}) {
   };
 }
 
+/*
+ * The Sorted view of the activity feed.
+ *
+ * The plain stream is one long list of events. Sorted answers the other
+ * question: what did each person you follow put out lately, and when. So it
+ * groups the same events by their author, keeps only the last `days`, and puts
+ * the newest first inside each author.
+ *
+ * An author is either the person who made the event, or, for a repost, the
+ * person who reposted it. Only tracks are kept: a comment, a like or a new
+ * follower is not something an author "put out". Each entry records which of
+ * the two it was, because the list marks an upload and a repost differently.
+ *
+ * The people walked are the ones you follow, capped by `maxPeople`, because the
+ * feed itself only reaches so far back and a follow with no recent activity is
+ * not worth a row. The walk stops early once an event is older than the window,
+ * since the stream is newest first.
+ */
+export function groupActivity(results, cutoff) {
+  const authors = new Map();
+  for (const { person, collection } of results) {
+    const entries = [];
+    for (const event of collection || []) {
+      const when = event?.created_at ? new Date(event.created_at).getTime() : NaN;
+      if (!Number.isFinite(when)) continue;
+      // The stream is newest first, so the first old event ends this author.
+      if (when < cutoff) break;
+      const track = event.track;
+      if (!track || !track.id) continue;
+      /*
+       * A track event is an upload when the event's author owns the track, and
+       * a repost when someone else's track is passed on. The repost event type
+       * says the same thing directly, but checking the owner covers the events
+       * that arrive as a plain track.
+       */
+      const ownerId = track.user?.id;
+      const repost = String(ownerId) !== String(person.id);
+      entries.push({
+        type: repost ? 'repost' : 'post',
+        created_at: event.created_at,
+        track: slimTrack(track),
+      });
+    }
+    if (!entries.length) continue;
+    // Newest first, so the top of the drop down is the latest thing they did.
+    entries.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    authors.set(String(person.id), {
+      user: person,
+      latest: entries[0].created_at,
+      entries,
+    });
+  }
+
+  /*
+   * The authors themselves are ordered by their latest event, so the list reads
+   * as "who did something most recently" rather than alphabetically.
+   */
+  return [...authors.values()].sort((a, b) => new Date(b.latest) - new Date(a.latest));
+}
+
+export async function sortedActivity(token, { days = 7, maxPeople = 60 } = {}) {
+  const windowMs = Math.max(1, Number(days) || 7) * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - windowMs;
+
+  const me = await meId(token);
+  const follows = await apiGet(`/users/${me}/followings?limit=${maxPeople}`, { token });
+  const people = (follows.collection || []).map(slimUser).filter(Boolean);
+
+  /*
+   * One stream per followed account, because the feed as a whole only reaches
+   * so far back. They are fetched a few at a time rather than all at once: a
+   * listener following a hundred people would otherwise open a hundred sockets
+   * in the same instant. A failure for one account leaves that account out
+   * instead of blanking the view.
+   */
+  const results = [];
+  const POOL = 6;
+  for (let i = 0; i < people.length; i += POOL) {
+    const batch = people.slice(i, i + POOL);
+    const settled = await Promise.all(
+      batch.map(async (person) => {
+        try {
+          const data = await apiGet(`/stream/users/${person.id}?limit=50`, { token });
+          return { person, collection: data.collection || [] };
+        } catch {
+          return { person, collection: [] };
+        }
+      })
+    );
+    results.push(...settled);
+  }
+
+  return {
+    collection: groupActivity(results, cutoff),
+    days,
+    cutoff: new Date(cutoff).toISOString(),
+  };
+}
+
 /* --------------------------------- writes ---------------------------------- */
 
 export async function like(token, trackId, on) {
