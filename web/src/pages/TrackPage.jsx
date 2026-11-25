@@ -60,6 +60,7 @@ import { ClampedText } from '@/components/ClampedText.jsx';
 import { resolveTrackParam, playlistLink, userLink, trackSubLink } from '@/lib/scRoute.js';
 import { DETAIL_GRID } from '@/lib/layout.js';
 import {
+  normalizeSamples,
   shapeSamples,
   themeColor,
   barGeometry,
@@ -1459,7 +1460,12 @@ export function TrackPage() {
         if (t.waveform_url) {
           api
             .get(`/api/tracks/${id}/waveform?url=${encodeURIComponent(t.waveform_url)}`)
-            .then((w) => !cancelled && setWaveform(w.samples || []))
+            /*
+             * SoundCloud's own payload is integers on the picture's height
+             * scale; it is divided down to 0-1 once, here, so the rest of the
+             * page works on the same values the small waveform does.
+             */
+            .then((w) => !cancelled && setWaveform(normalizeSamples(w)))
             .catch(() => {});
         }
 
