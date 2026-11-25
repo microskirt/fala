@@ -45,11 +45,11 @@ function ViewSwitch({ view, onChange }) {
     <div
       role="tablist"
       aria-label="Activity view"
-      className="inline-flex items-center rounded-full border bg-card p-0.5"
+      className="inline-flex items-center gap-0.5 rounded-lg border bg-card p-1"
     >
       {[
-        ['log', 'Log'],
         ['sorted', 'Sorted'],
+        ['log', 'Log'],
       ].map(([id, label]) => (
         <button
           key={id}
@@ -58,10 +58,12 @@ function ViewSwitch({ view, onChange }) {
           aria-selected={view === id}
           onClick={() => onChange(id)}
           className={cn(
-            'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+            // The same shape and weight as the app's buttons, so the switch
+            // belongs to the page instead of looking like its own widget.
+            'rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors',
             view === id
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+              ? 'bg-primary text-primary-foreground shadow-xs'
+              : 'text-muted-foreground hover:bg-accent hover:text-foreground'
           )}
         >
           {label}
@@ -252,7 +254,9 @@ function AuthorGroup({ author, context }) {
 export function ActivityPage() {
   const { isAuthed } = useAuth();
   const [prefs] = usePrefs();
-  const [view, setView] = useState('log');
+  // Sorted is the default: what each person put out lately is the question
+  // this page is usually opened to answer, and the plain log is one click away.
+  const [view, setView] = useState('sorted');
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);

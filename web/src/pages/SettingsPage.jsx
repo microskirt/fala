@@ -492,7 +492,7 @@ export function SettingsPage() {
                   <div
                     role="radiogroup"
                     aria-label="Sorted window"
-                    className="inline-flex items-center rounded-full border bg-card p-0.5"
+                    className="inline-flex items-center gap-0.5 rounded-lg border bg-card p-1"
                   >
                     {[5, 7, 10].map((d) => {
                       const active = (Number(prefs.sortedDays) || 7) === d;
@@ -504,10 +504,10 @@ export function SettingsPage() {
                           aria-checked={active}
                           onClick={() => setPrefs({ sortedDays: d })}
                           className={cn(
-                            'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                             active
-                              ? 'bg-primary text-primary-foreground'
-                              : 'text-muted-foreground hover:text-foreground'
+                              ? 'bg-primary text-primary-foreground shadow-xs'
+                              : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                           )}
                         >
                           {d} days
