@@ -90,12 +90,14 @@ function SortedEntry({ entry, context, onPlay }) {
       </div>
 
       {/*
-       * A fixed width, because a bar squeezed by a long title would stop
-       * showing where its comments sit. It sits between the song and the
-       * buttons rather than beside the cover, so the title stays next to its
-       * picture and the bar is read as a detail of the song, not of the cover.
+       * The title and the bar split the space between the cover and the buttons
+       * evenly, so the bar always begins at the same point on the row no matter
+       * how long the title is. A fixed width gave a short title a long empty
+       * stretch and a long title a short bar; an even split keeps every row
+       * reading the same way. On a narrow screen there is not enough room to
+       * split, so the bar keeps a fixed width and the title takes the rest.
        */}
-      <div className="w-28 shrink-0 sm:w-40 lg:w-56">
+      <div className="w-28 shrink-0 sm:w-auto sm:min-w-0 sm:flex-1">
         <MiniWaveform
           samples={samples}
           markers={markers}
