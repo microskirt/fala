@@ -219,6 +219,24 @@ function mix(color, surface, amount) {
 }
 
 /*
+ * The opaque colour of the tinted band behind a detail page's top card.
+ *
+ * That band is painted as `color-mix(in srgb, <cover> 30%, var(--background))`,
+ * so a song page's waveform does not sit on the card the way a list row does: it
+ * sits on this. The surface matters because the lower half of every bar is built
+ * by flattening the bar colour against whatever is behind it. Mixed against the
+ * cooler card colour instead, the lower half came out darker than the band it was
+ * drawn on (measured 57,58,80 over a band of 65,59,66), which reads as a notch
+ * bitten out of the wave rather than a shadowed plate under it. Against the real
+ * band it lands above the band and below the bar, which is where SoundCloud's
+ * lower half sits.
+ */
+export function bandSurface(tint, background, amount = 0.3) {
+  if (!tint) return null;
+  return mix(tint, background, amount);
+}
+
+/*
  * Splits a colour into its three channels. The canvas can be handed a hex string or
  * an `rgb()` string depending on where the theme colour came from, and both the
  * shading and the gap tint need the numbers. Returns null when the string is in a

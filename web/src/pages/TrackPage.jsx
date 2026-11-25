@@ -65,6 +65,7 @@ import {
   themeColor,
   barGeometry,
   paintBars,
+  bandSurface,
   buildCommentMarkers,
   markerAtTime,
 } from '@/lib/waveform.js';
@@ -86,6 +87,7 @@ function Waveform({
   activeMarker = null,
   onMarkerEnter,
   onMarkerLeave,
+  tint = null,
 }) {
   const outerRef = useRef(null);
   const restRef = useRef(null);
@@ -157,10 +159,18 @@ function Waveform({
     if (!width || !norm.length) return;
     const played = themeColor('--primary', '#ff5500');
     const rest = themeColor('--waveform-bar', '#55565f');
-    const common = { norm, width, height: h, geometry };
+    /*
+     * The surface is read here, not passed in as a colour, so it follows a theme
+     * switch. The bars sit on the tinted band behind the card when the cover
+     * gives one, and on the page background when it does not; either way the
+     * lower half and the gap are flattened against what is really behind them.
+     */
+    const bg = themeColor('--background', '#0c0c0e');
+    const surface = bandSurface(tint, bg) || bg;
+    const common = { norm, width, height: h, geometry, surface };
     paintBars(restRef.current, { ...common, color: rest });
     paintBars(playedRef.current, { ...common, color: played });
-  }, [width, h, norm, geometry]);
+  }, [width, h, norm, geometry, tint]);
 
   // Redraw on size, data or theme change. The clip below handles the playhead,
   // so no repaint happens while the song plays.
@@ -441,7 +451,7 @@ function WaveformTip({ marker, width, barFraction = 1 }) {
  * own timestamp, and while the song plays through that moment the comment pops
  * up on its own for a few seconds, the way SoundCloud surfaces it.
  */
-function WaveformPlayer({ samples, active, onSeek, durationMs, markers }) {
+function WaveformPlayer({ samples, active, onSeek, durationMs, markers, tint }) {
   const { currentTime, duration } = usePlayerTime();
   const total = duration || durationMs || 0;
   const time = active ? currentTime : 0;
@@ -474,6 +484,7 @@ function WaveformPlayer({ samples, active, onSeek, durationMs, markers }) {
           currentTime={time}
           duration={total}
           onSeek={onSeek}
+          tint={tint}
           fill
           markers={markers}
           activeMarker={tip}
@@ -1796,6 +1807,7 @@ export function TrackPage() {
                 active={active}
                 durationMs={track.full_duration || track.duration || 0}
                 markers={commentMarkers}
+                tint={tint}
                 onSeek={(ratio) => {
                   /*
                    * The track id rides along because starting a song and
