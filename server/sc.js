@@ -1416,19 +1416,21 @@ async function waveformAt(url) {
   const samples = data.samples || [];
   if (!samples.length) return null;
   /*
-   * More bars than a coarse 200 keeps the shape readable at SoundCloud's width,
-   * but the thinning takes the loudest sample in each window rather than every
-   * step-th one. Taking every step-th sample drops the transients between them,
-   * and a kick or a snare is exactly the peak that gives a waveform its shape.
+   * Each window becomes the average of the samples in it, not the loudest one.
+   * A bar stands for a stretch of the song, and the average of that stretch is
+   * how loud it actually is. Taking the loudest sample instead lets every kick
+   * and snare push its whole bar to the ceiling, so a busy master turns into a
+   * wall of full-height bars: the loud and the quiet parts stop reading apart,
+   * which is exactly the difference from SoundCloud's own picture.
    */
   const count = Math.min(280, samples.length);
   const out = [];
   for (let i = 0; i < count; i += 1) {
     const from = Math.floor((i * samples.length) / count);
     const to = Math.max(from + 1, Math.floor(((i + 1) * samples.length) / count));
-    let peak = 0;
-    for (let j = from; j < to; j += 1) if (samples[j] > peak) peak = samples[j];
-    out.push(peak);
+    let sum = 0;
+    for (let j = from; j < to; j += 1) sum += samples[j];
+    out.push(sum / (to - from));
   }
   return { width: data.width, height: data.height, samples: out };
 }

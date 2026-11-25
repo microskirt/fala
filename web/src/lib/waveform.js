@@ -6,19 +6,29 @@
  */
 
 /*
+ * How much of the box the loudest bar may fill. The samples reach the top of the
+ * range on a mastered track, so mapping the peak straight onto the box makes
+ * every bar touch the edge: the waveform becomes a solid slab with no air around
+ * it, and it also grows taller than it used to be. Holding the peak a little
+ * under three quarters keeps the margin the bars had before and gives the shape
+ * its depth instead of a wall of full-height bars.
+ */
+const PEAK_FILL = 0.72;
+
+/*
  * Turns SoundCloud's sample amplitudes into bar heights between 0 and 1.
  *
  * The samples are not on a 0-255 scale. SoundCloud scales every track so its
  * loudest moment equals the picture's own `height`, which is 140 on every track
  * sampled, so dividing by 255 leaves a mastered song reaching only 55% of the
- * range. Every bar then crowds into the top of the box and the waveform reads as
- * a flat slab instead of a shape. Dividing by the array's own peak puts the
- * loudest moment at full height and lets the quiet passages fall away, which is
- * what SoundCloud's own player draws.
+ * range. Dividing by the array's own peak instead puts the loudest moment at the
+ * top of the scale and lets the quiet passages fall away, which is how
+ * SoundCloud's own player reads.
  *
- * The curve above 1 pushes the quiet passages down a little further, because a
- * straight reading still comes out flatter than SoundCloud's bars. The floor
- * keeps a near-silent bar visible rather than letting it disappear.
+ * A gentle curve above 1 pushes the quiet passages down a little further. A
+ * straight reading still comes out flatter than SoundCloud's bars, whose dips
+ * drop well below the body of the wave. The floor keeps a near-silent bar
+ * visible rather than letting it vanish.
  */
 export function shapeSamples(samples) {
   let peak = 0;
@@ -26,7 +36,7 @@ export function shapeSamples(samples) {
   if (peak <= 0) peak = 1;
   return samples.map((s) => {
     const v = Math.pow(Math.min(1, Math.max(0, s) / peak), 1.1);
-    return Math.min(1, Math.max(0.04, v));
+    return Math.min(PEAK_FILL, Math.max(0.04, v * PEAK_FILL));
   });
 }
 
@@ -164,15 +174,17 @@ export function paintBars(canvas, { norm, width, height, geometry, color, minBar
   const shaded = shade(color, 0.55);
   for (let i = 0; i < barCount; i += 1) {
     /*
-     * A bar stands for a slice of the song, not for the single sample under its
-     * own pixel. Taking the loudest value in that slice keeps a transient that
-     * falls between two bar positions, which point sampling would drop and the
-     * waveform would then show a dent where the song actually hits hardest.
+     * A bar stands for a slice of the song, so its height is the average of that
+     * slice rather than the loudest sample in it. Taking the loudest value pulls
+     * every bar that contains a kick up to the ceiling, which is what turned the
+     * waveform into a flat slab. The average keeps a loud stretch tall and a
+     * quiet one short, the way SoundCloud's bars step down through a break.
      */
     const from = Math.floor((i * norm.length) / barCount);
     const to = Math.max(from + 1, Math.floor(((i + 1) * norm.length) / barCount));
-    let v = 0;
-    for (let j = from; j < to; j += 1) if (norm[j] > v) v = norm[j];
+    let sum = 0;
+    for (let j = from; j < to; j += 1) sum += norm[j];
+    const v = sum / (to - from);
     const bh = Math.max(minBar, Math.round(minBar + v * (maxBar - minBar)));
     const x = Math.round(i * step);
     const top = Math.round(mid - bh / 2);
