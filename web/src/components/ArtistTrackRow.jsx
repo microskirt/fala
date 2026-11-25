@@ -491,7 +491,7 @@ export function ArtistTrackRow({ track, context }) {
           src={track.artwork_url}
           fallback={track.user?.avatar_url}
           alt={track.title}
-          size={112}
+          size={144}
           rounded={8}
         />
       </Link>
@@ -596,7 +596,7 @@ export function ArtistTrackRow({ track, context }) {
 export function ArtistTrackRowSkeleton() {
   return (
     <div className="flex gap-3 rounded-lg px-2 py-2">
-      <Skeleton className="size-28 shrink-0 rounded-lg" />
+      <Skeleton className="size-36 shrink-0 rounded-lg" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2.5">
           <Skeleton className="size-8 shrink-0 rounded-full" />
