@@ -1607,9 +1607,25 @@ export function TrackPage() {
    */
   const creditParts = [];
   if (metaArtist) {
+    /*
+     * The credit names the song's own artist, which often differs from the
+     * account that uploaded the file. SoundCloud still treats it as the way
+     * into the artist's page, so it lifts on hover and opens the uploader.
+     * Without an uploader to point at, it stays plain text.
+     */
     creditParts.push({
       key: 'artist',
-      node: <span className="min-w-0 break-words">{metaArtist}</span>,
+      node: track.user ? (
+        <Link
+          {...userLink(track.user)}
+          title={`Open ${track.user.username || 'the artist'}'s page`}
+          className="min-w-0 break-words underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline focus-visible:outline-hidden"
+        >
+          {metaArtist}
+        </Link>
+      ) : (
+        <span className="min-w-0 break-words">{metaArtist}</span>
+      ),
     });
   }
   if (track.display_date) {
