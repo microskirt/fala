@@ -256,11 +256,12 @@ function Waveform({
         {/*
           * The playhead. It is a thin bright line over the bars, positioned by
           * percentage so it slides with the frame instead of stepping bar by
-          * bar. It sits a few pixels inside the box at either end, so it reads
-          * as a marker on the bars rather than as the box's own border.
+          * bar. It covers the middle half of the box rather than its full
+          * height: at full height the line read as a divider cutting the wave
+          * in two, and the bars themselves are what should carry the shape.
           */}
         <div
-          className="pointer-events-none absolute inset-y-[3px] z-[5] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+          className="pointer-events-none absolute inset-y-[25%] z-[5] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
           style={{ left: `${progress * barFraction * 100}%` }}
           aria-hidden="true"
         />
