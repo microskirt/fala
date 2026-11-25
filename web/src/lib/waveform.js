@@ -16,6 +16,22 @@
 const PEAK_FILL = 0.72;
 
 /*
+ * How far the quiet passages are pushed down before the cap. Above 1 this is a
+ * contrast curve: the loudest bar stays where it is and the quieter ones fall
+ * further away from it, which is what makes a wave read as a shape instead of a
+ * filled band.
+ *
+ * The value comes from measuring two screenshots of the same song, one from each
+ * player. Their envelopes correlate at 0.90, so they are directly comparable, and
+ * the comparison showed Fala's dips were too shallow: SoundCloud's bars fell to
+ * 65% of its tallest at the tenth percentile, Fala's only to 78%. Matching that
+ * song's percentiles put the exponent near 1.7; sweeping the whole corpus put the
+ * best match for the tenth percentile at 1.5, which is what this uses, because
+ * one song's fit will chase its own noise.
+ */
+const CURVE = 1.5;
+
+/*
  * Turns the server's sample values into bar heights between 0 and 1.
  *
  * The server has already divided each sample by the track's own peak, which is
@@ -23,12 +39,15 @@ const PEAK_FILL = 0.72;
  * on a 0-1 scale and there is no second stretch to apply here; doing it twice
  * would be a no-op at best and would hide a bad payload at worst.
  *
- * The only work left is the clamp, the cap and the floor. The cap keeps the
- * loudest bar short of the box edge so the waveform keeps the air around it, and
- * the floor keeps a near-silent bar visible rather than letting it vanish.
+ * The work left is the curve, the clamp, the cap and the floor. The curve deepens
+ * the quiet passages, the cap keeps the loudest bar short of the box edge so the
+ * waveform keeps the air around it, and the floor keeps a near-silent bar visible
+ * rather than letting it vanish.
  */
 export function shapeSamples(samples) {
-  return samples.map((s) => Math.min(PEAK_FILL, Math.max(0.04, Math.min(1, Math.max(0, s)) * PEAK_FILL)));
+  return samples.map((s) =>
+    Math.min(PEAK_FILL, Math.max(0.04, Math.pow(Math.min(1, Math.max(0, s)), CURVE) * PEAK_FILL))
+  );
 }
 
 /*
@@ -128,9 +147,25 @@ export function markerAtTime(markers, time, { lead = 500, hold = 3000 } = {}) {
  */
 export function barGeometry(width, { bar = 2, gap = 1, gutter = 0 } = {}) {
   const barWidth = Math.max(0, width - gutter);
-  const barCount = barWidth > 0 ? Math.max(1, Math.floor((barWidth + gap) / (bar + gap))) : 0;
-  const step = barCount > 0 ? (barWidth + gap) / barCount : 0;
-  const barFraction = width > 0 ? barWidth / width : 1;
+  const pitch = bar + gap;
+  const barCount = barWidth > 0 ? Math.max(1, Math.floor((barWidth + gap) / pitch)) : 0;
+  /*
+   * The step is the whole pitch, never a fraction stretched to fill the width.
+   * It used to be (barWidth + gap) / barCount, so a bar sat at round(i * step)
+   * with a step like 3.0045. Every so often that rounding jumps four pixels
+   * instead of three and leaves an empty column, which reads as a dead bar in
+   * the middle of the wave. Measured at 1336px it happened twice, and SoundCloud
+   * never shows one because its pitch is a whole number. A few unused pixels at
+   * the right edge are invisible; a missing bar is not.
+   */
+  const step = pitch;
+  /*
+   * The bars span one gap less than the full count of pitches. That span, not the
+   * whole bar area, is what the playhead and the played layer should be measured
+   * against, so a seek lands on the bar under the pointer.
+   */
+  const span = barCount > 0 ? barCount * pitch - gap : 0;
+  const barFraction = width > 0 ? Math.min(1, span / width) : 1;
   return { bar, gap, barWidth, barCount, step, barFraction };
 }
 
