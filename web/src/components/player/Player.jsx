@@ -118,7 +118,7 @@ function VolumeControl({ volume, muted, icon: Icon, onToggleMute, onVolume }) {
            * easy to hit. The inner width is only as wide as the thumb needs, so
            * the sides do not read as dead space beside the fader.
            */}
-          <div className="flex h-44 w-7 items-center justify-center">
+          <div className="flex h-40 w-7 items-center justify-center">
             <Slider
               orientation="vertical"
               className="h-full"
@@ -229,7 +229,15 @@ export function Player() {
   const toggled = 'bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary';
 
   return (
-    <div className="shrink-0 border-t border-border bg-card/90 backdrop-blur">
+    /*
+     * The bar owns a stacking context of its own, above the scrolling page.
+     * Without it the volume popup, which opens upward over the page, was
+     * painted under anything positioned in the page such as the carousel's
+     * scroll arrows, even though the popup itself asks for a high z-index: a
+     * child's z-index only counts inside its parent's context. It stays below
+     * the sidebar and the topbar, and below the mobile drawer's scrim.
+     */
+    <div className="relative z-20 shrink-0 border-t border-border bg-card/90 backdrop-blur">
       {/*
         * The bar keeps its own border and tint across the full width, but its
         * contents sit on the same column as the page: same max width, same
