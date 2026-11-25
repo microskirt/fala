@@ -6,106 +6,48 @@
  */
 
 /*
- * There is no cap on how much of the box the loudest bar may fill.
- *
- * There used to be one, at 0.72, from when the curve was wrong: with a bad shape
- * the bars crowded the top of the box and read as a solid slab, so the whole wave
- * was shrunk to hide it. With SoundCloud's own curve that is no longer a problem,
- * and the cap became the last visible difference from their waveform. Measured
- * against their own draw of the same song, Fala filled 67% of its box against
- * their 94%, so every bar sat too low and the wave looked small and flat even
- * though its shape was right.
- *
- * The 2px margin in `paintBars` is what keeps the loudest bar clear of the box
- * edge now, which is the same small margin their own geometry leaves. Filling the
- * box is not the same as growing it: the box is unchanged, the bars simply use it
- * the way SoundCloud's do.
+ * How much of the box the loudest bar may fill. The samples reach the top of the
+ * range on a mastered track, so mapping the peak straight onto the box makes
+ * every bar touch the edge: the waveform becomes a solid slab with no air around
+ * it, and it also grows taller than it used to be. Holding the peak a little
+ * under three quarters keeps the margin the bars had before and gives the shape
+ * its depth instead of a wall of full-height bars.
  */
+const PEAK_FILL = 0.72;
 
 /*
- * The curve is not invented. It is SoundCloud's own, read out of the bundle their
- * player ships (`56-760b5386.js`), where `WaveformData` transforms every sample
- * and `BackgroundNode#draw` turns it into a bar:
+ * How far the quiet passages are pushed down before the cap. Above 1 this is a
+ * contrast curve: the loudest bar stays where it is and the quieter ones fall
+ * further away from it, which is what makes a wave read as a shape instead of a
+ * filled band.
  *
- *   this.samples = raw.reduce((t, n, r) =>
- *     t[r] = Math.round(Math.pow((maxHeight - n) / maxHeight, 1 / 1.5) * maxHeight))
- *
- *   S = Math.floor(b / maxHeight * upperSize)
- *   O = Math.floor((1 - b / maxHeight) * lowerSize + upperSize)
- *   bar height = O - S
- *
- * With `x = raw / maxHeight` and `upperSize + lowerSize = box`, that collapses
- * to one line:
- *
- *   height / box = 1 - (1 - x)^(2/3)
- *
- * The exponent sits on the DISTANCE FROM THE PEAK, not on the value. That is the
- * part every earlier attempt missed. A plain power of x (`x^1.5`) deepens the
- * middle but leaves the near-silent bars bunched together, which is why the quiet
- * passages still read as a flat block with the tops missing. Pushing the distance
- * from the peak instead spreads the quiet bars apart and keeps the loud ones
- * apart too, which is the shape their waveform actually has.
- *
- * Measured on the corpus at 260 bars, as ratios to the tallest bar in the same
- * track, against the percentiles read off their own screenshot of a song:
- *
- *   this curve   p10 0.62  p50 0.84  p90 0.91
- *   x^1.5        p10 0.65  p50 0.88  p90 0.94
- *   screenshot   p10 0.62  p50 0.79  p90 0.92
- *
- * The tenth and ninetieth land on the screenshot; the median stays a little high
- * because that song is not in the corpus. The curve is theirs, so it is not fitted
- * to one track's noise the way the previous exponents were.
+ * The value comes from measuring two screenshots of the same song, one from each
+ * player. Their envelopes correlate at 0.90, so they are directly comparable, and
+ * the comparison showed Fala's dips were too shallow: SoundCloud's bars fell to
+ * 65% of its tallest at the tenth percentile, Fala's only to 78%. Matching that
+ * song's percentiles put the exponent near 1.7; sweeping the whole corpus put the
+ * best match for the tenth percentile at 1.5, which is what this uses, because
+ * one song's fit will chase its own noise.
  */
-const CURVE_POWER = 2 / 3;
+const CURVE = 1.5;
 
 /*
- * Turns a waveform response into values between 0 and 1.
+ * Turns the server's sample values into bar heights between 0 and 1.
  *
- * The server passes SoundCloud's own payload straight through: every sample as
- * an integer on the picture's `height` scale, which is 140 on every track and
- * always equal to the loudest sample. Dividing by that height is therefore the
- * same division by the track's own peak that SoundCloud's `WaveformData` does
- * before its curve.
+ * The server has already divided each sample by the track's own peak, which is
+ * the picture height SoundCloud ships with the samples. So these values arrive
+ * on a 0-1 scale and there is no second stretch to apply here; doing it twice
+ * would be a no-op at best and would hide a bad payload at worst.
  *
- * The samples are not thinned here or on the server. They used to be cut to 1200
- * on the way out, which skipped every third sample, and a skipped sample can be
- * the dip between two hits. Integers on the original scale cost about 7.2kB a
- * track against 7.0kB for the thinned floats, so the detail was being thrown away
- * to save nothing.
+ * The work left is the curve, the clamp, the cap and the floor. The curve deepens
+ * the quiet passages, the cap keeps the loudest bar short of the box edge so the
+ * waveform keeps the air around it, and the floor keeps a near-silent bar visible
+ * rather than letting it vanish.
  */
-export function normalizeSamples(payload) {
-  const samples = payload?.samples || [];
-  if (!samples.length) return [];
-  const scale = payload?.height || 140;
-  return samples.map((s) => Math.min(1, Math.max(0, s / scale)));
-}
-
-/*
- * Turns the normalised values into bar heights between 0 and 1.
- *
- * The curve above is SoundCloud's own and turns a value straight into the share of
- * the box a bar fills. Nothing is scaled afterwards, because their renderer does
- * not scale anything either: the loudest sample draws a bar the full height of the
- * box.
- *
- * The transform is quantised on the way through. SoundCloud's `WaveformData`
- * rounds the transformed sample to a whole number on the picture's own scale
- * before the draw divides it again:
- *
- *   b = round(H * (1 - x)^(2/3))
- *   bar = 1 - b / H
- *
- * Keeping it in floating point instead lands a pixel off on the columns where the
- * rounding crosses a pixel boundary: compared column by column against their own
- * draw of the same song, that was 57 of 830 columns, every one of them by exactly
- * one pixel. Quantising the same way closes all 57 and matches every column.
- */
-export function shapeSamples(samples, scale = 140) {
-  return samples.map((s) => {
-    const x = Math.min(1, Math.max(0, s));
-    return 1 - Math.round(scale * Math.pow(1 - x, CURVE_POWER)) / scale;
-  });
+export function shapeSamples(samples) {
+  return samples.map((s) =>
+    Math.min(PEAK_FILL, Math.max(0.04, Math.pow(Math.min(1, Math.max(0, s)), CURVE) * PEAK_FILL))
+  );
 }
 
 /*
@@ -245,23 +187,14 @@ export function barGeometry(width, { bar = 2, gap = 1, gutter = 0 } = {}) {
  * left equal runs of 7.2 bars; reading one sample leaves 5.6, which is exactly
  * what SoundCloud's own data produces at the same width.
  *
- * The position is the bar's LEFT PIXEL, not its index. SoundCloud reads
- * `samples[floor((E / width) * samples.length)]` where `E` is that pixel, so the
- * sample is chosen by where the bar sits in the box. Mapping by bar index instead
- * (`i / barCount`) is almost the same but drifts as the index grows, because the
- * bar count is rounded down from the width. At 831px the two agreed by accident;
- * at 1336px they were up to two samples apart by the right edge, which on a spiky
- * track is a visibly different bar. Taking the pixel makes the read exact at every
- * width.
- *
  * When there are more bars than samples the same read repeats a sample, and no
  * mapping can avoid that, so the guard is simply to stay inside the array.
  */
-export function barValue(norm, x, barWidth) {
-  if (!norm.length || barWidth <= 0) return 0;
+export function barValue(norm, i, barCount) {
+  if (!norm.length || barCount <= 0) return 0;
   const at = Math.min(
     norm.length - 1,
-    Math.max(0, Math.floor((x / barWidth) * norm.length))
+    Math.max(0, Math.floor(((i + 0.5) * norm.length) / barCount))
   );
   return norm[at];
 }
@@ -284,26 +217,9 @@ export function paintBars(canvas, { norm, width, height, geometry, color, minBar
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
 
-  const { bar, gap, barCount, step } = geometry;
+  const { bar, barCount, step } = geometry;
+  const maxBar = height - 2;
   const mid = Math.round(height / 2);
-  /*
-   * The two edges come from SoundCloud's own draw, not from a height rounded
-   * around the centre:
-   *
-   *   S = floor((1 - v) * upperSize)
-   *   O = floor(v * lowerSize + upperSize)
-   *
-   * with `upperSize` and `lowerSize` each half the box, because their waveform was
-   * measured symmetric (the axis sits at 49.2% of the box and the bars reach as
-   * far above it as below).
-   *
-   * Rounding a height and then splitting it either side of the centre gives a
-   * result within a pixel of this, but that pixel is visible as a jagged edge once
-   * the whole wave is compared column by column: it was the last difference left
-   * after the curve and the gap fill were matched.
-   */
-  const upperSize = height / 2;
-  const lowerSize = height - upperSize;
   /*
    * Each bar is two tones around the centre line: the half above the axis
    * catches the light, the half below sits in shadow. That is what gives
@@ -312,89 +228,20 @@ export function paintBars(canvas, { norm, width, height, geometry, color, minBar
    */
   const lit = color;
   const shaded = shade(color, 0.55);
-  /*
-   * The gap between two bars is filled over the height they share. SoundCloud's
-   * own draw does exactly this:
-   *
-   *   if (E) fillRect(E - gap, max(S, prevS), gap, min(O, prevO) - max(S, prevS))
-   *
-   * so a gap column is never empty; it carries the part of the two neighbours
-   * that overlaps. That is the difference between a row of separate slivers and
-   * the continuous shape their waveform has, and it is why their screenshot shows
-   * "bars" 5px and 14px wide: those are neighbours joined by this fill.
-   *
-   * Measured on their screenshot, all 258 inner gap columns carry ink, with a mean
-   * overlap of 20px, so this is not a rare touch-up. Leaving it out is what made
-   * Fala's wave look thinner and more broken up at every width.
-   */
-  let prevTop = null;
-  let prevBottom = null;
   for (let i = 0; i < barCount; i += 1) {
     /*
      * The bar's value is the sample nearest its own position, never a blend of
      * its neighbours. Blending is what used to make runs of bars land on the
      * same pixel height and merge into a slab.
-     *
-     * The position handed over is the bar's own left pixel, because that is the
-     * position SoundCloud samples at; see `barValue`.
      */
+    const v = barValue(norm, i, barCount);
+    const bh = Math.max(minBar, Math.round(minBar + v * (maxBar - minBar)));
     const x = Math.round(i * step);
-    const v = barValue(norm, x, width);
-    /*
-     * Both edges are floored from the box, exactly as their draw does, so a bar
-     * of a given value lands on the same pixel here as it does there. The minimum
-     * height is then enforced around the centre, which keeps a near-silent bar
-     * visible instead of letting it vanish into the axis.
-     */
-    let top = Math.floor((1 - v) * upperSize);
-    let bottom = Math.floor(v * lowerSize + upperSize);
-    if (bottom - top < minBar) {
-      const half = Math.floor(minBar / 2);
-      top = mid - half;
-      bottom = top + minBar;
-    }
-    if (top > mid) top = mid;
-    if (bottom < mid) bottom = mid;
-    /*
-     * Join this bar to the one before it before drawing either, so the fill sits
-     * under the bars rather than over them.
-     */
-    if (prevTop !== null && gap > 0 && i > 0) {
-      const joinTop = Math.max(top, prevTop);
-      const joinBottom = Math.min(bottom, prevBottom);
-      if (joinBottom > joinTop) {
-        const gx = x - gap;
-        const litBottom = Math.min(mid, joinBottom);
-        if (litBottom > joinTop) {
-          ctx.fillStyle = lit;
-          ctx.fillRect(gx, joinTop, gap, litBottom - joinTop);
-        }
-        const shadeTop = Math.max(mid, joinTop);
-        if (joinBottom > shadeTop) {
-          ctx.fillStyle = shaded;
-          ctx.fillRect(gx, shadeTop, gap, joinBottom - shadeTop);
-        }
-      }
-    }
+    const top = Math.round(mid - bh / 2);
+    const bottom = Math.round(mid + bh / 2);
     ctx.fillStyle = lit;
     ctx.fillRect(x, top, bar, Math.max(1, mid - top));
     ctx.fillStyle = shaded;
     ctx.fillRect(x, mid, bar, Math.max(1, bottom - mid));
-    prevTop = top;
-    prevBottom = bottom;
   }
-  /*
-   * Their draw punches a one pixel hole along the axis after filling everything:
-   *
-   *   clearRect(0, g - 1, u, 1)
-   *
-   * so the light upper plate and the dark lower plate never touch, and the
-   * waveform reads as two halves around a seam. Measured on their screenshot, that
-   * row carries no bar ink at all while every other row inside the band does, and
-   * it sits at 49.2% of the box, which is exactly `floor(height / 2) - 1`.
-   *
-   * Without it the two tones meet in the middle and the seam disappears, which is
-   * part of why Fala's wave read as one solid shape instead of theirs.
-   */
-  ctx.clearRect(0, Math.floor(upperSize) - 1, width, 1);
 }

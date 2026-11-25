@@ -4,7 +4,6 @@ import { Avatar } from '@/components/Media.jsx';
 import { usePlayerTime } from '@/context/PlayerContext.jsx';
 import { cn } from '@/lib/utils.js';
 import {
-  normalizeSamples,
   shapeSamples,
   themeColor,
   barGeometry,
@@ -40,16 +39,10 @@ function loadWaveform(track) {
   if (!id) return Promise.resolve([]);
   if (url && waveformCache.has(url)) return Promise.resolve(waveformCache.get(url));
   if (waveformPending.has(id)) return waveformPending.get(id);
-  /*
-   * The server sends SoundCloud's own payload: every sample as an integer on the
-   * picture's height scale. It is divided down to 0-1 here, once, so everything
-   * downstream keeps working on normalised values and the cache never holds two
-   * different scales.
-   */
   const ask = () =>
     api
       .get(`/api/tracks/${id}/waveform${url ? `?url=${encodeURIComponent(url)}` : ''}`)
-      .then((res) => normalizeSamples(res))
+      .then((res) => res?.samples || [])
       .catch(() => []);
   const request = ask()
     .then((samples) => (samples.length ? samples : ask()))
