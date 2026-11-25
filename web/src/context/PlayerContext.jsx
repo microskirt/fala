@@ -29,6 +29,21 @@ const PlayerTimeContext = createContext(0);
  */
 const PlayerVolumeContext = createContext(null);
 
+/*
+ * A protected track needs the browser's key system, and the browser only
+ * offers that on a secure origin. `localhost` and `127.0.0.1` count as secure
+ * even over plain http. A LAN address or `0.0.0.0` does not, so
+ * `navigator.requestMediaKeySystemAccess` is simply absent there and no amount
+ * of retrying will change that. Naming the address is the only useful advice at
+ * that point, because neither the track nor the browser is at fault.
+ */
+function drmUnavailableMessage() {
+  if (typeof window !== 'undefined' && !window.isSecureContext) {
+    return 'Protected tracks need a secure address. Open Fala on localhost or over https';
+  }
+  return 'This browser cannot play protected tracks';
+}
+
 function readStoredVolume() {
   const raw = readKey(KEYS.volume);
   if (raw !== null) {
@@ -173,7 +188,7 @@ export function PlayerProvider({ children }) {
         if (info.drm && typeof navigator.requestMediaKeySystemAccess !== 'function') {
           setBuffering(false);
           setPlaying(false);
-          toast.error('This track is protected and cannot be played in this browser');
+          toast.error(drmUnavailableMessage());
           return;
         }
         const looksHls =
@@ -201,7 +216,7 @@ export function PlayerProvider({ children }) {
           if (!Hls.isSupported() && drm) {
             setBuffering(false);
             setPlaying(false);
-            toast.error('This track is protected and cannot be played in this browser');
+            toast.error(drmUnavailableMessage());
             return;
           }
           if (Hls.isSupported()) {
@@ -240,7 +255,7 @@ export function PlayerProvider({ children }) {
               if (drm && data.type === 'keySystemError') {
                 setBuffering(false);
                 setPlaying(false);
-                toast.error('This track is protected and cannot be played in this browser');
+                toast.error(drmUnavailableMessage());
                 return;
               }
               failRef.current();
