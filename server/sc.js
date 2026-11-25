@@ -1422,8 +1422,15 @@ async function waveformAt(url) {
    * and snare push its whole bar to the ceiling, so a busy master turns into a
    * wall of full-height bars: the loud and the quiet parts stop reading apart,
    * which is exactly the difference from SoundCloud's own picture.
+   *
+   * The cap has to clear the bar count, or the thinning runs out of samples
+   * before it runs out of bars. A 2px bar and a 1px gap put about 421 bars
+   * across the widest the song page gets, so the old cap of 280 left several
+   * bars drawing from one sample: neighbouring bars came out identical, which
+   * reads as stair steps rather than a curve. 480 covers the widest render and
+   * costs about 2.5kB a track, against 6.8kB for the full 1800.
    */
-  const count = Math.min(280, samples.length);
+  const count = Math.min(480, samples.length);
   const out = [];
   for (let i = 0; i < count; i += 1) {
     const from = Math.floor((i * samples.length) / count);

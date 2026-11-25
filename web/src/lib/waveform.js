@@ -144,6 +144,42 @@ export function barGeometry(width, { bar = 2, gap = 1, gutter = 0 } = {}) {
 }
 
 /*
+ * The height, between 0 and 1, that one bar should be drawn at.
+ *
+ * Normally a bar stands for a slice of the song, so its value is the average of
+ * the samples in that slice. That only works while there are at least as many
+ * samples as bars. Past that point several bars share one sample, and because
+ * they all average the same single value they come out pixel-identical: the
+ * waveform grows flat plateaus that read as stair steps rather than a curve.
+ *
+ * The guard for that case is interpolation rather than repetition. Each bar
+ * takes its value from the spot it sits at between two samples, so every bar
+ * gets a slightly different number and the plateau cannot form. The bar count
+ * stays driven by the width, as it was, and the shape stays centred.
+ */
+export function barValue(norm, i, barCount) {
+  if (!norm.length || barCount <= 0) return 0;
+  if (barCount <= norm.length) {
+    const from = Math.floor((i * norm.length) / barCount);
+    const to = Math.max(from + 1, Math.floor(((i + 1) * norm.length) / barCount));
+    let sum = 0;
+    for (let j = from; j < to; j += 1) sum += norm[j];
+    return sum / (to - from);
+  }
+  /*
+   * More bars than samples. The bar's own position across the track is read as
+   * a fraction of the sample array, and the value is read between the two
+   * samples that bracket it. A single sample just repeats, which is the one case
+   * where a plateau is unavoidable and also invisible.
+   */
+  const at = norm.length > 1 ? (i / (barCount - 1)) * (norm.length - 1) : 0;
+  const lo = Math.floor(at);
+  const hi = Math.min(norm.length - 1, lo + 1);
+  const t = at - lo;
+  return norm[lo] * (1 - t) + norm[hi] * t;
+}
+
+/*
  * Paints one colour layer of bars into a canvas, sized for the device pixel
  * ratio so the bars stay crisp on a retina screen. The song page calls this
  * twice, once in the resting colour and once in the played colour, and clips
@@ -174,17 +210,12 @@ export function paintBars(canvas, { norm, width, height, geometry, color, minBar
   const shaded = shade(color, 0.55);
   for (let i = 0; i < barCount; i += 1) {
     /*
-     * A bar stands for a slice of the song, so its height is the average of that
-     * slice rather than the loudest sample in it. Taking the loudest value pulls
-     * every bar that contains a kick up to the ceiling, which is what turned the
-     * waveform into a flat slab. The average keeps a loud stretch tall and a
-     * quiet one short, the way SoundCloud's bars step down through a break.
+     * The bar's value comes from barValue, which averages the slice while the
+     * samples cover the bars and interpolates between samples when they do not.
+     * Either way a bar is never a repeat of its neighbour, so the shape stays a
+     * curve instead of growing flat plateaus.
      */
-    const from = Math.floor((i * norm.length) / barCount);
-    const to = Math.max(from + 1, Math.floor(((i + 1) * norm.length) / barCount));
-    let sum = 0;
-    for (let j = from; j < to; j += 1) sum += norm[j];
-    const v = sum / (to - from);
+    const v = barValue(norm, i, barCount);
     const bh = Math.max(minBar, Math.round(minBar + v * (maxBar - minBar)));
     const x = Math.round(i * step);
     const top = Math.round(mid - bh / 2);
