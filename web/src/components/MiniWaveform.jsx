@@ -247,11 +247,11 @@ function MiniPlayed({ samples, width, height, geometry, duration, hoverRatio, ac
       />
       {active ? (
         /*
-         * The same playhead as the song page, and the same proportion: the
-         * middle half of the box, so a short row and a tall one read alike.
+         * The same playhead as the song page, and the same proportion, so a
+         * short row and a tall one read alike.
          */
         <div
-          className="pointer-events-none absolute inset-y-[25%] z-[6] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+          className="pointer-events-none absolute inset-y-[12%] z-[6] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
           style={{ left: `${progress * 100}%` }}
           aria-hidden="true"
         />
