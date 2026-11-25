@@ -303,7 +303,7 @@ function MiniTip({ marker, width }) {
  * either end. The upper half is a seek target, the same as the big waveform, and
  * a pointer over it previews the stretch a click would play.
  */
-function MiniWaveform({ samples, markers, duration, active, onSeek, height = 64 }) {
+function MiniWaveform({ samples, markers, duration, active, onSeek, height = 72 }) {
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const dragging = useRef(false);
@@ -373,7 +373,7 @@ function MiniWaveform({ samples, markers, duration, active, onSeek, height = 64 
   const showPlayed = active || hoverRatio !== null;
 
   return (
-    <div className="relative mt-2 w-full" style={{ height }} ref={boxRef}>
+    <div className="relative w-full" style={{ height }} ref={boxRef}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden="true" />
 
       {showPlayed ? (
@@ -502,7 +502,13 @@ export function ArtistTrackRow({ track, context }) {
        * footer, so it grows tall without the actions crowding it.
        */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-start justify-between gap-3">
+        {/*
+         * The top row starts a small step below the cover's top edge, and the
+         * footer ends the same step above its bottom edge. Matching the two
+         * means the entry reads as one block centred on the cover instead of
+         * one that starts flush and trails off short.
+         */}
+        <div className="flex items-start justify-between gap-3 pt-1.5">
           <div className="flex min-w-0 items-center gap-2.5">
             {/*
              * The play button lives beside the title rather than over the
@@ -545,28 +551,38 @@ export function ArtistTrackRow({ track, context }) {
           </div>
         </div>
 
-        <MiniWaveform
-          samples={samples}
-          markers={markers}
-          duration={duration}
-          active={active}
-          onSeek={(ratio) => {
-            /*
-             * Starting a song and seeking into it happen together here, so the
-             * track id rides along: the player still holds the previous song
-             * for a moment, and the spot has to be parked against this one.
-             */
-            if (!active) playTrack(track, context);
-            seek(ratio * duration, track.id);
-          }}
-        />
+        {/*
+         * The bar takes the space between the two rows and sits centred in it,
+         * so it lands on the middle of the cover rather than hugging the title.
+         */}
+        <div className="flex min-h-0 flex-1 items-center">
+          <MiniWaveform
+            samples={samples}
+            markers={markers}
+            duration={duration}
+            active={active}
+            onSeek={(ratio) => {
+              /*
+               * Starting a song and seeking into it happen together here, so
+               * the track id rides along: the player still holds the previous
+               * song for a moment, and the spot has to be parked against this
+               * one.
+               */
+              if (!active) playTrack(track, context);
+              seek(ratio * duration, track.id);
+            }}
+          />
+        </div>
 
         {/*
          * Every action stays out, not just the like. A row that hides three of
          * its four buttons makes the listener hunt for them, and on a list this
-         * is where the song is dealt with.
+         * is where the song is dealt with. The footer also ends the same step
+         * above the cover's bottom edge as the top row starts below its top
+         * edge, so the two bracket the cover evenly and the bar between them
+         * lands on the cover's middle.
          */}
-        <div className="mt-auto flex items-center justify-between gap-3 pt-2">
+        <div className="flex min-h-9 items-center justify-between gap-3 pb-1.5">
           <div className="flex items-center gap-0.5">
             <LikeButton track={track} size={16} />
             <RepostButton track={track} size={16} iconOnly />
@@ -610,8 +626,8 @@ export function ArtistTrackRowSkeleton() {
             <Skeleton className="mt-2 h-2.5 w-1/4" />
           </div>
         </div>
-        <Skeleton className="mt-2 h-16 w-full rounded" />
-        <div className="mt-auto flex items-center justify-between pt-2">
+        <Skeleton className="my-2 h-[72px] w-full rounded" />
+        <div className="flex min-h-9 items-center justify-between pb-1.5">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-3 w-28" />
         </div>
