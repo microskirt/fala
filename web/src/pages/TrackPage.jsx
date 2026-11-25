@@ -1725,15 +1725,16 @@ export function TrackPage() {
               aria-label={active && playing ? 'Pause' : 'Play'}
             >
               {/*
-                * The glyph keeps the same share of its button as the transport
-                * button in the player bar: 15px inside 36px is a little over
-                * two fifths, which on this 56px button is 23px. At 22 the icon
-                * sat a touch small for the circle it fills.
+                * The player bar's transport button is 15px in 36px, a little
+                * over two fifths. Copying that ratio onto this 56px button gave
+                * 23px, which read as too small for a circle this size, so the
+                * glyph is a little larger than the ratio at 28px. It stays
+                * inside the circle with room to spare.
                 */}
               {active && playing ? (
-                <Pause size={23} fill="currentColor" />
+                <Pause size={28} fill="currentColor" />
               ) : (
-                <Play size={23} fill="currentColor" className="ml-0.5" />
+                <Play size={28} fill="currentColor" className="ml-0.5" />
               )}
             </button>
 

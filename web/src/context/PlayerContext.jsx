@@ -120,6 +120,49 @@ export function PlayerProvider({ children }) {
     currentIdRef.current = current ? String(current.id) : null;
   }, [current]);
 
+  /*
+   * Applies a parked seek to the element. It is called from two places: right
+   * after the source is attached, which is the earliest the element may accept a
+   * position, and again on `loadedmetadata`, which is when it is guaranteed to.
+   * Whichever succeeds first clears the park, so the other call is a no-op.
+   *
+   * A parked seek named for a different song is dropped rather than applied, so
+   * a slow load can never drag a stale position onto the wrong track.
+   */
+  const applyParkedSeek = useCallback(() => {
+    const audio = audioRef.current;
+    const parked = pendingSeekRef.current;
+    if (!audio || !parked) return;
+    if (parked.id && currentIdRef.current && parked.id !== currentIdRef.current) {
+      pendingSeekRef.current = null;
+      return;
+    }
+    /*
+     * A spot past the end is pulled back just short of it rather than dropped,
+     * because a click on the very last bar still means the end of the song. The
+     * ratio a waveform sends is at most 1, so this only guards a bad payload or
+     * a duration that arrived shorter than expected.
+     */
+    let seconds = Math.max(0, parked.ms / 1000);
+    if (Number.isFinite(audio.duration) && audio.duration > 0 && seconds >= audio.duration) {
+      seconds = Math.max(0, audio.duration - 0.25);
+    }
+    try {
+      audio.currentTime = seconds;
+    } catch {
+      /* The element is not ready to take a position yet; the metadata event retries. */
+      return;
+    }
+    /*
+     * The park is deliberately not cleared here. Before the media arrives the
+     * element still reports a position of zero even after it has been handed
+     * the spot, so clearing now would let the frame loop snap the bar back to
+     * the top. The loop clears the park once the element reports the spot, and
+     * that is the first moment the bar can trust the element's own time.
+     */
+    setCurrentTime(seconds * 1000);
+  }, []);
+
   useEffect(() => {
     playingRef.current = playing;
   }, [playing]);
@@ -174,11 +217,26 @@ export function PlayerProvider({ children }) {
     const loadId = ++loadIdRef.current;
     let cancelled = false;
 
+    /*
+     * A click on an unplayed waveform parks its spot before this effect runs, so
+     * the reset below must not wipe it. Reading it first keeps the bar under the
+     * pointer while the stream loads instead of snapping to zero and jumping
+     * back a moment later.
+     */
+    const parkedAtLoad = pendingSeekRef.current;
+    const parkedForThisSong =
+      parkedAtLoad && (!parkedAtLoad.id || parkedAtLoad.id === String(current.id));
+    /*
+     * A park meant for a different song is dropped here rather than carried
+     * along, so it can never place this song at another one's spot.
+     */
+    if (parkedAtLoad && !parkedForThisSong) pendingSeekRef.current = null;
+
     // Before any request goes out: silence the previous track and put the
     // playhead back at zero, so the bar and the audio agree immediately.
     detach();
     setBuffering(true);
-    setCurrentTime(0);
+    setCurrentTime(parkedForThisSong ? parkedAtLoad.ms : 0);
     setDuration(current.full_duration || current.duration || 0);
 
     (async () => {
@@ -280,6 +338,16 @@ export function PlayerProvider({ children }) {
         }
 
         if (info.duration) setDuration(info.duration);
+
+        /*
+         * Take the parked spot before playback starts. Waiting for the metadata
+         * event meant the element played from zero for a moment and then jumped
+         * forward once the seek landed, which is the skip the listener sees. The
+         * element refuses a position until it has the media, so this is tried
+         * here and again on `loadedmetadata`; whichever succeeds first wins.
+         */
+        applyParkedSeek();
+
         if (playingRef.current) {
           try {
             await audio.play();
@@ -361,26 +429,6 @@ export function PlayerProvider({ children }) {
     const onDuration = () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) setDuration(audio.duration * 1000);
     };
-    /*
-     * A click that arrived before the media did is applied here, once the
-     * element knows how long the song is. It is dropped if the queue has since
-     * moved to a different track, so a slow load never drags a stale position
-     * onto the next song.
-     */
-    const applyPendingSeek = () => {
-      const parked = pendingSeekRef.current;
-      if (!parked) return;
-      if (parked.id && currentIdRef.current && parked.id !== currentIdRef.current) {
-        pendingSeekRef.current = null;
-        return;
-      }
-      pendingSeekRef.current = null;
-      const seconds = Math.max(0, parked.ms / 1000);
-      try {
-        audio.currentTime = seconds;
-        setCurrentTime(seconds * 1000);
-      } catch {}
-    };
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => {
       setBuffering(false);
@@ -388,7 +436,19 @@ export function PlayerProvider({ children }) {
     };
     const onCanPlay = () => setBuffering(false);
     const onEnded = () => handleEnded();
-    const syncTime = () => setCurrentTime((audio.currentTime || 0) * 1000);
+    /*
+     * `seeked` is the element confirming it took the parked position, which is
+     * the one signal that the park is no longer needed. Clearing it here, rather
+     * than at the moment the position is handed over, is what stops the frame
+     * loop from snapping the bar back to the top during the load.
+     */
+    const syncTime = () => {
+      const parked = pendingSeekRef.current;
+      if (parked && Math.abs((audio.currentTime || 0) * 1000 - parked.ms) < 500) {
+        pendingSeekRef.current = null;
+      }
+      setCurrentTime((audio.currentTime || 0) * 1000);
+    };
     const onError = () => {
       if (!audio.currentSrc) return;
       // The bar never shows this. A stale stream is retried first, and only a
@@ -404,7 +464,7 @@ export function PlayerProvider({ children }) {
      */
     const onMeta = () => {
       onDuration();
-      applyPendingSeek();
+      applyParkedSeek();
     };
 
     audio.addEventListener('durationchange', onDuration);
@@ -425,7 +485,7 @@ export function PlayerProvider({ children }) {
       audio.removeEventListener('error', onError);
       audio.removeEventListener('seeked', syncTime);
     };
-  }, [handleEnded]);
+  }, [handleEnded, applyParkedSeek]);
 
   /*
    * `timeupdate` only fires about four times a second, which is why the bar used
@@ -436,7 +496,25 @@ export function PlayerProvider({ children }) {
     let raf = 0;
     const tick = () => {
       const audio = audioRef.current;
-      if (audio) setCurrentTime((audio.currentTime || 0) * 1000);
+      if (audio) {
+        /*
+         * While a seek is parked the element still sits at zero, because its
+         * media has not arrived yet. Reading it here would drag the bar back to
+         * the top for the whole length of the load and then snap forward once
+         * the seek lands, which is the flicker a click on an unplayed waveform
+         * used to cause. The parked spot is shown instead, until the element
+         * reports a time close enough to it to be the same place.
+         */
+        const parked = pendingSeekRef.current;
+        const own = (audio.currentTime || 0) * 1000;
+        const parkedHere = parked && (!parked.id || parked.id === currentIdRef.current);
+        if (parkedHere && Math.abs(own - parked.ms) >= 500) {
+          setCurrentTime(parked.ms);
+        } else {
+          if (parkedHere) pendingSeekRef.current = null;
+          setCurrentTime(own);
+        }
+      }
       raf = requestAnimationFrame(tick);
     };
     if (typeof requestAnimationFrame === 'function') raf = requestAnimationFrame(tick);

@@ -603,6 +603,14 @@ export function ProfilePage() {
           </div>
 
           <div className="mt-6">{renderTab()}</div>
+          {/*
+            * The sentinel and its wheel belong to the list, not to the page. It
+            * used to sit under the two-column grid, so it centred on the whole
+            * width and the wheel appeared under the details column as well,
+            * even though the songs are the only thing being loaded. Keeping it
+            * in the list column puts it under the list it is waiting on.
+            */}
+          <LoadMore sentinelRef={tabSentinel} loading={loadingMore} />
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4">
@@ -682,8 +690,6 @@ export function ProfilePage() {
           autoFocus
         />
       </Modal>
-
-      <LoadMore sentinelRef={tabSentinel} loading={loadingMore} />
 
       {/*
        * The close button sits in the top right corner of the dialog box, so the
