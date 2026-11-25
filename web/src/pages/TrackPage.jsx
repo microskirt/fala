@@ -261,7 +261,7 @@ function Waveform({
           * wave in two, and the bars themselves are what should carry the shape.
           */}
         <div
-          className="pointer-events-none absolute inset-y-[12%] z-[5] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+          className="pointer-events-none absolute inset-y-[8%] z-[5] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
           style={{ left: `${progress * barFraction * 100}%` }}
           aria-hidden="true"
         />

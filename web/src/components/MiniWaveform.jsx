@@ -251,7 +251,7 @@ function MiniPlayed({ samples, width, height, geometry, duration, hoverRatio, ac
          * short row and a tall one read alike.
          */
         <div
-          className="pointer-events-none absolute inset-y-[12%] z-[6] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+          className="pointer-events-none absolute inset-y-[8%] z-[6] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
           style={{ left: `${progress * 100}%` }}
           aria-hidden="true"
         />
