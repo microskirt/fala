@@ -188,7 +188,17 @@ function WriteAccessPanel() {
   );
 }
 
+/*
+ * The selector order matches the theme list in the context, so the default
+ * theme is also the first choice on screen.
+ */
 const THEMES = [
+  {
+    id: 'mocha',
+    name: 'Catppuccin Mocha',
+    icon: Cat,
+    swatch: { bg: '#1e1e2e', elev: '#313244', text: '#cdd6f4', accent: '#cba6f7', border: '#45475a' },
+  },
   {
     id: 'dark',
     name: 'Dark',
@@ -200,12 +210,6 @@ const THEMES = [
     name: 'Light',
     icon: Sun,
     swatch: { bg: '#fafafb', elev: '#f3f3f5', text: '#17171b', accent: '#f04d00', border: '#e5e5ea' },
-  },
-  {
-    id: 'mocha',
-    name: 'Catppuccin Mocha',
-    icon: Cat,
-    swatch: { bg: '#1e1e2e', elev: '#313244', text: '#cdd6f4', accent: '#cba6f7', border: '#45475a' },
   },
 ];
 

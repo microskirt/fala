@@ -3,7 +3,12 @@ import { KEYS, readKey, writeKey } from '@/lib/storage.js';
 
 const ThemeContext = createContext(null);
 
-const THEMES = ['dark', 'light', 'mocha'];
+/*
+ * Catppuccin Mocha leads the list and is the fallback, so a first visit opens
+ * on it. The order is also the order the selector shows and the order the
+ * cycle shortcut walks.
+ */
+const THEMES = ['mocha', 'dark', 'light'];
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -15,7 +20,7 @@ export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
     const saved = readKey(KEYS.theme);
     if (THEMES.includes(saved)) return saved;
-    return 'dark';
+    return 'mocha';
   });
 
   useEffect(() => {
