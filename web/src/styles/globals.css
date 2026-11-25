@@ -4,6 +4,13 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
+ * Focus styling only while the keyboard is driving, the same rule the base
+ * outline follows. A pointer click or a play shortcut must not paint a ring on
+ * something that was never navigated to with the keyboard.
+ */
+@custom-variant focus-kb (&:where([data-input='keyboard'] *):focus-visible);
+
+/*
  * Fala design tokens.
  *
  * One token set, three themes. Every component reads these variables, so the
@@ -52,6 +59,14 @@
   --input: #2c2c34;
   --ring: #ff5500;
 
+  /*
+   * The shade behind a modal, a drawer, or a control laid over artwork. It was
+   * a raw black alpha in five places; one token keeps every overlay the same
+   * colour and lets each surface pick its own density with the usual opacity
+   * modifier.
+   */
+  --scrim: #000000;
+
   --sidebar: #0a0a0c;
   --sidebar-foreground: #c9c9d1;
   --sidebar-accent: #1c1c21;
@@ -62,11 +77,6 @@
   --player-height: 56px;
   /* Toasts spawn below this, never over the top bar. */
   --topbar-height: 56px;
-  --chart-1: #ff5500;
-  --chart-2: #60a5fa;
-  --chart-3: #4ade80;
-  --chart-4: #fbbf24;
-  --chart-5: #c084fc;
 }
 
 [data-theme='light'] {
@@ -109,12 +119,6 @@
   --sidebar-foreground: #4b4b55;
   --sidebar-accent: #f0f0f3;
   --sidebar-border: #e7e7ec;
-
-  --chart-1: #f04d00;
-  --chart-2: #2563eb;
-  --chart-3: #16a34a;
-  --chart-4: #b45309;
-  --chart-5: #7c3aed;
 }
 
 [data-theme='mocha'] {
@@ -157,12 +161,6 @@
   --sidebar-foreground: #bac2de;
   --sidebar-accent: #313244;
   --sidebar-border: #313244;
-
-  --chart-1: #cba6f7;
-  --chart-2: #89b4fa;
-  --chart-3: #a6e3a1;
-  --chart-4: #f9e2af;
-  --chart-5: #b4befe;
 }
 
 @theme inline {
@@ -183,11 +181,10 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -239,7 +236,13 @@
     line-height: 1.25;
   }
 
-  :focus-visible {
+  /*
+   * A ring is for a keyboard user, and the browser's own rule is too broad: any
+   * key at all counts, so pressing Space to play after clicking a nav item drew
+   * a box around a link that had only been clicked. `inputModality.js` records
+   * the device, and the ring follows that instead.
+   */
+  [data-input='keyboard'] :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }

@@ -57,16 +57,6 @@ export const api = {
   del: (path, body, opts) => request(path, { ...opts, method: 'DELETE', body }),
 };
 
-export const qs = (params) => {
-  const usp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v === undefined || v === null || v === '') continue;
-    usp.set(k, v);
-  }
-  const s = usp.toString();
-  return s ? `?${s}` : '';
-};
-
 /* --------------------------------- formatting -------------------------------- */
 
 export function formatCount(n) {
@@ -207,17 +197,3 @@ export function trackArtistName(track) {
   return credit || track?.user?.username || '';
 }
 
-export function userPath(user) {
-  if (!user) return '/';
-  return scPath(user) || `/artist/${user.id}`;
-}
-
-export function playlistPath(playlist) {
-  if (!playlist) return '/';
-  const slug = scPath(playlist);
-  // A system playlist has no public permalink, so it keeps its id based route.
-  if (slug) return slug;
-  const raw = String(playlist.id);
-  const isSystem = playlist.kind === 'system-playlist' || raw.startsWith('system:');
-  return `/playlist/${isSystem ? `system:${raw.replace(/^system:/, '')}` : `sc:${raw}`}`;
-}

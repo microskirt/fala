@@ -27,7 +27,7 @@ import { Avatar, Skeleton, ErrorState, EmptyState } from '@/components/Media.jsx
 import { PlaylistCard } from '@/components/Cards.jsx';
 import { ArtistTrackRow, ArtistTrackRowSkeleton } from '@/components/ArtistTrackRow.jsx';
 import { FollowButton } from '@/components/Controls.jsx';
-import { Page, CardGrid, LoadMore } from '@/components/layout/Page.jsx';
+import { Page, CardGrid, CardGridSkeleton, LoadMore } from '@/components/layout/Page.jsx';
 import { useAutoLoad } from '@/lib/useAutoLoad.js';
 import { useArtworkPalette } from '@/lib/artworkColor.js';
 import { Modal } from '@/components/Modal.jsx';
@@ -406,17 +406,7 @@ export function ProfilePage() {
           </div>
         );
       }
-      return (
-        <CardGrid>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex flex-col gap-2">
-              <Skeleton className="aspect-square w-full rounded-lg" />
-              <Skeleton className="h-3 w-4/5" />
-              <Skeleton className="h-2.5 w-1/2" />
-            </div>
-          ))}
-        </CardGrid>
-      );
+      return <CardGridSkeleton count={8} />;
     }
 
     if (tabData.error) {
@@ -526,7 +516,7 @@ export function ProfilePage() {
           >
             <Avatar src={profile.avatar_url} name={profile.username} size={220} />
             {profile.avatar_url ? (
-              <span className="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover:bg-black/20" />
+              <span className="pointer-events-none absolute inset-0 rounded-full bg-scrim/0 transition-colors group-hover:bg-scrim/20" />
             ) : null}
           </button>
         </div>

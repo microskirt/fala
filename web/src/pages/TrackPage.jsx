@@ -578,10 +578,10 @@ function CommentForm({
     const liveMs = pinnedAt ?? currentTime;
     const placeholder =
       timestampMs != null
-        ? `Comment at ${formatDuration(timestampMs)}…`
+        ? `Comment at ${formatDuration(timestampMs)}...`
         : active
-          ? `Comment at ${formatDuration(liveMs)}…`
-          : 'Write a comment…';
+          ? `Comment at ${formatDuration(liveMs)}...`
+          : 'Write a comment...';
 
     return (
       <form className={cn('flex items-center gap-1.5', className)} onSubmit={submit}>
@@ -619,7 +619,7 @@ function CommentForm({
       <Input
         className="flex-1"
         placeholder={
-          timestampMs ? `Comment at ${formatDuration(timestampMs)}…` : 'Write a comment…'
+          timestampMs ? `Comment at ${formatDuration(timestampMs)}...` : 'Write a comment...'
         }
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -1837,7 +1837,7 @@ export function TrackPage() {
             * the components.
             */}
           <div className="mt-3.5 flex flex-wrap items-center gap-2">
-            <LikeButton track={track} size={18} className="size-9 justify-center px-0" />
+            <LikeButton track={track} className="size-9 justify-center px-0" />
 
             <CommentForm
               track={track}
@@ -1854,9 +1854,9 @@ export function TrackPage() {
 
             <RepostControl track={track} />
 
-            <AddToPlaylistButton track={track} size={18} className="size-9" />
+            <AddToPlaylistButton track={track} className="size-9" />
 
-            <AddToQueueButton track={track} size={18} className="size-9" />
+            <AddToQueueButton track={track} className="size-9" />
           </div>
         </div>
       </div>
@@ -1882,20 +1882,14 @@ export function TrackPage() {
             {mainTag || tags.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-1.5">
                 {mainTag ? (
-                  <span
-                    className="rounded-md border border-white px-2 py-0.5 text-xs text-white"
-                    title="Main tag"
-                  >
+                  <Badge variant="outline" title="Main tag">
                     {mainTag}
-                  </span>
+                  </Badge>
                 ) : null}
                 {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
-                  >
+                  <Badge key={tag} variant="outline" className="text-muted-foreground">
                     {tag}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             ) : null}
@@ -2055,7 +2049,7 @@ function RepostControl({ track }) {
       </Button>
 
       {open ? (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-72 rounded-xl border bg-popover p-3 shadow-lg">
+        <div className="absolute top-full right-0 z-50 mt-1.5 w-72 rounded-lg border bg-popover p-3 shadow-lg">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted-foreground">
               Add a note to the repost

@@ -102,7 +102,7 @@ export function CaptchaProvider({ children }) {
     }
   }, [toast]);
 
-  // DataDome posts {"eventType":"passed","cookie":"…"} to the embedding page.
+  // DataDome posts {"eventType":"passed","cookie":"..."} to the embedding page.
   useEffect(() => {
     if (!open) return undefined;
 

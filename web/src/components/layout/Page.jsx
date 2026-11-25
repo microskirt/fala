@@ -7,12 +7,12 @@ import { Skeleton } from '@/components/ui/skeleton.jsx';
  * scale and grid. Pages compose these instead of inventing their own spacing.
  */
 
-export function Page({ children, className, wide = false }) {
+export function Page({ children, className }) {
   return (
     <div
       className={cn(
         'mx-auto w-full px-4 pt-6 pb-12 sm:px-6 lg:px-8',
-        wide ? 'max-w-[1680px]' : 'max-w-[1400px]',
+        'max-w-[1400px]',
         className
       )}
     >

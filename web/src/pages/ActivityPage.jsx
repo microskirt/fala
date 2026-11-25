@@ -14,7 +14,7 @@ import {
   AddToPlaylistButton,
 } from '@/components/Controls.jsx';
 import { MiniWaveform, useRowData } from '@/components/MiniWaveform.jsx';
-import { Page, TrackListSkeleton } from '@/components/layout/Page.jsx';
+import { Page, PageHeader, TrackListSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { trackLink, userLink } from '@/lib/scRoute.js';
 import { usePlayed, markPlayed, playedKey, isPlayed } from '@/lib/played.js';
@@ -310,9 +310,7 @@ export function ActivityPage() {
   if (!isAuthed) {
     return (
       <Page>
-        <div className="relative mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Activity</h1>
-        </div>
+        <PageHeader title="Activity" />
         <EmptyState
           icon={Activity}
           title="Connect SoundCloud to see your feed"
@@ -330,12 +328,10 @@ export function ActivityPage() {
 
   return (
     <Page>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Activity</h1>
-        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          {`What each person you follow put out in the last ${days} days, newest first.`}
-        </p>
-      </div>
+      <PageHeader
+        title="Activity"
+        description={`What each person you follow put out in the last ${days} days, newest first.`}
+      />
 
       {sortedLoading ? (
         <TrackListSkeleton />

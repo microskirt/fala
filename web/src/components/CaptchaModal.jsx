@@ -62,7 +62,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
       {loading ? (
         <div className="flex h-[420px] w-full flex-col items-center justify-center gap-2.5 rounded-lg border bg-muted/40 text-sm text-muted-foreground">
           <Loader2 size={20} className="animate-spin" />
-          <span>Asking SoundCloud for a fresh check…</span>
+          <span>Asking SoundCloud for a fresh check...</span>
         </div>
       ) : null}
 
@@ -74,7 +74,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
               id="dd-cookie"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder="datadome=… or just the value"
+              placeholder="datadome=... or just the value"
               spellCheck={false}
               autoComplete="off"
             />
@@ -86,7 +86,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
           >
             {saving ? (
               <>
-                <Loader2 size={16} className="animate-spin" /> Checking…
+                <Loader2 size={16} className="animate-spin" /> Checking...
               </>
             ) : (
               'Save and test'
@@ -103,7 +103,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
                 {[
                   'Switch back with "Use the check instead". That check cannot change your account: it asks SoundCloud to repost a track id that does not exist, so the bot check answers first.',
                   'Solve the puzzle or audio check in the panel.',
-                  'If Fala does not pick the result up by itself, open DevTools (F12) → Application → Cookies → https://soundcloud.com and copy the value of datadome.',
+                  'If Fala does not pick the result up by itself, open DevTools (F12) > Application > Cookies > https://soundcloud.com and copy the value of datadome.',
                   'Paste it above and press "Save and test". A correct value is accepted straight away.',
                 ].map((text, i) => (
                   <li key={i} className="flex gap-3 text-sm leading-relaxed text-muted-foreground">
@@ -124,7 +124,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
 
       {saving && !manual ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          <Loader2 size={14} className="inline animate-spin" /> Saving the verification…
+          <Loader2 size={14} className="inline animate-spin" /> Saving the verification...
         </p>
       ) : null}
 

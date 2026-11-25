@@ -136,7 +136,9 @@ export function AuthPage() {
               </>,
               <>
                 Open developer tools, go to{' '}
-                <strong className="text-foreground">Application → Cookies → soundcloud.com</strong>{' '}
+                <strong className="text-foreground">
+                  Application {'>'} Cookies {'>'} soundcloud.com
+                </strong>{' '}
                 and copy the value of <code className="rounded-sm bg-muted px-1 font-mono text-xs">oauth_token</code>.
               </>,
               <>Paste it below.</>,
@@ -182,7 +184,7 @@ export function AuthPage() {
             <Button type="submit" size="lg" className="w-full" disabled={busy || !token.trim()}>
               {busy ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Checking with SoundCloud…
+                  <Loader2 size={16} className="animate-spin" /> Checking with SoundCloud...
                 </>
               ) : (
                 <>

@@ -202,7 +202,7 @@ export function QueuePanel() {
                     />
                     <span
                       className={cn(
-                        'absolute inset-0 grid place-items-center rounded-[5px] bg-black/45 text-white transition-opacity',
+                        'absolute inset-0 grid place-items-center rounded-[5px] bg-scrim/45 text-white transition-opacity',
                         active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                       )}
                     >

@@ -232,7 +232,7 @@ export async function apiGet(href, { ttl = 60_000, token = null } = {}) {
 const CAPTCHA_MESSAGE =
   'SoundCloud is asking for a captcha check before it allows write actions (likes, ' +
   'reposts, comments, follows and playlists). Reading and streaming still work. ' +
-  'Open Settings → Write access in Fala to fix this.';
+  'Open Settings > Write access in Fala to fix this.';
 
 const ddCookies = new Map();
 
@@ -571,11 +571,6 @@ export async function mixedSelections({ token = null } = {}) {
   // With a token SoundCloud returns the personalised shelves ("Mixed for you",
   // "Made for you", "More of what you like"). Without it, generic editorial.
   const data = await apiGet('/mixed-selections', { ttl: 600_000, token });
-  return data.collection || [];
-}
-
-export async function chartSelections() {
-  const data = await apiGet('/charts/selections', { ttl: 600_000 });
   return data.collection || [];
 }
 

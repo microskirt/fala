@@ -74,7 +74,7 @@ function PlaylistTrackRow({ track, index, context }) {
           src={track.artwork_url}
           fallback={track.user?.avatar_url}
           alt={track.title}
-          size={48}
+          size={44}
           rounded={6}
         />
       </Link>
@@ -370,7 +370,7 @@ export function PlaylistPage() {
                 variant="outline"
                 onClick={() => togglePlaylistLike(playlist)}
                 aria-pressed={liked}
-                className={cn(liked && 'text-rose-500')}
+                className={cn(liked && 'text-primary')}
                 title={user ? (liked ? 'Unlike this playlist' : 'Like this playlist') : 'Sign in to like'}
               >
                 <Heart size={16} fill={liked ? 'currentColor' : 'none'} /> Like
@@ -406,7 +406,7 @@ export function PlaylistPage() {
       <div className="mt-10">
         {tracks.length === 0 ? (
           <EmptyState icon={Music2} title="This playlist is empty">
-            Add tracks from anywhere using the “add to playlist” button.
+            Add tracks from anywhere using the "add to playlist" button.
           </EmptyState>
         ) : (
           <TrackList>
@@ -432,7 +432,7 @@ export function PlaylistPage() {
               Cancel
             </Button>
             <Button onClick={save} disabled={busy}>
-              {busy ? 'Saving…' : 'Save changes'}
+              {busy ? 'Saving...' : 'Save changes'}
             </Button>
           </>
         }
@@ -483,7 +483,7 @@ export function PlaylistPage() {
         onClose={() => setConfirmDelete(false)}
         onConfirm={doDelete}
         title="Delete playlist?"
-        message={`“${playlist.title}” will be permanently deleted. This cannot be undone.`}
+        message={`"${playlist.title}" will be permanently deleted. This cannot be undone.`}
         confirmLabel="Delete playlist"
         danger
         busy={busy}

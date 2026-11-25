@@ -8,6 +8,7 @@ import {
   trackArtistName,
 } from '@/api.js';
 import { Artwork, Skeleton } from '@/components/Media.jsx';
+import { Badge } from '@/components/ui/badge.jsx';
 import { MiniWaveform, useRowData } from '@/components/MiniWaveform.jsx';
 import {
   PlayButton,
@@ -104,12 +105,9 @@ export function ArtistTrackRow({ track, context }) {
               </time>
             ) : null}
             {mainTag ? (
-              <span
-                className="rounded-md border border-white px-2 py-0.5 text-xs text-white"
-                title="Main tag"
-              >
+              <Badge variant="outline" title="Main tag">
                 {mainTag}
-              </span>
+              </Badge>
             ) : null}
           </div>
         </div>

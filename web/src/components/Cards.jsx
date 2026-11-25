@@ -4,7 +4,6 @@ import {
   Play,
   Heart,
   MessageSquare,
-  PlayCircle,
   ListMusic,
   ChevronLeft,
   ChevronRight,
@@ -263,7 +262,7 @@ export function PlaylistCard({ playlist }) {
           />
         </Link>
         {trackCount > 0 ? (
-          <span className="pointer-events-none absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
+          <span className="pointer-events-none absolute right-2 bottom-2 inline-flex items-center gap-1 rounded-md bg-scrim/70 px-1.5 py-0.5 text-xs font-medium text-white">
             <ListMusic size={14} /> {trackCount}
           </span>
         ) : null}
@@ -416,20 +415,5 @@ export function SectionScroller({ title, subtitle, children, action }) {
         ) : null}
       </div>
     </section>
-  );
-}
-
-/*
- * The line under the player: plays only. Likes and comments have their own
- * buttons above, so repeating them here just made the row noisy.
- */
-export function TrackStatLine({ track }) {
-  if (!track) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      <span className="inline-flex items-center gap-1.5">
-        <PlayCircle size={14} /> {formatCount(track.playback_count)} plays
-      </span>
-    </div>
   );
 }

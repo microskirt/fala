@@ -214,7 +214,7 @@ route('POST', '/api/captcha', async (ctx) => {
   const token = requireToken(ctx);
   const raw = String(ctx.body.cookie || '').trim();
   if (!raw) throw new HttpError(400, 'Paste the datadome cookie value first');
-  // Accept a full "datadome=…; Path=…" line as well as the bare value.
+  // Accept a full "datadome=...; Path=..." line as well as the bare value.
   const value = raw
     .replace(/^datadome=/i, '')
     .split(';')[0]

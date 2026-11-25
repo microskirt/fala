@@ -49,7 +49,7 @@ function Slider({ className, defaultValue, value, min = 0, max = 100, orientatio
           key={i}
           data-slot="slider-thumb"
           className={cn(
-            'border-primary bg-background ring-ring/50 block shrink-0 cursor-grab rounded-full border-2 shadow-sm transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden active:cursor-grabbing disabled:pointer-events-none disabled:opacity-50',
+            'border-primary bg-background ring-ring/50 block shrink-0 cursor-grab rounded-full border-2 shadow-sm transition-[color,box-shadow] hover:ring-4 focus-kb:ring-4 focus-kb:outline-hidden active:cursor-grabbing disabled:pointer-events-none disabled:opacity-50',
             /* The vertical fader is larger than a horizontal one needs to be. */
             vertical ? 'size-4' : 'size-3.5'
           )}

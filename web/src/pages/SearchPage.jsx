@@ -146,7 +146,7 @@ export function SearchPage() {
     return (
       <Page>
         <EmptyState icon={Music2} title="Search the catalogue">
-          Look for tracks, artists, playlists and albums. Try “ambient”, “lo-fi beats” or an artist
+          Look for tracks, artists, playlists and albums. Try "ambient", "lo-fi beats" or an artist
           name.
         </EmptyState>
       </Page>
@@ -154,7 +154,7 @@ export function SearchPage() {
   }
 
   const countLabel = loading
-    ? 'Searching…'
+    ? 'Searching...'
     : data.total_results
       ? `${formatCount(data.total_results)} results`
       : `${data.collection.length} results`;
@@ -162,7 +162,7 @@ export function SearchPage() {
   return (
     <Page className="pb-24">
       <PageHeader
-        title={`Results for “${q}”`}
+        title={`Results for "${q}"`}
         description={countLabel}
         actions={
           <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-muted/40 p-1">
@@ -212,7 +212,7 @@ export function SearchPage() {
       ) : data.collection.length === 0 &&
         mineRows.length === 0 ? (
         <EmptyState icon={SearchX} title="No results">
-          Nothing matched “{q}”. Try a different spelling or a broader term.
+          Nothing matched "{q}". Try a different spelling or a broader term.
         </EmptyState>
       ) : filter === 'all' ? (
         <div className="flex flex-col gap-10">

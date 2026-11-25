@@ -145,7 +145,7 @@ function LikeIndicator({ track }) {
     <Button
       variant="ghost"
       size="icon-sm"
-      className={cn(liked && 'text-rose-500 hover:text-rose-500')}
+      className={cn(liked && 'text-primary hover:text-primary')}
       onClick={() => toggleLike(track)}
       aria-pressed={liked}
       aria-label={liked ? 'Unlike this track' : 'Like this track'}

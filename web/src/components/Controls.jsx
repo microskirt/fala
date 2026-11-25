@@ -17,7 +17,7 @@ import {
   MoreHorizontal,
   Search,
 } from 'lucide-react';
-import { api } from '@/api.js';
+import { api, formatCount } from '@/api.js';
 import { Artwork } from '@/components/Media.jsx';
 import { Modal } from '@/components/Modal.jsx';
 import { usePlayer } from '@/context/PlayerContext.jsx';
@@ -82,27 +82,26 @@ export function PlayButton({ track, context, size = 'md', className, onPlay }) {
   );
 }
 
-function formatLikeCount(track, liked) {
-  const base = Number(track?.likes_count || 0) + (liked && !track?.liked ? 1 : 0);
-  if (base >= 1_000_000) return (base / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-  if (base >= 1000) return (base / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-  return String(base);
-}
-
-export function LikeButton({ track, showCount = false, size = 18, className }) {
+/*
+ * The heart is the same ghost icon button as the repost, playlist and queue
+ * buttons beside it. It used to be a hand-rolled `<button>` that sat dimmer at
+ * rest than its neighbours and turned rose on like, so the one row carried two
+ * different ideas of what an action looks like. The on state is `text-primary`,
+ * matching every other active icon in the app.
+ */
+export function LikeButton({ track, showCount = false, size = 16, className }) {
   const { isLiked, toggleLike, isBusy } = useLibrary();
   const { user } = useAuth();
   const liked = isLiked(track);
   const busy = isBusy('like:' + track?.id);
+  // The count reads one higher the moment it is liked, before the write lands.
+  const count = Number(track?.likes_count || 0) + (liked && !track?.liked ? 1 : 0);
 
   return (
-    <button
-      type="button"
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent',
-        liked ? 'text-rose-500' : 'text-muted-foreground hover:text-foreground',
-        className
-      )}
+    <Button
+      variant="ghost"
+      size={showCount ? 'sm' : 'icon-sm'}
+      className={cn(liked && 'text-primary hover:text-primary', className)}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -113,12 +112,12 @@ export function LikeButton({ track, showCount = false, size = 18, className }) {
       title={user ? (liked ? 'Unlike' : 'Like') : 'Sign in to like'}
     >
       <Heart size={size} fill={liked ? 'currentColor' : 'none'} className={busy ? 'animate-pulse' : ''} />
-      {showCount ? <span className="tabular-nums">{formatLikeCount(track, liked)}</span> : null}
-    </button>
+      {showCount ? <span className="tabular-nums">{formatCount(count)}</span> : null}
+    </Button>
   );
 }
 
-export function RepostButton({ track, size = 18, className, iconOnly = false }) {
+export function RepostButton({ track, size = 16, className, iconOnly = false }) {
   const { isReposted, toggleRepost } = useLibrary();
   const reposted = isReposted(track);
 
@@ -202,7 +201,7 @@ export function FollowButton({ target, size = 'default', className }) {
  * click. A song is often in several lists at once, and each one needs its own
  * answer: Add where it is missing, Remove where it is already there.
  */
-export function AddToPlaylistButton({ track, size = 18, className }) {
+export function AddToPlaylistButton({ track, size = 16, className }) {
   const { playlists, addTrackToPlaylist, removeTrackFromPlaylist, createPlaylist } = useLibrary();
   const { user } = useAuth();
   const toast = useToast();
@@ -418,7 +417,7 @@ export function AddToPlaylistButton({ track, size = 18, className }) {
   );
 }
 
-export function AddToQueueButton({ track, size = 18, className }) {
+export function AddToQueueButton({ track, size = 16, className }) {
   const { addToQueue } = usePlayer();
 
   /*
@@ -542,7 +541,7 @@ export function QueueMenuButton({ track, size = 18 }) {
             copy();
           }}
         >
-          <Share2 size={16} /> Share…
+          <Share2 size={16} /> Share...
         </DropdownMenuItem>
         {track?.permalink_url ? (
           <DropdownMenuItem asChild>

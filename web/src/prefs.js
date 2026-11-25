@@ -37,10 +37,6 @@ function emit() {
   for (const fn of listeners) fn(current);
 }
 
-export function getPrefs() {
-  return current;
-}
-
 export function setPrefs(patch) {
   current = { ...current, ...patch };
   writeKey(KEY, JSON.stringify(current));

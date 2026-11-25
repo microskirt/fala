@@ -21,13 +21,13 @@ import {
   Loader2,
   Eraser,
 } from 'lucide-react';
-import { formatDate, formatCount, api } from '@/api.js';
+import { formatDate, api } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { useTheme } from '@/context/ThemeContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
 import { useCaptcha } from '@/context/CaptchaContext.jsx';
 import { usePrefs } from '@/prefs.js';
-import { Avatar } from '@/components/Media.jsx';
+import { Avatar, EmptyState } from '@/components/Media.jsx';
 import { Modal } from '@/components/Modal.jsx';
 import { Page, PageHeader } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
@@ -252,17 +252,18 @@ export function SettingsPage() {
   if (!user) {
     return (
       <Page>
-        <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-16 text-center">
-          <h2 className="text-base font-semibold tracking-tight">Connect your SoundCloud account</h2>
-          <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
-            Fala has no accounts of its own. Connect SoundCloud to use your real profile.
-          </p>
-          <Button className="mt-5" asChild>
-            <Link to="/login">
-              <KeyRound size={16} /> Connect SoundCloud
-            </Link>
-          </Button>
-        </div>
+        <PageHeader title="Settings" />
+        <EmptyState
+          icon={KeyRound}
+          title="Connect your SoundCloud account"
+          action={
+            <Button asChild>
+              <Link to="/login">Connect SoundCloud</Link>
+            </Button>
+          }
+        >
+          Fala has no accounts of its own. Connect SoundCloud to use your real profile.
+        </EmptyState>
       </Page>
     );
   }
