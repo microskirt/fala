@@ -13,148 +13,42 @@ import {
   AddToQueueButton,
   AddToPlaylistButton,
 } from '@/components/Controls.jsx';
-import { Page, TrackList, TrackListSkeleton } from '@/components/layout/Page.jsx';
+import { MiniWaveform, useRowData } from '@/components/MiniWaveform.jsx';
+import { Page, TrackListSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { trackLink, userLink } from '@/lib/scRoute.js';
 import { usePlayed } from '@/lib/played.js';
-import { cn } from '@/lib/utils.js';
+import { buildCommentMarkers } from '@/lib/waveform.js';
 
 /*
- * A `track` entry is either the artist posting their own track or someone
- * reposting a track by another artist. Only the second reads as a repost, and
- * it has to name the original artist.
- */
-function describe(item, track) {
-  const actor = item.user;
-  const owner = track?.user;
-  const ownTrack = actor && owner && String(actor.id) === String(owner.id);
-  if (item.type === 'track') return ownTrack ? 'shared a track' : 'reposted a track from';
-  if (item.type === 'comment') return 'commented';
-  if (item.type === 'like') return 'liked a track';
-  if (item.type === 'repost') return 'reposted a track from';
-  if (item.type === 'follow') return 'followed someone';
-  if (item.type === 'playlist') return 'shared a playlist';
-  return 'shared something';
-}
-
-/*
- * The two views of Activity are one page, so the switch sits in the header
- * rather than being a route of its own. It is a segmented control: the current
- * view is filled, the other is plain text, and both are one click apart.
- */
-function ViewSwitch({ view, onChange }) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Activity view"
-      className="inline-flex items-center gap-0.5 rounded-lg border bg-card p-1"
-    >
-      {[
-        ['sorted', 'Sorted'],
-        ['log', 'Log'],
-      ].map(([id, label]) => (
-        <button
-          key={id}
-          type="button"
-          role="tab"
-          aria-selected={view === id}
-          onClick={() => onChange(id)}
-          className={cn(
-            // The same shape and weight as the app's buttons, so the switch
-            // belongs to the page instead of looking like its own widget.
-            'rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors',
-            view === id
-              ? 'bg-primary text-primary-foreground shadow-xs'
-              : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/*
- * One row of the plain log: who did what, to which song, and when. The actions
- * stay out rather than appearing on hover, so a song is dealt with from the row
- * without hunting for the buttons first.
- */
-function LogEntry({ item, context }) {
-  const track = item.track;
-  if (!track) return null;
-  return (
-    <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
-      <Link {...userLink(item.user)} className="shrink-0">
-        <Avatar src={item.user?.avatar_url} name={item.user?.username} size={34} />
-      </Link>
-      <Link {...trackLink(track)} className="shrink-0">
-        <Artwork
-          src={track.artwork_url}
-          fallback={track.user?.avatar_url}
-          alt={track.title}
-          size={52}
-          rounded={6}
-        />
-      </Link>
-      <div className="min-w-0 flex-1">
-        <Link
-          {...trackLink(track)}
-          className="block truncate text-sm font-medium hover:underline"
-        >
-          {track.title}
-        </Link>
-        <div className="truncate text-xs text-muted-foreground">
-          <Link {...userLink(item.user)} className="hover:text-foreground">
-            {item.user?.username || 'Someone'}
-          </Link>{' '}
-          {describe(item, track)}
-          {track.user && String(track.user.id) !== String(item.user?.id) ? (
-            <>
-              {' '}
-              <Link {...userLink(track.user)} className="hover:text-foreground">
-                {trackArtistName(track)}
-              </Link>
-            </>
-          ) : null}
-          <time
-            dateTime={item.created_at}
-            title={formatDate(item.created_at)}
-            className="cursor-default opacity-60"
-          >
-            {' '}
-            · {timeAgo(item.created_at)}
-          </time>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-0.5">
-        <LikeButton track={track} size={16} />
-        <RepostButton track={track} size={16} iconOnly />
-        <AddToPlaylistButton track={track} size={16} />
-        <AddToQueueButton track={track} size={16} />
-        <PlayButton track={track} context={context} size="sm" />
-      </div>
-    </div>
-  );
-}
-
-/*
- * One song inside an author's drop down. It is the log row's shape, narrowed to
- * what the Sorted view is about: the song, its own artist credit, and when the
- * author put it out. The badge on the cover says whether that was an upload or
- * a repost, because the same song can arrive either way.
+ * One song under its author. The cover, a small waveform, the song and its
+ * credit, then the actions. The waveform is the artist page's bar in a shorter
+ * form: same shape, same comment faces, same two clocks, but it never opens a
+ * comment card, because a compact list is not where a comment is read.
  */
 function SortedEntry({ entry, context }) {
   const track = entry.track;
   const isRepost = entry.type === 'repost';
+  const { samples, comments, rowRef } = useRowData(track);
+  const { isCurrent, playTrack, seek } = usePlayer();
+  const duration = track?.full_duration || track?.duration || 0;
+  const markers = useMemo(
+    () => buildCommentMarkers(comments, duration),
+    [comments, duration]
+  );
+  const active = isCurrent(track);
+
   return (
-    <div className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
+    <div
+      className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent/50"
+      ref={rowRef}
+    >
       <Link {...trackLink(track)} className="relative shrink-0" aria-label={track.title}>
         <Artwork
           src={track.artwork_url}
           fallback={track.user?.avatar_url}
           alt={track.title}
-          size={44}
+          size={64}
           rounded={6}
         />
         {/*
@@ -170,6 +64,32 @@ function SortedEntry({ entry, context }) {
           {isRepost ? <Repeat2 size={11} /> : <Upload size={11} />}
         </span>
       </Link>
+
+      {/*
+       * A fixed width, because a bar squeezed by a long title would stop
+       * showing where its comments sit. The height sits just under the cover's
+       * so the two read as a pair.
+       */}
+      <div className="w-32 shrink-0 sm:w-44">
+        <MiniWaveform
+          samples={samples}
+          markers={markers}
+          duration={duration}
+          active={active}
+          height={56}
+          showTip={false}
+          onSeek={(ratio) => {
+            /*
+             * Starting a song and seeking into it happen together, so the
+             * track id rides along: the player still holds the previous song
+             * for a moment, and the spot has to be parked against this one.
+             */
+            if (!active) playTrack(track, context);
+            seek(ratio * duration, track.id);
+          }}
+        />
+      </div>
+
       <div className="min-w-0 flex-1">
         <Link
           {...trackLink(track)}
@@ -193,6 +113,7 @@ function SortedEntry({ entry, context }) {
           </time>
         </div>
       </div>
+
       <div className="flex shrink-0 items-center gap-0.5">
         <LikeButton track={track} size={16} />
         <RepostButton track={track} size={16} iconOnly />
@@ -205,7 +126,7 @@ function SortedEntry({ entry, context }) {
 }
 
 /*
- * One author and their recent songs. The header is taller than a log row
+ * One author and their recent songs. The header is taller than a song row
  * because it is the thing you scan first. The songs sit under it, always open
  * and indented past the avatar, so the list reads as one author with their
  * tracks beneath them rather than as a set of folds to open one by one.
@@ -231,9 +152,9 @@ function AuthorGroup({ author, context }) {
         </div>
       </div>
       {/*
-        * The rule and the left inset are what make the songs read as belonging
-        * to the author above them instead of as the next row in one flat list.
-        */}
+       * The rule and the left inset are what make the songs read as belonging
+       * to the author above them instead of as the next row in one flat list.
+       */}
       <div className="ml-[3.75rem] border-l border-border/60 px-2 pb-2">
         <div className="flex flex-col gap-0.5">
           {author.entries.map((entry, i) => (
@@ -251,32 +172,12 @@ export function ActivityPage() {
   const played = usePlayed();
   const { current } = usePlayer();
   const currentId = current?.id ? String(current.id) : null;
-  // Sorted is the default: what each person put out lately is the question
-  // this page is usually opened to answer, and the plain log is one click away.
-  const [view, setView] = useState('sorted');
-
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   const [authors, setAuthors] = useState([]);
   const [sortedLoading, setSortedLoading] = useState(false);
   const [sortedError, setSortedError] = useState(null);
 
   const days = [5, 7, 10].includes(Number(prefs.sortedDays)) ? Number(prefs.sortedDays) : 7;
-
-  const loadLog = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get('/api/me/stream?limit=100');
-      setItems(res.collection || []);
-    } catch (err) {
-      setError(err.message || 'Could not load your activity');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadSorted = async () => {
     setSortedLoading(true);
@@ -292,22 +193,14 @@ export function ActivityPage() {
   };
 
   useEffect(() => {
-    if (isAuthed) loadLog();
-    else setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthed]);
-
-  useEffect(() => {
-    if (!isAuthed || view !== 'sorted') return;
+    if (!isAuthed) return;
     loadSorted();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthed, view, days]);
-
-  const logTracks = useMemo(() => items.map((x) => x.track).filter(Boolean), [items]);
+  }, [isAuthed, days]);
 
   /*
-   * A song leaves the Sorted view once this browser has played it, so the list
-   * only carries what is still unheard. The song loaded in the player is the
+   * A song leaves the view once this browser has played it, so the list only
+   * carries what is still unheard. The song loaded in the player is the
    * exception: it stays until the listener moves to another song, because a row
    * vanishing under the button that was just pressed would be a jolt. That also
    * covers a return visit, since nothing is loaded when the page opens again.
@@ -354,42 +247,14 @@ export function ActivityPage() {
 
   return (
     <Page>
-      {/*
-       * The switch shares the title's row and is pushed to the right edge, the
-       * way a page's main action sits on a list page. On a narrow screen there
-       * is no room beside the title, so it drops below instead of crowding it.
-       */}
       <div className="mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <h1 className="min-w-0 text-2xl font-semibold tracking-tight sm:text-3xl">Activity</h1>
-          <div className="shrink-0">
-            <ViewSwitch view={view} onChange={setView} />
-          </div>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Activity</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          {view === 'log'
-            ? 'New tracks and reposts from the people you follow on SoundCloud.'
-            : `What each person you follow put out in the last ${days} days, newest first.`}
+          {`What each person you follow put out in the last ${days} days, newest first.`}
         </p>
       </div>
 
-      {view === 'log' ? (
-        loading ? (
-          <TrackListSkeleton />
-        ) : error ? (
-          <ErrorState message={error} onRetry={loadLog} />
-        ) : items.length === 0 ? (
-          <EmptyState icon={Activity} title="Nothing in your stream yet">
-            Follow artists on SoundCloud and their new tracks will land here.
-          </EmptyState>
-        ) : (
-          <TrackList>
-            {items.map((item, i) => (
-              <LogEntry key={`${item.track?.id}-${i}`} item={item} context={logTracks} />
-            ))}
-          </TrackList>
-        )
-      ) : sortedLoading ? (
+      {sortedLoading ? (
         <TrackListSkeleton />
       ) : sortedError ? (
         <ErrorState message={sortedError} onRetry={loadSorted} />
