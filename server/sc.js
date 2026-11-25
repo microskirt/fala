@@ -1415,10 +1415,21 @@ async function waveformAt(url) {
   }
   const samples = data.samples || [];
   if (!samples.length) return null;
-  // More bars than a coarse 200 keeps the shape readable at SoundCloud's width.
-  const step = Math.max(1, Math.floor(samples.length / 280));
+  /*
+   * More bars than a coarse 200 keeps the shape readable at SoundCloud's width,
+   * but the thinning takes the loudest sample in each window rather than every
+   * step-th one. Taking every step-th sample drops the transients between them,
+   * and a kick or a snare is exactly the peak that gives a waveform its shape.
+   */
+  const count = Math.min(280, samples.length);
   const out = [];
-  for (let i = 0; i < samples.length; i += step) out.push(samples[i]);
+  for (let i = 0; i < count; i += 1) {
+    const from = Math.floor((i * samples.length) / count);
+    const to = Math.max(from + 1, Math.floor(((i + 1) * samples.length) / count));
+    let peak = 0;
+    for (let j = from; j < to; j += 1) if (samples[j] > peak) peak = samples[j];
+    out.push(peak);
+  }
   return { width: data.width, height: data.height, samples: out };
 }
 

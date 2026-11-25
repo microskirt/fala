@@ -6,16 +6,27 @@
  */
 
 /*
- * Turns SoundCloud's 0-255 amplitude into a bar height. A straight division
- * leaves mastered tracks looking flat, because most samples sit near the top of
- * the range, and a min-max stretch swings the other way and flattens the peaks.
- * A gentle power curve lifts the quiet parts into view while keeping the loud
- * ones apart, which is the shape SoundCloud's own bars have.
+ * Turns SoundCloud's sample amplitudes into bar heights between 0 and 1.
+ *
+ * The samples are not on a 0-255 scale. SoundCloud scales every track so its
+ * loudest moment equals the picture's own `height`, which is 140 on every track
+ * sampled, so dividing by 255 leaves a mastered song reaching only 55% of the
+ * range. Every bar then crowds into the top of the box and the waveform reads as
+ * a flat slab instead of a shape. Dividing by the array's own peak puts the
+ * loudest moment at full height and lets the quiet passages fall away, which is
+ * what SoundCloud's own player draws.
+ *
+ * The curve above 1 pushes the quiet passages down a little further, because a
+ * straight reading still comes out flatter than SoundCloud's bars. The floor
+ * keeps a near-silent bar visible rather than letting it disappear.
  */
 export function shapeSamples(samples) {
+  let peak = 0;
+  for (const s of samples) if (s > peak) peak = s;
+  if (peak <= 0) peak = 1;
   return samples.map((s) => {
-    const v = Math.pow(Math.min(255, Math.max(0, s)) / 255, 0.6);
-    return Math.min(1, Math.max(0.3, v));
+    const v = Math.pow(Math.min(1, Math.max(0, s) / peak), 1.1);
+    return Math.min(1, Math.max(0.04, v));
   });
 }
 
@@ -152,8 +163,16 @@ export function paintBars(canvas, { norm, width, height, geometry, color, minBar
   const lit = color;
   const shaded = shade(color, 0.55);
   for (let i = 0; i < barCount; i += 1) {
-    const t = barCount === 1 ? 0 : i / (barCount - 1);
-    const v = norm[Math.min(norm.length - 1, Math.floor(t * norm.length))];
+    /*
+     * A bar stands for a slice of the song, not for the single sample under its
+     * own pixel. Taking the loudest value in that slice keeps a transient that
+     * falls between two bar positions, which point sampling would drop and the
+     * waveform would then show a dent where the song actually hits hardest.
+     */
+    const from = Math.floor((i * norm.length) / barCount);
+    const to = Math.max(from + 1, Math.floor(((i + 1) * norm.length) / barCount));
+    let v = 0;
+    for (let j = from; j < to; j += 1) if (norm[j] > v) v = norm[j];
     const bh = Math.max(minBar, Math.round(minBar + v * (maxBar - minBar)));
     const x = Math.round(i * step);
     const top = Math.round(mid - bh / 2);
