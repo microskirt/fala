@@ -236,21 +236,31 @@ route('DELETE', '/api/captcha', async (ctx) => {
 
 route('GET', '/api/me/likes', async (ctx) => {
   const token = requireToken(ctx);
-  const data = await sc.myLikes(token, {
-    limit: pageLimit(ctx.query, 50),
-    next: ctx.query.get('next'),
-  });
-  const flags = await flagsFor(token);
+  /*
+   * The list and the flags that decorate it are independent, so they are asked
+   * for together. Awaiting them one after the other put a whole upstream round
+   * trip on every page load for no reason; reads are shared now, so the two
+   * cannot duplicate work.
+   */
+  const [data, flags] = await Promise.all([
+    sc.myLikes(token, {
+      limit: pageLimit(ctx.query, 50),
+      next: ctx.query.get('next'),
+    }),
+    flagsFor(token),
+  ]);
   return { ...data, collection: data.collection.map((t) => decorateTrack(t, flags)) };
 });
 
 route('GET', '/api/me/reposts', async (ctx) => {
   const token = requireToken(ctx);
-  const data = await sc.myReposts(token, {
-    limit: pageLimit(ctx.query, 50),
-    next: ctx.query.get('next'),
-  });
-  const flags = await flagsFor(token);
+  const [data, flags] = await Promise.all([
+    sc.myReposts(token, {
+      limit: pageLimit(ctx.query, 50),
+      next: ctx.query.get('next'),
+    }),
+    flagsFor(token),
+  ]);
   return { ...data, collection: data.collection.map((t) => decorateTrack(t, flags)) };
 });
 
@@ -269,18 +279,22 @@ route('GET', '/api/me/playlists', async (ctx) => {
 
 route('GET', '/api/me/following', async (ctx) => {
   const token = requireToken(ctx);
-  const data = await sc.myFollowing(token, {
-    limit: pageLimit(ctx.query, 50),
-    next: ctx.query.get('next'),
-  });
-  const flags = await flagsFor(token);
+  const [data, flags] = await Promise.all([
+    sc.myFollowing(token, {
+      limit: pageLimit(ctx.query, 50),
+      next: ctx.query.get('next'),
+    }),
+    flagsFor(token),
+  ]);
   return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
 });
 
 route('GET', '/api/me/history', async (ctx) => {
   const token = requireToken(ctx);
-  const data = await sc.myHistory(token, { limit: pageLimit(ctx.query, 50) });
-  const flags = await flagsFor(token);
+  const [data, flags] = await Promise.all([
+    sc.myHistory(token, { limit: pageLimit(ctx.query, 50) }),
+    flagsFor(token),
+  ]);
   return { ...data, collection: data.collection.map((t) => decorateTrack(t, flags)) };
 });
 
@@ -304,11 +318,13 @@ route('GET', '/api/me/stream/sorted', async (ctx) => {
 
 route('GET', '/api/me/notifications', async (ctx) => {
   const token = requireToken(ctx);
-  const data = await sc.notifications(token, {
-    limit: pageLimit(ctx.query, 50),
-    next: ctx.query.get('next'),
-  });
-  const flags = await flagsFor(token);
+  const [data, flags] = await Promise.all([
+    sc.notifications(token, {
+      limit: pageLimit(ctx.query, 50),
+      next: ctx.query.get('next'),
+    }),
+    flagsFor(token),
+  ]);
   return {
     ...data,
     collection: data.collection.map((n) => ({
@@ -358,8 +374,10 @@ route('GET', '/api/search', async (ctx) => {
   const next = ctx.query.get('next');
   const limit = pageLimit(ctx.query, 20);
   if (!q.trim() && !next) return { collection: [], next_href: null };
-  const data = await sc.search({ q, filter, limit, next });
-  const flags = await flagsFor(ctx.token);
+  const [data, flags] = await Promise.all([
+    sc.search({ q, filter, limit, next }),
+    flagsFor(ctx.token),
+  ]);
   return { ...data, collection: decorateItems(data.collection, flags) };
 });
 
@@ -393,8 +411,7 @@ route('GET', '/api/search/suggest', async (ctx) => {
 
 route('GET', '/api/next', async (ctx) => {
   const href = ctx.query.get('href');
-  const data = await sc.proxyHref(href);
-  const flags = await flagsFor(ctx.token);
+  const [data, flags] = await Promise.all([sc.proxyHref(href), flagsFor(ctx.token)]);
   return { ...data, collection: decorateItems(data.collection, flags) };
 });
 
@@ -402,8 +419,10 @@ route('GET', '/api/next', async (ctx) => {
 
 route('GET', '/api/home', async (ctx) => {
   // mixed-selections is personalised only when the token is present.
-  const sections = await sc.home({ token: ctx.token || null });
-  const flags = await flagsFor(ctx.token);
+  const [sections, flags] = await Promise.all([
+    sc.home({ token: ctx.token || null }),
+    flagsFor(ctx.token),
+  ]);
   return {
     sections: sections.map((s) => ({ ...s, items: decorateItems(s.items, flags) })),
   };
@@ -414,23 +433,26 @@ route('GET', '/api/genres', async () => ({ collection: await sc.genres() }));
 route('GET', '/api/charts', async (ctx) => {
   const next = ctx.query.get('next');
   const limit = pageLimit(ctx.query, 20);
-  const data = await sc.charts({ limit, next });
-  const flags = await flagsFor(ctx.token);
+  const [data, flags] = await Promise.all([sc.charts({ limit, next }), flagsFor(ctx.token)]);
   return { ...data, collection: decorateItems(data.collection, flags) };
 });
 
 route('GET', '/api/system-playlists/:id', async (ctx) => {
-  const pl = await sc.systemPlaylist(ctx.params.id, { token: ctx.token || null });
-  const flags = await flagsFor(ctx.token);
+  const [pl, flags] = await Promise.all([
+    sc.systemPlaylist(ctx.params.id, { token: ctx.token || null }),
+    flagsFor(ctx.token),
+  ]);
   return { ...pl, tracks: (pl.tracks || []).map((t) => decorateTrack(t, flags)) };
 });
 
 /* --------------------------------- tracks --------------------------------- */
 
 route('GET', '/api/tracks/:id', async (ctx) => {
-  const t = await sc.track(ctx.params.id, { token: ctx.token || null });
+  const [t, flags] = await Promise.all([
+    sc.track(ctx.params.id, { token: ctx.token || null }),
+    flagsFor(ctx.token),
+  ]);
   if (!t) throw new HttpError(404, 'Track not found');
-  const flags = await flagsFor(ctx.token);
   return decorateTrack(t, flags);
 });
 
@@ -506,26 +528,32 @@ route('DELETE', '/api/comments/:id', async (ctx) => {
 });
 
 route('GET', '/api/tracks/:id/related', async (ctx) => {
-  const items = await sc.related(ctx.params.id, { limit: Number(ctx.query.get('limit') || 12) });
-  const flags = await flagsFor(ctx.token);
+  const [items, flags] = await Promise.all([
+    sc.related(ctx.params.id, { limit: Number(ctx.query.get('limit') || 12) }),
+    flagsFor(ctx.token),
+  ]);
   return { collection: decorateItems(items, flags) };
 });
 
 route('GET', '/api/tracks/:id/reposters', async (ctx) => {
-  const data = await sc.reposters(ctx.params.id, {
-    limit: pageLimit(ctx.query, 50),
-    next: ctx.query.get('next'),
-  });
-  const flags = await flagsFor(ctx.token);
+  const [data, flags] = await Promise.all([
+    sc.reposters(ctx.params.id, {
+      limit: pageLimit(ctx.query, 50),
+      next: ctx.query.get('next'),
+    }),
+    flagsFor(ctx.token),
+  ]);
   return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
 });
 
 route('GET', '/api/tracks/:id/likers', async (ctx) => {
-  const data = await sc.likers(ctx.params.id, {
-    limit: pageLimit(ctx.query, 50),
-    next: ctx.query.get('next'),
-  });
-  const flags = await flagsFor(ctx.token);
+  const [data, flags] = await Promise.all([
+    sc.likers(ctx.params.id, {
+      limit: pageLimit(ctx.query, 50),
+      next: ctx.query.get('next'),
+    }),
+    flagsFor(ctx.token),
+  ]);
   return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
 });
 
@@ -554,8 +582,7 @@ route('GET', '/api/tracks/:id/collection-counts', async (ctx) => {
 
 route('GET', '/api/tracks/:id/also-liked', async (ctx) => {
   const token = requireToken(ctx);
-  const data = await sc.alsoLiked(token, ctx.params.id);
-  const flags = await flagsFor(token);
+  const [data, flags] = await Promise.all([sc.alsoLiked(token, ctx.params.id), flagsFor(token)]);
   return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
 });
 
@@ -577,12 +604,12 @@ route('GET', '/api/users/:id', async (ctx) => {
    * the user rather than after it. A failure there is not a reason to fail the
    * whole profile: the page renders without the links.
    */
-  const [user, links] = await Promise.all([
+  const [user, links, flags] = await Promise.all([
     sc.user(ctx.params.id),
     sc.webProfiles(ctx.params.id),
+    flagsFor(ctx.token),
   ]);
   if (!user) throw new HttpError(404, 'User not found');
-  const flags = await flagsFor(ctx.token);
   /*
    * api-v2 blanks `created_at` on every public user payload, so an artist's
    * join date is not readable by anyone. The caller's own /me does carry it,
@@ -607,18 +634,20 @@ route('GET', '/api/users/:id/tab', async (ctx) => {
    * much the artist has rather than how much of it is loaded. Later pages skip
    * it: the number does not change while scrolling.
    */
-  const [data, total] = await Promise.all([
+  const [data, total, flags] = await Promise.all([
     sc.userTab(ctx.params.id, tab, { limit, next, token: ctx.token || null }),
     next ? null : sc.userTabTotal(ctx.params.id, tab).catch(() => null),
+    flagsFor(ctx.token),
   ]);
-  const flags = await flagsFor(ctx.token);
   return { ...data, total, collection: decorateItems(data.collection, flags) };
 });
 
 route('GET', '/api/users/:id/activity', async (ctx) => {
   const next = ctx.query.get('next');
-  const data = await sc.activity(ctx.params.id, { limit: 20, next, token: ctx.token || null });
-  const flags = await flagsFor(ctx.token);
+  const [data, flags] = await Promise.all([
+    sc.activity(ctx.params.id, { limit: 20, next, token: ctx.token || null }),
+    flagsFor(ctx.token),
+  ]);
   return {
     ...data,
     collection: data.collection.map((item) => ({
@@ -639,9 +668,13 @@ route('GET', '/api/resolve', async (ctx) => {
   if (!url) throw new HttpError(400, 'Missing url');
   let normalized = String(url).trim();
   if (!/^https?:\/\//.test(normalized)) normalized = 'https://soundcloud.com/' + normalized.replace(/^\/+/, '');
-  const data = await sc.resolve(normalized);
+  /*
+   * Resolving a slug is the first thing a page does, so its latency is the whole
+   * wait before anything renders. The lookup and the flags are independent and
+   * now go out together: this endpoint is the one the HAR shows at 8.8s.
+   */
+  const [data, flags] = await Promise.all([sc.resolve(normalized), flagsFor(ctx.token)]);
   if (!data) throw new HttpError(404, 'Nothing found at that URL');
-  const flags = await flagsFor(ctx.token);
   if (data.kind === 'track') return decorateTrack(data, flags);
   if (data.kind === 'user') return decorateUser(data, flags);
   return data;
@@ -652,14 +685,18 @@ route('GET', '/api/resolve', async (ctx) => {
 route('GET', '/api/playlists/:id', async (ctx) => {
   let id = ctx.params.id;
   if (id.startsWith('system:')) {
-    const pl = await sc.systemPlaylist(decodeURIComponent(id.slice(7)), { token: ctx.token || null });
-    const flags = await flagsFor(ctx.token);
+    const [pl, flags] = await Promise.all([
+      sc.systemPlaylist(decodeURIComponent(id.slice(7)), { token: ctx.token || null }),
+      flagsFor(ctx.token),
+    ]);
     return { ...pl, tracks: (pl.tracks || []).map((t) => decorateTrack(t, flags)) };
   }
   if (id.startsWith('sc-playlist:')) id = id.slice('sc-playlist:'.length);
-  const pl = await sc.playlist(id, { token: ctx.token || null });
+  const [pl, flags] = await Promise.all([
+    sc.playlist(id, { token: ctx.token || null }),
+    flagsFor(ctx.token),
+  ]);
   if (!pl) throw new HttpError(404, 'Playlist not found');
-  const flags = await flagsFor(ctx.token);
   return decoratePlaylist(pl, flags);
 });
 
@@ -672,11 +709,13 @@ route('PUT', '/api/playlists/:id/like', async (ctx) => {
 route('GET', '/api/playlists/:id/likers', async (ctx) => {
   let id = ctx.params.id;
   if (id.startsWith('sc-playlist:')) id = id.slice('sc-playlist:'.length);
-  const data = await sc.playlistLikers(id, {
-    limit: pageLimit(ctx.query, 50),
-    next: ctx.query.get('next'),
-  });
-  const flags = await flagsFor(ctx.token);
+  const [data, flags] = await Promise.all([
+    sc.playlistLikers(id, {
+      limit: pageLimit(ctx.query, 50),
+      next: ctx.query.get('next'),
+    }),
+    flagsFor(ctx.token),
+  ]);
   return { ...data, collection: data.collection.map((u) => decorateUser(u, flags)) };
 });
 

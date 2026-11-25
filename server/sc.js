@@ -45,29 +45,59 @@ export class ScError extends Error {
   }
 }
 
-async function refreshClientId() {
-  try {
-    const res = await fetch('https://soundcloud.com/', {
-      headers: { 'User-Agent': UA, Accept: 'text/html' },
-    });
-    const html = await res.text();
-    const assets = [...html.matchAll(/https:\/\/a-v2\.sndcdn\.com\/assets\/[\w-]+\.js/g)].map(
-      (m) => m[0]
-    );
-    for (const asset of assets.slice(0, 12)) {
-      try {
-        const js = await (await fetch(asset, { headers: { 'User-Agent': UA } })).text();
-        const m = js.match(/client_id:"([A-Za-z0-9]{20,})"/);
-        if (m) {
-          clientId = m[1];
-          fs.mkdirSync(DATA_DIR, { recursive: true });
-          fs.writeFileSync(CLIENT_ID_FILE, clientId);
-          return clientId;
-        }
-      } catch {}
-    }
-  } catch {}
-  return clientId;
+/*
+ * A client id refresh is up to thirteen fetches in a row, and it used to sit
+ * inside a request with no time limit at all. One slow asset was therefore able
+ * to hold a page open for as long as the socket stayed up; the HAR that led here
+ * has an 8.8s `/api/resolve` with nothing else in flight, which is this shape.
+ * Every fetch is now bounded, the scan stops after the first few assets, and two
+ * requests that need a refresh at the same time share one.
+ */
+const CLIENT_ID_FETCH_TIMEOUT = 4_000;
+/*
+ * The per-fetch bound alone is not enough: six slow assets at four seconds each
+ * is still most of a minute. The whole refresh gets one deadline, and past it the
+ * current id is kept, which is better than holding a page open.
+ */
+const CLIENT_ID_TOTAL_BUDGET = 6_000;
+let clientIdRefresh = null;
+
+function refreshClientId() {
+  if (clientIdRefresh) return clientIdRefresh;
+  const deadline = Date.now() + CLIENT_ID_TOTAL_BUDGET;
+  clientIdRefresh = (async () => {
+    const get = (href, accept) => {
+      const left = deadline - Date.now();
+      if (left <= 0) return Promise.reject(new Error('client id refresh budget spent'));
+      return fetch(href, {
+        headers: { 'User-Agent': UA, ...(accept ? { Accept: accept } : {}) },
+        signal: AbortSignal.timeout(Math.min(CLIENT_ID_FETCH_TIMEOUT, left)),
+      }).then((r) => r.text());
+    };
+    try {
+      const html = await get('https://soundcloud.com/', 'text/html');
+      const assets = [...html.matchAll(/https:\/\/a-v2\.sndcdn\.com\/assets\/[\w-]+\.js/g)].map(
+        (m) => m[0]
+      );
+      for (const asset of assets.slice(0, 6)) {
+        if (Date.now() >= deadline) break;
+        try {
+          const js = await get(asset);
+          const m = js.match(/client_id:"([A-Za-z0-9]{20,})"/);
+          if (m) {
+            clientId = m[1];
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+            fs.writeFileSync(CLIENT_ID_FILE, clientId);
+            return clientId;
+          }
+        } catch {}
+      }
+    } catch {}
+    return clientId;
+  })().finally(() => {
+    clientIdRefresh = null;
+  });
+  return clientIdRefresh;
 }
 
 export function getClientId() {
@@ -171,24 +201,32 @@ function rememberTokenKey(token, key) {
   }
 }
 
+/*
+ * Reads already on the wire, so a page that asks for the same thing twice pays
+ * for it once. Several routes decorate their payload through `flagsFor` at the
+ * same moment as the page's own request, and on a cold cache every one of those
+ * would otherwise open its own socket for `/me` or an id list.
+ */
+const inflightReads = new Map();
+
 export async function apiGet(href, { ttl = 60_000, token = null } = {}) {
-  if (token) {
-    const key = tokenKey(token, href);
-    const hit = cacheGet(key);
-    if (hit !== undefined) return hit;
-    const data = await rawGet(href, { token });
-    cacheSet(key, data, ttl);
-    rememberTokenKey(token, key);
-    rememberUsers(data);
-    return data;
-  }
-  const key = href.replace(/([?&])client_id=[^&]*/g, '$1');
+  const key = token
+    ? tokenKey(token, href)
+    : href.replace(/([?&])client_id=[^&]*/g, '$1');
   const hit = cacheGet(key);
   if (hit !== undefined) return hit;
-  const data = await rawGet(href);
-  cacheSet(key, data, ttl);
-  rememberUsers(data);
-  return data;
+  const pending = inflightReads.get(key);
+  if (pending) return pending;
+  const request = rawGet(href, { token })
+    .then((data) => {
+      cacheSet(key, data, ttl);
+      if (token) rememberTokenKey(token, key);
+      rememberUsers(data);
+      return data;
+    })
+    .finally(() => inflightReads.delete(key));
+  inflightReads.set(key, request);
+  return request;
 }
 
 const CAPTCHA_MESSAGE =
@@ -1264,6 +1302,17 @@ export async function trackAlbums(id, opts = {}) {
  * needs an exact figure, so it stops early and reports that it did.
  */
 export async function trackCollectionCount(id, kind, { pages = 5, pageSize = 200 } = {}) {
+  /*
+   * The finished count is cached for longer than the pages it was built from.
+   * The walk is serial and can run five pages deep, and it used to re-run on
+   * every visit to a song even when the answer had not changed; the HAR that led
+   * here shows a 6.1s and a 3.9s one. The count is a display figure and moves
+   * slowly, so a few minutes of reuse is safe.
+   */
+  const key = `collcount:${kind}:${id}`;
+  const hit = cacheGet(key);
+  if (hit !== undefined) return hit;
+
   let total = 0;
   let next = null;
   let complete = false;
@@ -1278,7 +1327,14 @@ export async function trackCollectionCount(id, kind, { pages = 5, pageSize = 200
     }
   }
 
-  return { total, complete };
+  const result = { total, complete };
+  /*
+   * An unfinished walk is only cached briefly: it is a lower bound that says
+   * "more than this", and a later visit may as well try again. A finished one
+   * is the real number and can sit longer.
+   */
+  cacheSet(key, result, complete ? 600_000 : 60_000);
+  return result;
 }
 
 /*
@@ -1684,38 +1740,71 @@ export async function meId(token) {
 }
 
 /*
- * The ids endpoints page like every other list, and one page holds only the
- * newest handful. Reading just the first page left every older like out of the
- * set, so a song could sit plainly in the likes list (which walks its pages)
- * and still show as not liked on its own page and in the player bar. The whole
- * list is walked here, bounded so a huge library cannot stall a request.
+ * The like, repost and follow sets, walked once and kept.
+ *
+ * These used to hang off the per-token entry, which is thrown away after sixty
+ * seconds. Every rollover therefore re-walked every page of every list, and
+ * because the walk is serial that landed on whatever request came next: the same
+ * page took a second on a warm cache and eight on a cold one. The HAR that led
+ * here shows exactly that, an 8.4s `/api/me/likes` with nothing else in flight.
+ *
+ * The sets now live in their own map with a long life. A write clears the token's
+ * entries through `invalidateToken`, so a like or a follow still shows up at
+ * once; nothing here goes stale on its own. A walk already running is shared, so
+ * the several routes that decorate a page at once pay for one walk between them.
  */
+const idSetCache = new Map();
+const idSetPending = new Map();
+const ID_SET_TTL = 10 * 60_000;
+
+function idSetKey(token, href) {
+  return `${token}\n${href}`;
+}
+
+/*
+ * Keep the set cache bounded. A visit normally has one token, but reconnecting
+ * leaves the old token's entries behind until they age out, so the expired ones
+ * are swept before the oldest live entry is dropped.
+ */
+function capIdSets() {
+  if (idSetCache.size <= 400) return;
+  const now = Date.now();
+  for (const [k, v] of idSetCache) if (v.exp < now) idSetCache.delete(k);
+  if (idSetCache.size > 400) idSetCache.delete(idSetCache.keys().next().value);
+}
+
 async function idSet(href, token, { maxPages = 40 } = {}) {
-  const entry = tokenEntry(token);
-  entry.sets = entry.sets || new Map();
-  const hit = entry.sets.get(href);
+  const key = idSetKey(token, href);
+  const hit = idSetCache.get(key);
   if (hit && hit.exp > Date.now()) return hit.ids;
-  const ids = new Set();
-  let next = href;
-  let pages = 0;
-  while (next && pages < maxPages) {
-    /*
-     * A page that fails mid walk keeps what was already read instead of
-     * throwing the whole set away. The caller treats a short set as a reason to
-     * top up from the list, so a partial answer still moves things forward.
-     */
-    let data;
-    try {
-      data = await apiGet(next, { token });
-    } catch {
-      break;
+  const pending = idSetPending.get(key);
+  if (pending) return pending;
+  const request = (async () => {
+    const ids = new Set();
+    let next = href;
+    let pages = 0;
+    while (next && pages < maxPages) {
+      /*
+       * A page that fails mid walk keeps what was already read instead of
+       * throwing the whole set away. The caller treats a short set as a reason
+       * to top up from the list, so a partial answer still moves things forward.
+       */
+      let data;
+      try {
+        data = await apiGet(next, { token });
+      } catch {
+        break;
+      }
+      for (const v of data.collection || []) ids.add(String(v?.id ?? v));
+      next = data.next_href ? stripClientId(data.next_href) : null;
+      pages += 1;
     }
-    for (const v of data.collection || []) ids.add(String(v?.id ?? v));
-    next = data.next_href ? stripClientId(data.next_href) : null;
-    pages += 1;
-  }
-  entry.sets.set(href, { ids, exp: Date.now() + 30_000 });
-  return ids;
+    idSetCache.set(key, { ids, exp: Date.now() + ID_SET_TTL });
+    capIdSets();
+    return ids;
+  })().finally(() => idSetPending.delete(key));
+  idSetPending.set(key, request);
+  return request;
 }
 
 /*
@@ -1741,33 +1830,39 @@ async function likesFromList(token, ids, expected, maxPages = 25) {
 }
 
 export async function likeIds(token) {
-  const entry = tokenEntry(token);
-  entry.sets = entry.sets || new Map();
   /*
-   * The finished set is cached on its own, so a short or empty ids answer only
-   * costs one walk per token every thirty seconds rather than one per request.
+   * The finished set is cached under its own key, because it can be filled from
+   * two sources: the ids endpoint, and the likes list when that endpoint answers
+   * short. It shares the long life and the in-flight sharing of `idSet`.
    */
-  const key = 'likes:full';
-  const hit = entry.sets.get(key);
+  const key = idSetKey(token, 'likes:full');
+  const hit = idSetCache.get(key);
   if (hit && hit.exp > Date.now()) return hit.ids;
-  let ids = new Set();
-  try {
-    ids = await idSet('/me/track_likes/ids', token);
-    const account = await me(token).catch(() => null);
-    const expected = Number(account?.likes_count || 0);
-    /*
-     * The ids endpoint can come back empty or capped without saying so, while
-     * the list endpoint is the one the likes page reads. Whenever the set is
-     * empty or short of the account's own count, the list is walked to fill it.
-     */
-    if (ids.size === 0 || (expected && ids.size < expected)) {
-      ids = await likesFromList(token, ids, expected);
+  const pending = idSetPending.get(key);
+  if (pending) return pending;
+  const request = (async () => {
+    let ids = new Set();
+    try {
+      ids = await idSet('/me/track_likes/ids', token);
+      const account = await me(token).catch(() => null);
+      const expected = Number(account?.likes_count || 0);
+      /*
+       * The ids endpoint can come back empty or capped without saying so, while
+       * the list endpoint is the one the likes page reads. Whenever the set is
+       * empty or short of the account's own count, the list is walked to fill it.
+       */
+      if (ids.size === 0 || (expected && ids.size < expected)) {
+        ids = await likesFromList(token, new Set(ids), expected);
+      }
+    } catch {
+      ids = new Set();
     }
-  } catch {
-    ids = new Set();
-  }
-  entry.sets.set(key, { ids, exp: Date.now() + 30_000 });
-  return ids;
+    idSetCache.set(key, { ids, exp: Date.now() + ID_SET_TTL });
+    capIdSets();
+    return ids;
+  })().finally(() => idSetPending.delete(key));
+  idSetPending.set(key, request);
+  return request;
 }
 
 export async function playlistLikeIds(token) {
@@ -1805,6 +1900,16 @@ export function invalidateToken(token) {
     for (const key of keys) cache.delete(key);
     tokenReadCache.delete(token);
   }
+  /*
+   * The like, repost and follow sets live longer than the rest, so they have to
+   * be dropped here too. This is what keeps them honest: within a visit they do
+   * not expire, so a like or a follow has to show at once rather than later.
+   */
+  const prefix = `${token}\n`;
+  for (const key of [...idSetCache.keys()]) {
+    if (key.startsWith(prefix)) idSetCache.delete(key);
+  }
+  libraryCache.delete(token);
 }
 
 /* ------------------------------- library reads ------------------------------ */
