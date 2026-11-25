@@ -17,7 +17,7 @@ import { MiniWaveform, useRowData } from '@/components/MiniWaveform.jsx';
 import { Page, TrackListSkeleton } from '@/components/layout/Page.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { trackLink, userLink } from '@/lib/scRoute.js';
-import { usePlayed } from '@/lib/played.js';
+import { usePlayed, markPlayed, playedKey, isPlayed } from '@/lib/played.js';
 import { buildCommentMarkers } from '@/lib/waveform.js';
 
 /*
@@ -26,7 +26,7 @@ import { buildCommentMarkers } from '@/lib/waveform.js';
  * form: same shape, same comment faces, same two clocks, but it never opens a
  * comment card, because a compact list is not where a comment is read.
  */
-function SortedEntry({ entry, context, onPlay }) {
+function SortedEntry({ entry, author, context, onPlay, pinned }) {
   const track = entry.track;
   const isRepost = entry.type === 'repost';
   const { samples, comments, rowRef } = useRowData(track);
@@ -36,7 +36,24 @@ function SortedEntry({ entry, context, onPlay }) {
     () => buildCommentMarkers(comments, duration),
     [comments, duration]
   );
-  const active = isCurrent(track);
+  /*
+   * Playing is a property of the row, not of the song. The player only knows
+   * the song, so two authors who put up the same track both look loaded while
+   * one of them is. The row this page started is remembered in `pinned`, and
+   * that is what decides which copy carries the playing state.
+   */
+  const rowKey = playedKey(author?.user?.id, track?.id);
+  const active = isCurrent(track) && (!pinned?.key || pinned.key === rowKey);
+
+  /*
+   * Starting this row is what marks it heard, and the author is part of the
+   * mark. The same song can sit under two people here, so a mark that only knew
+   * the song would take both rows away when one of them was opened.
+   */
+  const choose = useCallback(() => {
+    markPlayed(author?.user?.id, track?.id);
+    onPlay?.(track, author);
+  }, [author, track, onPlay]);
 
   return (
     <div
@@ -129,7 +146,7 @@ function SortedEntry({ entry, context, onPlay }) {
              */
             if (!active) {
               playTrack(track, context);
-              onPlay?.(track);
+              choose();
             }
             seek(ratio * duration, track.id);
           }}
@@ -141,7 +158,8 @@ function SortedEntry({ entry, context, onPlay }) {
         <RepostButton track={track} size={16} iconOnly />
         <AddToPlaylistButton track={track} size={16} />
         <AddToQueueButton track={track} size={16} />
-        <PlayButton track={track} context={context} size="sm" onPlay={onPlay} />
+        {/* The row, not the button, knows which author this start belongs to. */}
+        <PlayButton track={track} context={context} size="sm" onPlay={choose} />
       </div>
     </div>
   );
@@ -153,7 +171,7 @@ function SortedEntry({ entry, context, onPlay }) {
  * and indented past the avatar, so the list reads as one author with their
  * tracks beneath them rather than as a set of folds to open one by one.
  */
-function AuthorGroup({ author, context, onPlay }) {
+function AuthorGroup({ author, context, onPlay, pinned }) {
   const count = author.entries.length;
   return (
     /*
@@ -190,8 +208,10 @@ function AuthorGroup({ author, context, onPlay }) {
             <SortedEntry
               key={`${entry.track.id}-${i}`}
               entry={entry}
+              author={author}
               context={context}
               onPlay={onPlay}
+              pinned={pinned}
             />
           ))}
         </div>
@@ -213,14 +233,20 @@ export function ActivityPage() {
    * the moment the player holds any other song, so stepping back through the
    * queue to a played song cannot bring its row back.
    */
-  const [pinnedId, setPinnedId] = useState(null);
+  const [pinned, setPinned] = useState(null);
 
+  /*
+   * The pin names the row, not the song, for the same reason the mark does. The
+   * pair is dropped once the player holds a different song, so stepping back
+   * through the queue to something already heard cannot bring its row back.
+   */
   useEffect(() => {
-    if (pinnedId && currentId !== pinnedId) setPinnedId(null);
-  }, [pinnedId, currentId]);
+    if (pinned && pinned.trackId !== currentId) setPinned(null);
+  }, [pinned, currentId]);
 
-  const onPlay = useCallback((track) => {
-    if (track?.id) setPinnedId(String(track.id));
+  const onPlay = useCallback((track, author) => {
+    const key = playedKey(author?.user?.id, track?.id);
+    if (key) setPinned({ key, trackId: String(track.id) });
   }, []);
 
   const [authors, setAuthors] = useState([]);
@@ -259,13 +285,21 @@ export function ActivityPage() {
     () =>
       authors
         .map((author) => {
-          const entries = author.entries.filter(
-            (e) => !played[String(e.track?.id)] || String(e.track?.id) === pinnedId
-          );
+          const entries = author.entries.filter((e) => {
+            const key = playedKey(author.user?.id, e.track?.id);
+            if (!key) return true;
+            /*
+             * The mark belongs to this author's posting of this song. A song
+             * another author put up is a different row and stays, which is the
+             * whole point of storing the pair.
+             */
+            if (!isPlayed(played, author.user?.id, e.track?.id)) return true;
+            return key === pinned?.key;
+          });
           return { ...author, entries, latest: entries[0]?.created_at ?? author.latest };
         })
         .filter((author) => author.entries.length > 0),
-    [authors, played, pinnedId]
+    [authors, played, pinned]
   );
 
   const sortedTracks = useMemo(
@@ -324,6 +358,7 @@ export function ActivityPage() {
               author={author}
               context={sortedTracks}
               onPlay={onPlay}
+              pinned={pinned}
             />
           ))}
         </div>
