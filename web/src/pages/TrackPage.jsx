@@ -244,10 +244,11 @@ function Waveform({
         {/*
           * The playhead. It is a thin bright line over the bars, positioned by
           * percentage so it slides with the frame instead of stepping bar by
-          * bar. It stops at the axis rather than running the full height.
+          * bar. It sits a few pixels inside the box at either end, so it reads
+          * as a marker on the bars rather than as the box's own border.
           */}
         <div
-          className="pointer-events-none absolute top-0 bottom-0 z-[5] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+          className="pointer-events-none absolute inset-y-[3px] z-[5] w-0.5 -translate-x-1/2 rounded-full bg-foreground"
           style={{ left: `${progress * barFraction * 100}%` }}
           aria-hidden="true"
         />
