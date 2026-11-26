@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Activity, Repeat2, Upload } from 'lucide-react';
 import { api, timeAgo, formatDate, trackArtistName } from '@/api.js';
@@ -287,6 +287,53 @@ export function ActivityPage() {
     loadSorted();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthed, days]);
+
+  /*
+   * A song counts as heard when it plays, not only when this page's own button
+   * starts it. Skipping with the player bar changes the loaded song without
+   * going through `choose`, so the row that was skipped to used to stay in the
+   * list as if it had never played.
+   *
+   * The row is found by the track object the player holds. The queue keeps the
+   * exact objects this page handed it, and two authors can post the same song,
+   * so matching the object names the one row that was skipped to instead of
+   * taking every posting of that song away. The ref remembers the last song
+   * this page already accounted for, so opening Activity while something plays
+   * from elsewhere does not mark it: only a change of song while the page is up
+   * counts.
+   */
+  const authorByTrack = useMemo(() => {
+    const map = new Map();
+    for (const author of authors) {
+      for (const entry of author.entries || []) {
+        if (entry.track) map.set(entry.track, author.user);
+      }
+    }
+    return map;
+  }, [authors]);
+
+  const handledIdRef = useRef(currentId);
+  useEffect(() => {
+    if (!current?.id || !authors.length) return;
+    const id = String(current.id);
+    if (handledIdRef.current === id) return;
+    handledIdRef.current = id;
+    if (pinned && pinned.trackId === id) return;
+    const author = authorByTrack.get(current);
+    if (author) {
+      markPlayed(author.id, current.id);
+      return;
+    }
+    /*
+     * A queue started elsewhere holds its own copy of the track, so it cannot
+     * name the row by object. One author posting it is still unambiguous; two
+     * or more are left alone rather than clearing all of them on a guess.
+     */
+    const posters = authors.filter((a) =>
+      (a.entries || []).some((e) => String(e.track?.id) === id)
+    );
+    if (posters.length === 1) markPlayed(posters[0].user?.id, current.id);
+  }, [current, pinned, authors, authorByTrack]);
 
   /*
    * A song leaves the view once this browser has played it, so the list only
