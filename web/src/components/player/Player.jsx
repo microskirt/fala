@@ -251,7 +251,7 @@ export function Player() {
        */}
       <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 sm:h-(--player-height) sm:flex-nowrap sm:gap-3 sm:px-6 sm:py-0 lg:px-8">
         {/* 1. Transport */}
-        <div className="order-2 flex shrink-0 items-center gap-0.5 sm:order-none">
+        <div className="order-3 flex shrink-0 items-center gap-0.5 sm:order-none">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -317,7 +317,7 @@ export function Player() {
         </Button>
 
         {/* 4. Elapsed, line, total */}
-        <div className="order-3 flex min-w-0 basis-full items-center gap-2 sm:order-none sm:basis-auto sm:flex-1">
+        <div className="order-1 flex min-w-0 basis-full items-center gap-2 sm:order-none sm:basis-auto sm:flex-1">
           <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
             {formatDuration(currentTime)}
           </span>
@@ -330,7 +330,7 @@ export function Player() {
         </div>
 
         {/* 5. Now playing: two lines, never taller than the thumbnail */}
-        <div className="order-1 flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:order-none sm:w-[190px] sm:flex-none lg:w-[260px]">
+        <div className="order-2 flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:order-none sm:w-[190px] sm:flex-none lg:w-[260px]">
           {current ? (
             <>
               <Link
@@ -383,7 +383,7 @@ export function Player() {
         </div>
 
         {/* Extras SoundCloud keeps on the far right */}
-        <div className="order-2 flex shrink-0 items-center gap-0.5 border-l border-border pl-1.5 sm:order-none">
+        <div className="order-3 flex shrink-0 items-center gap-0.5 border-l border-border pl-1.5 sm:order-none">
           <Button
             variant="ghost"
             size="icon-sm"
