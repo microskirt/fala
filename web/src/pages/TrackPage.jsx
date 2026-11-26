@@ -1881,13 +1881,15 @@ export function TrackPage() {
             <LikeButton track={track} className="size-9 justify-center px-0" />
 
             {/*
-              * On a phone the field takes a line of its own and the buttons wrap
-              * under it, so it never shrinks to a sliver between them. The basis
-              * goes back to zero from `sm`, which is the flex-1 it always had.
+              * On a phone the field takes the first line and the buttons wrap
+              * under it, so the like button sits at the bottom left of the
+              * strip instead of floating alone above the field. `order-first`
+              * moves the field up only on the narrow layout; from `sm` the
+              * original order returns and the desktop row is unchanged.
               */}
             <CommentForm
               track={track}
-              className="min-w-0 flex-1 basis-full sm:basis-0"
+              className="order-first min-w-0 flex-1 basis-full sm:order-none sm:basis-0"
               compact
               active={active}
               onPosted={(c) => {
