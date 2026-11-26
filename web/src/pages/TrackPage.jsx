@@ -96,16 +96,25 @@ function Waveform({
   const [width, setWidth] = useState(0);
   const [boxHeight, setBoxHeight] = useState(height);
   const [hoverRatio, setHoverRatio] = useState(null);
+  /*
+   * The spot a held finger is on. A press follows the pointer through this
+   * state and only commits when it is let go, so the bars track the finger and
+   * the song jumps once, at the place the listener stopped. Seeking on every
+   * move made the audio stutter and re-buffer under the hand.
+   */
+  const [dragRatio, setDragRatio] = useState(null);
 
   const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
   const progress = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
   /*
    * While the pointer is over the bars the played edge follows it: ahead of
    * the playhead it previews the stretch that would play, behind it the stretch
-   * that would be skipped. The playhead itself stays on the real position, so
+   * that would be skipped. A held finger takes priority over the hover, so the
+   * preview tracks the drag. The playhead itself stays on the real position, so
    * the preview never looks like the song jumped.
    */
-  const edge = hoverRatio === null ? progress : hoverRatio;
+  const previewRatio = dragRatio !== null ? dragRatio : hoverRatio;
+  const edge = previewRatio === null ? progress : previewRatio;
 
   // The bars fill the box; the comment faces float over the centre line.
   const h = Math.max(48, fill ? boxHeight : height);
@@ -280,19 +289,25 @@ function Waveform({
           * No focus ring is drawn. The bar stays focusable so the arrow keys
           * work, but a click used to leave a ring that read as an orange
           * selection box around the waveform.
+          *
+          * `touch-none` is what makes a hold work on a phone. Without it the
+          * browser claims the gesture for scrolling the page as soon as the
+          * finger moves, and the pointer stream stops arriving, so the bars
+          * froze under the finger. It only covers the top half, so the page
+          * still scrolls from anywhere else on the waveform.
           */}
         <div
-          className="absolute inset-x-0 top-0 h-1/2 cursor-pointer outline-none"
+          className="absolute inset-x-0 top-0 h-1/2 cursor-pointer touch-none outline-none"
           onPointerDown={(e) => {
             dragging.current = true;
             e.currentTarget.setPointerCapture?.(e.pointerId);
             setHoverRatio(null);
-            commit(e.clientX);
+            setDragRatio(ratioAt(e.clientX));
           }}
           onPointerMove={(e) => {
             if (dragging.current) {
               setHoverRatio(null);
-              commit(e.clientX);
+              setDragRatio(ratioAt(e.clientX));
               return;
             }
             setHoverRatio(hoverAt(e.clientX));
@@ -301,7 +316,14 @@ function Waveform({
             if (!dragging.current) setHoverRatio(null);
           }}
           onPointerUp={(e) => {
+            if (dragging.current) commit(e.clientX);
             dragging.current = false;
+            setDragRatio(null);
+            e.currentTarget.releasePointerCapture?.(e.pointerId);
+          }}
+          onPointerCancel={(e) => {
+            dragging.current = false;
+            setDragRatio(null);
             e.currentTarget.releasePointerCapture?.(e.pointerId);
           }}
           onKeyDown={(e) => {
@@ -361,7 +383,7 @@ function Waveform({
           * Off the bars it goes back to the real playhead.
           */}
         <span className="font-medium text-foreground">
-          {formatDuration(hoverRatio !== null ? hoverRatio * duration : currentTime)}
+          {formatDuration(previewRatio !== null ? previewRatio * duration : currentTime)}
         </span>
         <span className="text-muted-foreground">{formatDuration(duration)}</span>
       </div>

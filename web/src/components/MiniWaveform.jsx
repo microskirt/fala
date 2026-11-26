@@ -414,10 +414,13 @@ export function MiniWaveform({
         * The hit area covers the top half only, the part above the axis. The
         * shaded lower half is where the comment faces hang, so it stays inert:
         * a pointer there names a comment rather than seeking the song.
+        *
+        * `touch-none` keeps the browser from claiming the gesture for scrolling
+        * once the finger moves, which is what stopped the drag on a phone.
         */}
       {seekable ? (
         <div
-          className="absolute inset-x-0 top-0 z-[8] h-1/2 cursor-pointer outline-none"
+          className="absolute inset-x-0 top-0 z-[8] h-1/2 cursor-pointer touch-none outline-none"
           onPointerDown={(e) => {
             dragging.current = true;
             e.currentTarget.setPointerCapture?.(e.pointerId);
