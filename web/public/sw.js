@@ -11,7 +11,7 @@
  *                  be replayed from a shared cache
  */
 
-const VERSION = 'fala-v1';
+const VERSION = 'fala-v2';
 const CACHE = `fala-${VERSION}`;
 
 /* The shell is small and changes rarely; precaching it makes the offline
@@ -20,6 +20,10 @@ const SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/favicon.ico',
+  '/favicon-16.png',
+  '/favicon-32.png',
+  '/favicon-48.png',
   '/favicon.svg',
   '/icon-192.png',
   '/icon-512.png',

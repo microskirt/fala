@@ -6,6 +6,17 @@
     <meta name="theme-color" content="#1e1e2e" />
     <title>Fala</title>
     <meta name="description" content="Fala is a working front-end for SoundCloud." />
+    <!--
+      Bitmap icons come first, and an .ico sits beside them. Android builds a
+      home-screen shortcut's icon from the bitmap favicon path, not from the
+      SVG, so an SVG-only declaration left it with nothing to use and the
+      launcher fell back to a letter drawn from the hostname. The SVG stays
+      last for browsers that prefer it in the tab.
+    -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
     <!-- Installability: Android/Chrome read the manifest, iOS reads the touch icon. -->
