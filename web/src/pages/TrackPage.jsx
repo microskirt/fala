@@ -93,6 +93,8 @@ function Waveform({
   const restRef = useRef(null);
   const playedRef = useRef(null);
   const dragging = useRef(false);
+  // The spot the press started on, so a release only seeks again if it moved.
+  const pressRatio = useRef(null);
   const [width, setWidth] = useState(0);
   const [boxHeight, setBoxHeight] = useState(height);
   const [hoverRatio, setHoverRatio] = useState(null);
@@ -302,7 +304,19 @@ function Waveform({
             dragging.current = true;
             e.currentTarget.setPointerCapture?.(e.pointerId);
             setHoverRatio(null);
-            setDragRatio(ratioAt(e.clientX));
+            const ratio = ratioAt(e.clientX);
+            pressRatio.current = ratio;
+            setDragRatio(ratio);
+            /*
+             * A plain click lands the moment the button goes down, the way
+             * SoundCloud's does. Waiting for the release made every click feel
+             * a fraction of a second late, because a click is a press and a
+             * release with that little gap between them. A drag still commits
+             * at the end: this seek is the press point, and the release below
+             * re-seeks only if the finger actually moved, so a hold does not
+             * stutter the audio on every pointer move.
+             */
+            commit(e.clientX);
           }}
           onPointerMove={(e) => {
             if (dragging.current) {
@@ -316,13 +330,26 @@ function Waveform({
             if (!dragging.current) setHoverRatio(null);
           }}
           onPointerUp={(e) => {
-            if (dragging.current) commit(e.clientX);
+            /*
+             * The press already sought. Only a drag needs this second seek,
+             * and only when the finger ended somewhere other than where it went
+             * down, so a plain click does not hand the element the same position
+             * twice.
+             */
+            if (dragging.current) {
+              const ratio = ratioAt(e.clientX);
+              if (pressRatio.current === null || Math.abs(ratio - pressRatio.current) > 0.001) {
+                commit(e.clientX);
+              }
+            }
             dragging.current = false;
+            pressRatio.current = null;
             setDragRatio(null);
             e.currentTarget.releasePointerCapture?.(e.pointerId);
           }}
           onPointerCancel={(e) => {
             dragging.current = false;
+            pressRatio.current = null;
             setDragRatio(null);
             e.currentTarget.releasePointerCapture?.(e.pointerId);
           }}
