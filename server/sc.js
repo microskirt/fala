@@ -1448,6 +1448,16 @@ export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
  */
 async function waveformAt(url) {
   if (!url) return null;
+  /*
+   * A shape never changes once the song is uploaded, so it is kept for a day.
+   * Without this the proxy downloaded the same picture from SoundCloud on every
+   * visit, which is the wait that put the bars behind the rest of the page. A
+   * dead url answers with nothing and is not cached, so the retry against the
+   * song's current url still happens.
+   */
+  const cacheKey = `waveform\n${url}`;
+  const cached = cacheGet(cacheKey);
+  if (cached !== undefined) return cached;
   let res;
   try {
     res = await fetch(url, {
@@ -1487,7 +1497,9 @@ async function waveformAt(url) {
    */
   const height = data.height || 140;
   const clamped = samples.map((s) => Math.min(height, Math.max(0, Math.round(s))));
-  return { width: data.width, height, samples: clamped };
+  const shape = { width: data.width, height, samples: clamped };
+  cacheSet(cacheKey, shape, 86_400_000);
+  return shape;
 }
 
 /*

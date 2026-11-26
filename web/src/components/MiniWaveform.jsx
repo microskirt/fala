@@ -3,8 +3,8 @@ import { api, formatDuration } from '@/api.js';
 import { Avatar } from '@/components/Media.jsx';
 import { usePlayerTime } from '@/context/PlayerContext.jsx';
 import { cn } from '@/lib/utils.js';
+import { loadWaveformSamples, peekWaveformSamples } from '@/lib/waveformStore.js';
 import {
-  normalizeSamples,
   shapeSamplesCached,
   themeColor,
   barGeometry,
@@ -16,56 +16,16 @@ import {
 } from '@/lib/waveform.js';
 
 /*
- * A song's waveform and its comments never change once uploaded, so a list can
- * share them. The maps keep a song's shape and comments after the row scrolls
- * away, and the pending maps make two rows asking at once share one request.
+ * A song's comments never change once uploaded, so a list can share them. The
+ * map keeps them after the row scrolls away, and the pending map makes two rows
+ * asking at once share one request. The shape itself lives in `waveformStore`,
+ * because the song page asks for the same one.
  */
-const waveformCache = new Map();
-const waveformPending = new Map();
 const commentsCache = new Map();
 const commentsPending = new Map();
 
 function cap(map, max) {
   if (map.size > max) map.delete(map.keys().next().value);
-}
-
-/*
- * A song's shape is asked for by id, not just by its stored url. The url in a
- * feed payload can be stale or point at a picture SoundCloud has since dropped,
- * and a song that answered with nothing used to be remembered as having no
- * shape at all, so its bar stayed blank for the rest of the visit even after a
- * reload. An empty answer is now treated as a failure: it is retried once and
- * never cached.
- */
-function loadWaveform(track) {
-  const url = track?.waveform_url || '';
-  const id = track?.id;
-  if (!id) return Promise.resolve([]);
-  if (url && waveformCache.has(url)) return Promise.resolve(waveformCache.get(url));
-  if (waveformPending.has(id)) return waveformPending.get(id);
-  /*
-   * The server sends SoundCloud's own payload: every sample as an integer on the
-   * picture's height scale. It is divided down to 0-1 here, once, so everything
-   * downstream keeps working on normalised values and the cache never holds two
-   * different scales.
-   */
-  const ask = () =>
-    api
-      .get(`/api/tracks/${id}/waveform${url ? `?url=${encodeURIComponent(url)}` : ''}`)
-      .then((res) => normalizeSamples(res))
-      .catch(() => []);
-  const request = ask()
-    .then((samples) => (samples.length ? samples : ask()))
-    .then((samples) => {
-      if (samples.length && url) {
-        waveformCache.set(url, samples);
-        cap(waveformCache, 400);
-      }
-      return samples;
-    })
-    .finally(() => waveformPending.delete(id));
-  waveformPending.set(id, request);
-  return request;
 }
 
 function loadComments(track) {
@@ -101,7 +61,7 @@ export function useRowData(track) {
   const url = track?.waveform_url || '';
   const id = track?.id || null;
   const wantsComments = (track?.comment_count || 0) > 0;
-  const [samples, setSamples] = useState(() => (url ? waveformCache.get(url) || null : null));
+  const [samples, setSamples] = useState(() => peekWaveformSamples(track));
   const [comments, setComments] = useState(() =>
     id && commentsCache.has(id) ? commentsCache.get(id) : null
   );
@@ -141,7 +101,7 @@ export function useRowData(track) {
      * made a repeated song show a shape on its first row and nothing on the
      * rest. So whatever the cache already holds is taken now.
      */
-    const cached = url ? waveformCache.get(url) : null;
+    const cached = peekWaveformSamples(track);
     if (cached) {
       setSamples(cached);
     } else {
@@ -149,7 +109,7 @@ export function useRowData(track) {
        * Asked for by id, so a song whose stored url is missing or dead still
        * gets its shape: the server falls back to the song's own current url.
        */
-      loadWaveform(track).then((next) => {
+      loadWaveformSamples(track).then((next) => {
         if (!cancelled && next.length) setSamples(next);
       });
     }

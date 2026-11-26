@@ -59,8 +59,8 @@ import { placeLabel } from '@/lib/places.js';
 import { ClampedText } from '@/components/ClampedText.jsx';
 import { resolveTrackParam, playlistLink, userLink, trackSubLink } from '@/lib/scRoute.js';
 import { DETAIL_GRID } from '@/lib/layout.js';
+import { loadWaveformSamples } from '@/lib/waveformStore.js';
 import {
-  normalizeSamples,
   shapeSamples,
   themeColor,
   barGeometry,
@@ -1455,13 +1455,32 @@ export function TrackPage() {
     };
   }, [params.id, params.artist, params.track]);
 
+  /*
+   * The shape is asked for by id as soon as the id is known, alongside the
+   * track payload rather than behind it. It used to wait for the track response
+   * only to learn the waveform url, which put the bars a beat or three behind
+   * the rest of the page; the server resolves the current url itself, so the id
+   * alone is enough to start. A shape a list row already fetched is served from
+   * the shared store with no request at all.
+   */
+  useEffect(() => {
+    if (!id) return undefined;
+    let cancelled = false;
+    setWaveform(null);
+    loadWaveformSamples({ id }).then((samples) => {
+      if (!cancelled && samples.length) setWaveform(samples);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
   useEffect(() => {
     if (!id) return undefined;
     let cancelled = false;
     setLoading(true);
     setError(null);
     setTrack(null);
-    setWaveform(null);
     setComments([]);
     setArtist(null);
     (async () => {
@@ -1476,18 +1495,6 @@ export function TrackPage() {
           api
             .get(`/api/users/${t.user.id}`)
             .then((u) => !cancelled && setArtist(u))
-            .catch(() => {});
-        }
-
-        if (t.waveform_url) {
-          api
-            .get(`/api/tracks/${id}/waveform?url=${encodeURIComponent(t.waveform_url)}`)
-            /*
-             * SoundCloud's own payload is integers on the picture's height
-             * scale; it is divided down to 0-1 once, here, so the rest of the
-             * page works on the same values the small waveform does.
-             */
-            .then((w) => !cancelled && setWaveform(normalizeSamples(w)))
             .catch(() => {});
         }
 
