@@ -1788,7 +1788,16 @@ async function idSet(href, token, { maxPages = 40 } = {}) {
   if (pending) return pending;
   const request = (async () => {
     const ids = new Set();
-    let next = href;
+    /*
+     * The ids endpoints answer ten entries at a time unless a page size is
+     * asked for, so an account with a few thousand likes paid for hundreds of
+     * serial round trips every time this set went cold. That was the whole wait
+     * on the first song after a pause. The largest page SoundCloud serves is
+     * 200, which brings the same walk down to a handful of requests.
+     */
+    let next = /[?&]limit=/.test(href)
+      ? href
+      : href + (href.includes('?') ? '&' : '?') + 'limit=200';
     let pages = 0;
     while (next && pages < maxPages) {
       /*
