@@ -4,13 +4,6 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
- * The light theme needs its own variant for the few places that are drawn in a
- * fixed ink, such as the main tag's white border and text. On white paper that
- * white would vanish, so those places swap to the page's own foreground.
- */
-@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
-
-/*
  * Focus styling only while the keyboard is driving, the same rule the base
  * outline follows. A pointer click or a play shortcut must not paint a ring on
  * something that was never navigated to with the keyboard.

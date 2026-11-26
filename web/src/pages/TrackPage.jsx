@@ -1898,14 +1898,18 @@ export function TrackPage() {
 
             {mainTag || tags.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-1.5">
+                {/*
+                 * The main tag is drawn in white, apart from the muted chips
+                 * below it. It stays a plain span rather than the shared badge,
+                 * whose outline variant would tint it back to the muted colour.
+                 */}
                 {mainTag ? (
-                  <Badge
-                    variant="outline"
+                  <span
+                    className="rounded-md border border-white px-2 py-0.5 text-xs text-white"
                     title="Main tag"
-                    className="border-white text-white light:border-foreground light:text-foreground"
                   >
                     {mainTag}
-                  </Badge>
+                  </span>
                 ) : null}
                 {tags.map((tag) => (
                   <Badge key={tag} variant="outline" className="text-muted-foreground">

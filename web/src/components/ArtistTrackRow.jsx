@@ -8,7 +8,6 @@ import {
   trackArtistName,
 } from '@/api.js';
 import { Artwork, Skeleton } from '@/components/Media.jsx';
-import { Badge } from '@/components/ui/badge.jsx';
 import { MiniWaveform, useRowData } from '@/components/MiniWaveform.jsx';
 import {
   PlayButton,
@@ -118,18 +117,20 @@ export const ArtistTrackRow = memo(function ArtistTrackRow({ track, context }) {
                 {formatRelativeDate(date)}
               </time>
             ) : null}
+            {/*
+             * The main tag is the one chip drawn in white: a white border and
+             * white text, the way SoundCloud marks the genre a song leads with.
+             * It is a plain span, not the shared badge, because the badge's
+             * outline variant carries its own foreground colour and weight and
+             * would pull the chip back to grey.
+             */}
             {mainTag ? (
-              /*
-               * A long genre would otherwise run past the row: the tag caps
-               * itself at the corner it lives in and cuts with an ellipsis.
-               */
-              <Badge
-                variant="outline"
+              <span
+                className="rounded-md border border-white px-2 py-0.5 text-xs text-white"
                 title="Main tag"
-                className="max-w-[8rem] truncate border-white text-white sm:max-w-none light:border-foreground light:text-foreground"
               >
                 {mainTag}
-              </Badge>
+              </span>
             ) : null}
           </div>
         </div>
