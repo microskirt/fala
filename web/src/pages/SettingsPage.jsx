@@ -20,6 +20,9 @@ import {
   ChevronDown,
   Loader2,
   Eraser,
+  Smartphone,
+  Share,
+  CheckCircle2,
 } from 'lucide-react';
 import { formatDate, api } from '@/api.js';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -34,10 +37,12 @@ import { Button } from '@/components/ui/button.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
 import { cn } from '@/lib/utils.js';
 import { placeLabel } from '@/lib/places.js';
+import { useInstallPrompt, installBlockedReason } from '@/lib/install.js';
 
 const SECTIONS = [
   { id: 'account', label: 'Account', icon: User },
   { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'install', label: 'Install app', icon: Smartphone },
   { id: 'playback', label: 'Playback', icon: Headphones },
   { id: 'write', label: 'Write access', icon: ShieldQuestion },
 ];
@@ -187,6 +192,78 @@ function WriteAccessPanel() {
           <Eraser size={14} /> Forget
         </Button>
       </Row>
+    </Group>
+  );
+}
+
+/*
+ * Installing to the home screen, with an honest answer when the browser will
+ * not offer it. Chrome hides its own install entry in the address bar, so this
+ * panel is the way most people will find the feature; the cases with no prompt
+ * (iOS, an insecure origin) get the exact steps instead of a dead button.
+ */
+function InstallPanel() {
+  const { canInstall, installed, install } = useInstallPrompt();
+  const toast = useToast();
+  const reason = installBlockedReason();
+
+  const start = async () => {
+    const accepted = await install();
+    if (accepted) toast.success('Fala is installing');
+  };
+
+  return (
+    <Group
+      title="Install Fala"
+      description="Fala installs like an app: its own window, its own icon, and the shell still opens without a connection."
+    >
+      {installed ? (
+        <div className="flex items-start gap-3 px-5 py-4">
+          <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-[var(--success)]" />
+          <div className="min-w-0 text-sm leading-relaxed">
+            Fala is already installed on this device. Open it from your home screen or app list.
+          </div>
+        </div>
+      ) : canInstall ? (
+        <Row
+          title="Install on this device"
+          description="Adds Fala to your home screen and opens it in its own window."
+        >
+          <Button onClick={start}>
+            <Smartphone size={14} /> Install Fala
+          </Button>
+        </Row>
+      ) : reason === 'ios' ? (
+        <div className="flex items-start gap-3 px-5 py-4">
+          <Share size={18} className="mt-0.5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 text-sm leading-relaxed text-muted-foreground">
+            On iPhone and iPad, open this page in Safari, tap the{' '}
+            <strong className="text-foreground">Share</strong> button, then choose{' '}
+            <strong className="text-foreground">Add to Home Screen</strong>. iOS does not let a
+            page show an install button of its own.
+          </div>
+        </div>
+      ) : reason === 'insecure' ? (
+        <div className="flex items-start gap-3 px-5 py-4">
+          <Smartphone size={18} className="mt-0.5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 text-sm leading-relaxed text-muted-foreground">
+            Installing needs a secure address. Open Fala over{' '}
+            <strong className="text-foreground">HTTPS</strong> or on{' '}
+            <strong className="text-foreground">localhost</strong>, and the install button will
+            appear here. A plain-http address on the network cannot be installed by any browser.
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start gap-3 px-5 py-4">
+          <Smartphone size={18} className="mt-0.5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 text-sm leading-relaxed text-muted-foreground">
+            This browser has not offered an install yet. In Chrome or Edge, open the browser menu
+            and choose <strong className="text-foreground">Install Fala</strong> or{' '}
+            <strong className="text-foreground">Apps &rarr; Install this site as an app</strong>.
+            Firefox does not install sites to the home screen.
+          </div>
+        </div>
+      )}
     </Group>
   );
 }
@@ -408,6 +485,8 @@ export function SettingsPage() {
               </div>
             </Group>
           ) : null}
+
+          {section === 'install' ? <InstallPanel /> : null}
 
           {section === 'write' ? <WriteAccessPanel /> : null}
 
