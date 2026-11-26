@@ -100,7 +100,12 @@ function linkifyMentions(text, keyPrefix) {
     }
 
     const at = match.index + lead.length;
+    /*
+     * The @ is punctuation, not part of the name, so it stays plain text and
+     * only the handle itself is the link. SoundCloud draws it the same way.
+     */
     if (at > last) out.push(text.slice(last, at));
+    out.push('@');
     out.push(
       <Link
         key={`${keyPrefix}-${at}`}
@@ -108,7 +113,7 @@ function linkifyMentions(text, keyPrefix) {
         params={{ artist: name }}
         className={LINK_CLASS}
       >
-        @{name}
+        {name}
       </Link>
     );
     if (tail) out.push(tail);
@@ -167,6 +172,11 @@ export function linkify(text) {
      * else keeps its own address and opens in a new tab.
      */
     const handle = profileHandle(raw);
+    /*
+     * The @ in front of the handle is punctuation, so it stays plain text and
+     * only the name is the link.
+     */
+    if (handle) out.push('@');
     out.push(
       handle ? (
         <Link
@@ -175,7 +185,7 @@ export function linkify(text) {
           params={{ artist: handle }}
           className={LINK_CLASS}
         >
-          @{handle}
+          {handle}
         </Link>
       ) : (
         <a
