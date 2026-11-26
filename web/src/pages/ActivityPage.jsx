@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Activity, Repeat2, Upload } from 'lucide-react';
 import { api, timeAgo, formatDate, trackArtistName } from '@/api.js';
@@ -26,7 +26,7 @@ import { buildCommentMarkers } from '@/lib/waveform.js';
  * form: same shape, same comment faces, same two clocks, but it never opens a
  * comment card, because a compact list is not where a comment is read.
  */
-function SortedEntry({ entry, author, context, onPlay, pinned }) {
+const SortedEntry = memo(function SortedEntry({ entry, author, context, onPlay, pinned }) {
   const track = entry.track;
   const isRepost = entry.type === 'repost';
   const { samples, comments, rowRef } = useRowData(track);
@@ -56,8 +56,14 @@ function SortedEntry({ entry, author, context, onPlay, pinned }) {
   }, [author, track, onPlay]);
 
   return (
+    /*
+     * On a phone the row cannot hold the cover, the title, the bar and five
+     * buttons on one line, so it wraps: the cover and title keep the first
+     * line, and the bar and buttons share a second one. `sm:contents` puts the
+     * pair back as plain children of the row on the wide layout.
+     */
     <div
-      className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent/50"
+      className="group flex flex-wrap items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent/50 sm:flex-nowrap"
       ref={rowRef}
     >
       <Link {...trackLink(track)} className="relative shrink-0" aria-label={track.title}>
@@ -126,44 +132,50 @@ function SortedEntry({ entry, author, context, onPlay, pinned }) {
        * evenly, so the bar always begins at the same point on the row no matter
        * how long the title is. A fixed width gave a short title a long empty
        * stretch and a long title a short bar; an even split keeps every row
-       * reading the same way. On a narrow screen there is not enough room to
-       * split, so the bar keeps a fixed width and the title takes the rest.
+       * reading the same way.
+       *
+       * On a phone there is no room to split: the bar takes a line of its own
+       * under the title and the buttons sit under it, so nothing is squeezed
+       * to nothing. `sm:contents` hands the pair back to the row on the wide
+       * layout, where they keep their old places.
        */}
-      <div className="w-28 shrink-0 sm:w-auto sm:min-w-0 sm:flex-1">
-        <MiniWaveform
-          samples={samples}
-          markers={markers}
-          duration={duration}
-          active={active}
-          height={64}
-          hoverTip
-          playingTip={false}
-          onSeek={(ratio) => {
-            /*
-             * Starting a song and seeking into it happen together, so the
-             * track id rides along: the player still holds the previous song
-             * for a moment, and the spot has to be parked against this one.
-             */
-            if (!active) {
-              playTrack(track, context);
-              choose();
-            }
-            seek(ratio * duration, track.id);
-          }}
-        />
-      </div>
+      <div className="flex basis-full flex-col gap-2 sm:contents">
+        <div className="min-w-0 sm:w-auto sm:min-w-0 sm:flex-1">
+          <MiniWaveform
+            samples={samples}
+            markers={markers}
+            duration={duration}
+            active={active}
+            height={64}
+            hoverTip
+            playingTip={false}
+            onSeek={(ratio) => {
+              /*
+               * Starting a song and seeking into it happen together, so the
+               * track id rides along: the player still holds the previous song
+               * for a moment, and the spot has to be parked against this one.
+               */
+              if (!active) {
+                playTrack(track, context);
+                choose();
+              }
+              seek(ratio * duration, track.id);
+            }}
+          />
+        </div>
 
-      <div className="flex shrink-0 items-center gap-0.5">
-        <LikeButton track={track} size={16} />
-        <RepostButton track={track} size={16} iconOnly />
-        <AddToPlaylistButton track={track} size={16} />
-        <AddToQueueButton track={track} size={16} />
-        {/* The row, not the button, knows which author this start belongs to. */}
-        <PlayButton track={track} context={context} size="sm" onPlay={choose} />
+        <div className="flex shrink-0 items-center gap-0.5 self-end sm:self-auto">
+          <LikeButton track={track} size={16} />
+          <RepostButton track={track} size={16} iconOnly />
+          <AddToPlaylistButton track={track} size={16} />
+          <AddToQueueButton track={track} size={16} />
+          {/* The row, not the button, knows which author this start belongs to. */}
+          <PlayButton track={track} context={context} size="sm" onPlay={choose} />
+        </div>
       </div>
     </div>
   );
-}
+});
 
 /*
  * One author and their recent songs. The header is taller than a song row
@@ -201,8 +213,10 @@ function AuthorGroup({ author, context, onPlay, pinned }) {
       {/*
        * The rule and the left inset are what make the songs read as belonging
        * to the author above them instead of as the next row in one flat list.
+       * A phone cannot spare the full avatar width for that inset, so the songs
+       * tuck in closer there and the rule still carries the grouping.
        */}
-      <div className="ml-[3.75rem] border-l border-border/60 px-2 pb-2">
+      <div className="ml-2 border-l border-border/60 px-2 pb-2 sm:ml-[3.75rem]">
         <div className="flex flex-col gap-0.5">
           {author.entries.map((entry, i) => (
             <SortedEntry

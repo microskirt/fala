@@ -169,13 +169,156 @@ export function shapeSamples(samples, scale = 140) {
 }
 
 /*
+ * The shaped array for a track, remembered by the array's own identity.
+ *
+ * A row draws two stacked canvases from the same samples, and before this each
+ * layer ran `shapeSamples` over the whole array on its own: two identical ~1200
+ * element passes and two arrays per row, a hundred rows at a time. Both layers
+ * now ask here and get the same array back, so the work and the allocation
+ * happen once per track. The inner map keeps the scale argument honest in case
+ * anything ever asks for a second quantisation of the same samples.
+ */
+const shapedCache = new WeakMap();
+
+export function shapeSamplesCached(samples, scale = 140) {
+  if (!samples || typeof samples !== 'object') return shapeSamples(samples, scale);
+  let byScale = shapedCache.get(samples);
+  if (!byScale) {
+    byScale = new Map();
+    shapedCache.set(samples, byScale);
+  }
+  const hit = byScale.get(scale);
+  if (hit) return hit;
+  const shaped = shapeSamples(samples, scale);
+  byScale.set(scale, shaped);
+  return shaped;
+}
+
+/*
  * Reads the current colour of a CSS variable so the canvas follows the theme
  * instead of hard coding one palette. A canvas cannot use Tailwind classes.
+ *
+ * The answer is memoised per variable name. Every waveform paint asks for the
+ * same two or three names, and at a hundred rows a theme change that is a
+ * hundred `getComputedStyle` calls per name; the variable can only change when
+ * the document element's attributes change, which is what
+ * `invalidateThemeColors` is for.
  */
+const themeColorCache = new Map();
+
+/*
+ * The theme lives on the document element's attributes, so their current values
+ * are the cache's version stamp. Comparing them is far cheaper than
+ * `getComputedStyle`, and it keeps the memo honest even in a place that paints
+ * without subscribing to the shared watcher, such as the song page's own
+ * waveform.
+ */
+let themeSignature = null;
+
+function currentThemeSignature() {
+  const root = document.documentElement;
+  return `${root.className}|${root.getAttribute('data-theme') || ''}|${root.getAttribute('style') || ''}`;
+}
+
+export function invalidateThemeColors() {
+  themeColorCache.clear();
+  themeSignature = null;
+}
+
 export function themeColor(name, fallback) {
   if (typeof window === 'undefined') return fallback;
+  const signature = currentThemeSignature();
+  if (signature !== themeSignature) {
+    themeColorCache.clear();
+    themeSignature = signature;
+  }
+  if (themeColorCache.has(name)) return themeColorCache.get(name);
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v || fallback;
+  const value = v || fallback;
+  themeColorCache.set(name, value);
+  return value;
+}
+
+/*
+ * One theme watcher for the whole page.
+ *
+ * Every small waveform used to put its own `MutationObserver` on the document
+ * element, so a theme switch fired a hundred observers and a hundred synchronous
+ * repaints in the same tick. The theme is a document-wide fact, so it is watched
+ * once here and the mounted waveforms subscribe to it. The observer only exists
+ * while at least one of them is mounted.
+ */
+const themeSubscribers = new Set();
+let themeObserver = null;
+
+function runThemeChange() {
+  // The colours come from the document element, so drop the memo first.
+  invalidateThemeColors();
+  for (const cb of [...themeSubscribers]) cb();
+}
+
+export function subscribeThemeChange(cb) {
+  if (typeof window === 'undefined' || typeof MutationObserver === 'undefined') {
+    return () => {};
+  }
+  themeSubscribers.add(cb);
+  if (!themeObserver) {
+    /*
+     * The cache may have been filled before this page's waveforms mounted, and
+     * a theme change while none of them was mounted had no observer to clear it.
+     * Dropping it here means the first paint of a freshly mounted list always
+     * reads the document's current colours.
+     */
+    invalidateThemeColors();
+    themeObserver = new MutationObserver(runThemeChange);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme', 'style'],
+    });
+  }
+  return () => {
+    themeSubscribers.delete(cb);
+    if (!themeSubscribers.size && themeObserver) {
+      themeObserver.disconnect();
+      themeObserver = null;
+    }
+  };
+}
+
+/*
+ * One width watcher for every small waveform.
+ *
+ * A hundred rows meant a hundred `ResizeObserver`s watching a hundred boxes for
+ * the same event. The map keeps each element's own callback, so the shared
+ * observer can still tell them apart, and it is created on the first box and
+ * dropped with the last.
+ */
+const resizeCallbacks = new Map();
+let resizeObserver = null;
+
+export function observeResize(el, cb) {
+  if (typeof ResizeObserver === 'undefined') return false;
+  if (!resizeObserver) {
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const callback = resizeCallbacks.get(entry.target);
+        if (callback) callback();
+      }
+    });
+  }
+  resizeCallbacks.set(el, cb);
+  resizeObserver.observe(el);
+  return true;
+}
+
+export function unobserveResize(el) {
+  resizeCallbacks.delete(el);
+  if (!resizeObserver) return;
+  resizeObserver.unobserve(el);
+  if (!resizeCallbacks.size) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
 }
 
 /*

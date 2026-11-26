@@ -73,8 +73,18 @@ export function PageHeader({ eyebrow, title, description, actions, className }) 
     <div className={cn('mb-6', className)}>
       {eyebrow ? <Eyebrow className="mb-1.5">{eyebrow}</Eyebrow> : null}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="min-w-0 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        <h1 className="min-w-0 text-2xl font-semibold tracking-tight break-words sm:text-3xl">
+          {title}
+        </h1>
+        {/*
+         * `max-w-full` lets a wide action group, such as the search filters, cap
+         * itself at the page width and wrap inside instead of pushing the page
+         * sideways on a phone. On a wide screen the group already fits, so the
+         * cap never comes into play.
+         */}
+        {actions ? (
+          <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        ) : null}
       </div>
       {description ? (
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">

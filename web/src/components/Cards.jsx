@@ -104,23 +104,29 @@ export function TrackCard({ track, context, showStats = true }) {
             {trackArtistName(track)}
           </Link>
         ) : null}
+        {/*
+         * A card is only about 130px wide in the two-column phone grid, which is
+         * not enough for four counts. The row wraps and the two quieter counts
+         * wait for `sm`, where the cards are wide enough to carry them again.
+         */}
         {showStats ? (
-          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1" title="Plays">
               <Play size={14} fill="currentColor" /> {formatCount(track.playback_count)}
             </span>
             <span className="inline-flex items-center gap-1" title="Likes">
               <Heart size={14} /> {formatCount(track.likes_count)}
             </span>
-            <span className="inline-flex items-center gap-1" title="Comments">
+            <span className="hidden items-center gap-1 sm:inline-flex" title="Comments">
               <MessageSquare size={14} /> {formatCount(track.comment_count)}
             </span>
             {/*
              * Reposts sit beside the other three counts, so a thumb tells the
              * whole story of how a song travelled instead of stopping at its
-             * comments.
+             * comments. They wait for `sm` with the comment count, since a phone
+             * card has room for the two numbers that matter most.
              */}
-            <span className="inline-flex items-center gap-1" title="Reposts">
+            <span className="hidden items-center gap-1 sm:inline-flex" title="Reposts">
               <Repeat2 size={14} /> {formatCount(track.reposts_count)}
             </span>
           </div>
@@ -211,8 +217,12 @@ export function TrackRow({
        * A row keeps its controls in the layout so nothing shifts on hover, but
        * a hidden row must not answer clicks. Without the pointer gate a click
        * meant for a popup above could land on an invisible Add to queue.
+       *
+       * A phone has no hover, so the tray would only ever be an invisible strip
+       * eating the width the title needs. It is dropped there and restored from
+       * `sm`, where the pointer can actually raise it.
        */}
-      <div className="pointer-events-none flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
+      <div className="pointer-events-none hidden shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 sm:flex">
         <LikeButton track={track} size={16} />
         {showRepost ? (
           <>

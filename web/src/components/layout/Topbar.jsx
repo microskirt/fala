@@ -164,7 +164,7 @@ export function Topbar({ onToggleSidebar }) {
      * that comes later in the DOM, which put the search suggestions behind the
      * song cards. A z-index here lifts the whole bar, and the dropdown with it.
      */
-    <header className="relative z-40 grid h-14 shrink-0 grid-cols-[1fr_minmax(0,40rem)_1fr] items-center gap-3 border-b border-border bg-background/80 px-3 backdrop-blur lg:px-5">
+    <header className="relative z-40 grid h-(--topbar-height) shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-border bg-background/80 px-3 pt-[env(safe-area-inset-top)] backdrop-blur sm:grid-cols-[1fr_minmax(0,40rem)_1fr] sm:gap-3 lg:px-5">
       <div className="flex min-w-0 items-center">
         <Button
           variant="ghost"

@@ -237,16 +237,21 @@ export function Player() {
      * child's z-index only counts inside its parent's context. It stays below
      * the sidebar and the topbar, and below the mobile drawer's scrim.
      */
-    <div className="relative z-20 shrink-0 border-t border-border bg-card/90 backdrop-blur">
+    <div className="relative z-20 shrink-0 border-t border-border bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       {/*
-        * The bar keeps its own border and tint across the full width, but its
-        * contents sit on the same column as the page: same max width, same
-        * gutters. That lines the transport up with the content's left edge and
-        * the volume with its right edge, instead of hugging the window.
-        */}
-      <div className="mx-auto flex h-(--player-height) w-full max-w-[1400px] items-center gap-1.5 px-4 sm:gap-3 sm:px-6 lg:px-8">
+       * The bar keeps its own border and tint across the full width, but its
+       * contents sit on the same column as the page: same max width, same
+       * gutters. That lines the transport up with the content's left edge and
+       * the volume with its right edge, instead of hugging the window.
+       *
+       * On a phone there is no room for one long line, so the bar wraps: the
+       * song and the transport share the first row and the seek line takes the
+       * second, full width. Order utilities place them without a second copy of
+       * the markup, and from `sm` up the original single row returns.
+       */}
+      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 sm:h-(--player-height) sm:flex-nowrap sm:gap-3 sm:px-6 sm:py-0 lg:px-8">
         {/* 1. Transport */}
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="order-2 flex shrink-0 items-center gap-0.5 sm:order-none">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -312,7 +317,7 @@ export function Player() {
         </Button>
 
         {/* 4. Elapsed, line, total */}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="order-3 flex min-w-0 basis-full items-center gap-2 sm:order-none sm:basis-auto sm:flex-1">
           <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
             {formatDuration(currentTime)}
           </span>
@@ -325,7 +330,7 @@ export function Player() {
         </div>
 
         {/* 5. Now playing: two lines, never taller than the thumbnail */}
-        <div className="flex w-[190px] shrink-0 items-center gap-2 overflow-hidden lg:w-[260px]">
+        <div className="order-1 flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:order-none sm:w-[190px] sm:flex-none lg:w-[260px]">
           {current ? (
             <>
               <Link
@@ -367,18 +372,22 @@ export function Player() {
           )}
         </div>
 
-        {/* 6 and 7. Like, follow */}
-        <div className="flex shrink-0 items-center gap-0.5">
+        {/*
+         * The like and follow marks are desktop extras: on a phone the row
+         * already carries the song and the transport, and both actions are a
+         * tap away on the song itself.
+         */}
+        <div className="hidden shrink-0 items-center gap-0.5 sm:flex">
           {current ? <LikeIndicator track={current} /> : null}
           {current?.user ? <FollowIndicator user={current.user} /> : null}
         </div>
 
         {/* Extras SoundCloud keeps on the far right */}
-        <div className="flex shrink-0 items-center gap-0.5 border-l border-border pl-1.5">
+        <div className="order-2 flex shrink-0 items-center gap-0.5 border-l border-border pl-1.5 sm:order-none">
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn('hidden sm:inline-flex', queueOpen && toggled)}
+            className={cn('inline-flex', queueOpen && toggled)}
             data-queue-toggle=""
             onClick={() => setQueueOpen((v) => !v)}
             aria-pressed={queueOpen}
@@ -387,7 +396,7 @@ export function Player() {
           >
             <ListMusic size={15} />
           </Button>
-          <div className="hidden md:block">
+          <div className="hidden sm:block">
             <VolumeControl
               volume={volume}
               muted={muted}

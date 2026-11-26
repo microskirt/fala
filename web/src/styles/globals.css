@@ -4,6 +4,13 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
+ * The light theme needs its own variant for the few places that are drawn in a
+ * fixed ink, such as the main tag's white border and text. On white paper that
+ * white would vanish, so those places swap to the page's own foreground.
+ */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
+
+/*
  * Focus styling only while the keyboard is driving, the same rule the base
  * outline follows. A pointer click or a play shortcut must not paint a ring on
  * something that was never navigated to with the keyboard.
@@ -75,8 +82,19 @@
   --radius: 0.625rem;
   /* Shared by the player bar and the queue panel that docks above it. */
   --player-height: 56px;
-  /* Toasts spawn below this, never over the top bar. */
-  --topbar-height: 56px;
+  /*
+   * The height the queue panel measures itself against. It matches
+   * `--player-height` on a desktop, but the player wraps onto two rows on a
+   * phone, so it needs its own token rather than dragging the sidebar footer
+   * along with it.
+   */
+  --player-bar-height: 56px;
+  /*
+   * Toasts spawn below this, never over the top bar. The top inset is folded in
+   * so a phone in standalone mode keeps the bar clear of the notch without the
+   * bar and the toasts measuring two different heights.
+   */
+  --topbar-height: calc(56px + env(safe-area-inset-top, 0px));
 }
 
 [data-theme='light'] {
@@ -199,6 +217,18 @@
     'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
     monospace;
+}
+
+/*
+ * Below `sm` the player wraps onto two rows: the song and transport on the
+ * first, the seek line across the second. The queue panel docks against this
+ * figure instead of the desktop height, and the bottom safe area is folded in
+ * because the panel is positioned against the bar, not the viewport edge.
+ */
+@media (width < 40rem) {
+  :root {
+    --player-bar-height: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @layer base {

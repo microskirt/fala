@@ -108,10 +108,17 @@ function FeedItem({ item }) {
                 </Link>
               ) : null}
             </div>
+            {/*
+             * A phone gives the title barely any width once four buttons sit
+             * beside it, so the two secondary actions wait for `sm`. Like and
+             * play stay: they are the two a feed row is for.
+             */}
             <div className="flex shrink-0 items-center gap-0.5">
               <LikeButton track={track} size={16} />
-              <AddToQueueButton track={track} size={16} />
-              <AddToPlaylistButton track={track} size={16} />
+              <span className="hidden items-center gap-0.5 sm:flex">
+                <AddToQueueButton track={track} size={16} />
+                <AddToPlaylistButton track={track} size={16} />
+              </span>
               <PlayButton track={track} size="sm" />
             </div>
           </div>

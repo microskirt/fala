@@ -69,8 +69,8 @@ export function Sidebar({ open, onNavigate }) {
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-40 flex w-[248px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar',
-        'transition-transform duration-200 lg:static lg:translate-x-0',
+        'fixed inset-y-0 left-0 z-40 flex w-[min(248px,82vw)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
+        'transition-transform duration-200 lg:static lg:w-[248px] lg:translate-x-0 lg:pt-0 lg:pb-0',
         open ? 'translate-x-0' : '-translate-x-full'
       )}
     >

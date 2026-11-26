@@ -65,7 +65,10 @@ function Row({ title, description, children }) {
           <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
         ) : null}
       </div>
-      {children ? <div className="flex shrink-0 items-center gap-2">{children}</div> : null}
+      {/* The controls wrap onto their own line rather than pushing the row wide. */}
+      {children ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{children}</div>
+      ) : null}
     </div>
   );
 }

@@ -5,11 +5,14 @@ import { usePlayerTime } from '@/context/PlayerContext.jsx';
 import { cn } from '@/lib/utils.js';
 import {
   normalizeSamples,
-  shapeSamples,
+  shapeSamplesCached,
   themeColor,
   barGeometry,
   paintBars,
   markerAtTime,
+  subscribeThemeChange,
+  observeResize,
+  unobserveResize,
 } from '@/lib/waveform.js';
 
 /*
@@ -196,7 +199,10 @@ function ClockPill({ children, side = 'left', muted = false }) {
 function MiniPlayed({ samples, width, height, geometry, duration, hoverRatio, active }) {
   const { currentTime } = usePlayerTime();
   const canvasRef = useRef(null);
-  const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
+  const norm = useMemo(
+    () => (samples && samples.length ? shapeSamplesCached(samples) : []),
+    [samples]
+  );
   const progress = active && duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
   // Under the pointer the edge follows it, so the preview is what would play.
   const edge = hoverRatio === null ? progress : hoverRatio;
@@ -213,6 +219,8 @@ function MiniPlayed({ samples, width, height, geometry, duration, hoverRatio, ac
   }, [norm, width, height, geometry]);
 
   useEffect(() => {
+    // The shared watcher repaints every mounted waveform on a theme change, so
+    // this layer does not need an observer of its own.
     const paint = () =>
       paintBars(canvasRef.current, {
         norm,
@@ -222,12 +230,7 @@ function MiniPlayed({ samples, width, height, geometry, duration, hoverRatio, ac
         color: themeColor('--primary', '#ff5500'),
         minBar: 1,
       });
-    const observer = new MutationObserver(paint);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme', 'style'],
-    });
-    return () => observer.disconnect();
+    return subscribeThemeChange(paint);
   }, [norm, width, height, geometry]);
 
   /*
@@ -353,18 +356,27 @@ export function MiniWaveform({
   const [hovered, setHovered] = useState(null);
   const [playing, setPlaying] = useState(null);
   const [hoverRatio, setHoverRatio] = useState(null);
-  const norm = useMemo(() => (samples && samples.length ? shapeSamples(samples) : []), [samples]);
+  const norm = useMemo(
+    () => (samples && samples.length ? shapeSamplesCached(samples) : []),
+    [samples]
+  );
   const geometry = useMemo(() => barGeometry(width), [width]);
 
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return undefined;
     const measure = () => setWidth(el.clientWidth);
+    // The first paint has to happen at the real width, so it is measured now
+    // rather than waiting for the observer's first callback.
     measure();
-    if (!('ResizeObserver' in globalThis)) return undefined;
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
+    /*
+     * One observer watches every row's box. A hundred rows used to mean a
+     * hundred observers; this one keeps each box's own measure callback. A
+     * browser without `ResizeObserver` keeps the old behaviour of measuring once
+     * and never following a resize.
+     */
+    if (!observeResize(el, measure)) return undefined;
+    return () => unobserveResize(el);
   }, []);
 
   const paint = () => {
@@ -384,12 +396,9 @@ export function MiniWaveform({
   }, [width, height, norm, geometry]);
 
   useEffect(() => {
-    const observer = new MutationObserver(() => paint());
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme', 'style'],
-    });
-    return () => observer.disconnect();
+    // Repaint on a theme change through the one shared watcher, instead of a
+    // `MutationObserver` per row all firing at once.
+    return subscribeThemeChange(() => paint());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height, norm, geometry]);
 

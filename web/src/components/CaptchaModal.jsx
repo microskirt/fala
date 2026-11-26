@@ -47,8 +47,13 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
         remembers the result for this connection.
       </p>
 
+      {/*
+       * The panel is taller than a phone screen inside a dialog, so below `sm`
+       * it gives way to the viewport height and the dialog scrolls instead of
+       * the frame running off the bottom. From `sm` it is the full 420px again.
+       */}
       {showFrame ? (
-        <div className="h-[420px] w-full overflow-hidden rounded-lg border bg-white">
+        <div className="h-[min(420px,50dvh)] w-full overflow-hidden rounded-lg border bg-white sm:h-[420px]">
           <iframe
             title="SoundCloud verification"
             src={url}
@@ -60,7 +65,7 @@ export function CaptchaModal({ open, url, loading, saving, error, onClose, onSub
       ) : null}
 
       {loading ? (
-        <div className="flex h-[420px] w-full flex-col items-center justify-center gap-2.5 rounded-lg border bg-muted/40 text-sm text-muted-foreground">
+        <div className="flex h-[min(420px,50dvh)] w-full flex-col items-center justify-center gap-2.5 rounded-lg border bg-muted/40 text-center text-sm text-muted-foreground sm:h-[420px]">
           <Loader2 size={20} className="animate-spin" />
           <span>Asking SoundCloud for a fresh check...</span>
         </div>

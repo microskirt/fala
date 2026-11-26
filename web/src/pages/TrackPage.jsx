@@ -614,9 +614,19 @@ function CommentForm({
     );
   }
 
+  /*
+   * The signed in box and a reply put the picture, the field and the buttons on
+   * one line. A phone cannot spare the 38px for the picture, so it steps aside
+   * there and the field keeps the width.
+   */
   return (
     <form className={cn('flex items-center gap-2.5', className)} onSubmit={submit}>
-      <Avatar src={user.avatar_url} name={user.username} size={38} />
+      <Avatar
+        src={user.avatar_url}
+        name={user.username}
+        size={38}
+        className="hidden sm:inline-flex"
+      />
       <Input
         className="flex-1"
         placeholder={
@@ -1757,7 +1767,8 @@ export function TrackPage() {
             </button>
 
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {/* A long title wraps rather than running past the cover. */}
+              <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">
                 {track.title}
               </h1>
 
@@ -1840,9 +1851,14 @@ export function TrackPage() {
           <div className="mt-3.5 flex flex-wrap items-center gap-2">
             <LikeButton track={track} className="size-9 justify-center px-0" />
 
+            {/*
+              * On a phone the field takes a line of its own and the buttons wrap
+              * under it, so it never shrinks to a sliver between them. The basis
+              * goes back to zero from `sm`, which is the flex-1 it always had.
+              */}
             <CommentForm
               track={track}
-              className="min-w-0 flex-1"
+              className="min-w-0 flex-1 basis-full sm:basis-0"
               compact
               active={active}
               onPosted={(c) => {
@@ -1883,7 +1899,11 @@ export function TrackPage() {
             {mainTag || tags.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-1.5">
                 {mainTag ? (
-                  <Badge variant="outline" title="Main tag">
+                  <Badge
+                    variant="outline"
+                    title="Main tag"
+                    className="border-white text-white light:border-foreground light:text-foreground"
+                  >
                     {mainTag}
                   </Badge>
                 ) : null}
@@ -2050,7 +2070,8 @@ function RepostControl({ track }) {
       </Button>
 
       {open ? (
-        <div className="absolute top-full right-0 z-50 mt-1.5 w-72 rounded-lg border bg-popover p-3 shadow-lg">
+        /* The note is 18rem wide, but never wider than the phone it opens on. */
+        <div className="absolute top-full right-0 z-50 mt-1.5 w-[min(18rem,calc(100vw-2rem))] rounded-lg border bg-popover p-3 shadow-lg">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted-foreground">
               Add a note to the repost

@@ -98,8 +98,12 @@ function PlaylistTrackRow({ track, index, context }) {
           )}
         </div>
       </div>
-      {/* Hidden until the row is hovered, and not clickable while hidden. */}
-      <div className="pointer-events-none flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
+      {/*
+       * Hidden until the row is hovered, and not clickable while hidden. A
+       * phone has no hover, so the tray is left out there and the title takes
+       * the width it would have eaten.
+       */}
+      <div className="pointer-events-none hidden shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 sm:flex">
         <LikeButton track={track} size={16} />
         <AddToQueueButton track={track} size={16} />
         <AddToPlaylistButton track={track} size={16} />
@@ -291,7 +295,8 @@ export function PlaylistPage() {
             )}
           </Eyebrow>
 
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {/* A long, unbroken title wraps instead of running past the card. */}
+          <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">
             {playlist.title}
           </h1>
 

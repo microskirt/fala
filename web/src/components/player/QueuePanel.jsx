@@ -103,7 +103,7 @@ export function QueuePanel() {
   return (
     <aside
       ref={panelRef}
-      className="fixed right-2 bottom-[calc(var(--player-height)+0.5rem)] z-40 flex max-h-[min(60vh,560px)] w-[min(24rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+      className="fixed right-2 bottom-[calc(var(--player-bar-height)+0.5rem)] z-40 flex max-h-[min(60vh,560px)] w-[min(24rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
       aria-label="Queue"
     >
       <div className="flex items-center justify-between border-b border-border px-3.5 py-2.5">

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Play, Heart, MessageSquare, Repeat2 } from 'lucide-react';
 import {
@@ -28,7 +28,7 @@ import { buildCommentMarkers } from '@/lib/waveform.js';
  * and the numbers on the other. The date and the main tag sit in the top right
  * corner, clear of the title.
  */
-export function ArtistTrackRow({ track, context }) {
+export const ArtistTrackRow = memo(function ArtistTrackRow({ track, context }) {
   const { samples, comments, rowRef } = useRowData(track);
   const { isCurrent, playTrack, seek } = usePlayer();
   const duration = track?.full_duration || track?.duration || 0;
@@ -49,12 +49,21 @@ export function ArtistTrackRow({ track, context }) {
       className="group -mx-2 flex gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent/50"
       ref={rowRef}
     >
-      <Link {...trackLink(track)} className="shrink-0 self-start" aria-label={track.title}>
+      {/*
+       * The cover takes a fifth of the row on a phone and goes back to its
+       * 160px square from `sm`. The column below keeps the height the cover had
+       * on the wide layout, so the bar still lands on the cover's middle.
+       */}
+      <Link
+        {...trackLink(track)}
+        className="w-20 shrink-0 self-center sm:w-40 sm:self-start"
+        aria-label={track.title}
+      >
         <Artwork
           src={track.artwork_url}
           fallback={track.user?.avatar_url}
           alt={track.title}
-          size={160}
+          size="100%"
           rounded={8}
         />
       </Link>
@@ -72,7 +81,12 @@ export function ArtistTrackRow({ track, context }) {
          * tallest on the bottom, so a band each keeps their inner margins equal
          * and the entry reads as bracketing the cover evenly.
          */}
-        <div className="flex min-h-11 items-center justify-between gap-3">
+        {/*
+         * On a phone the date and tag column is allowed to drop under the title
+         * instead of squeezing it to a few letters; `sm:flex-nowrap` restores
+         * the single band the wide layout has always used.
+         */}
+        <div className="flex min-h-11 flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
           <div className="flex min-w-0 items-center gap-2.5">
             {/*
              * The play button lives beside the title rather than over the
@@ -94,7 +108,7 @@ export function ArtistTrackRow({ track, context }) {
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="ml-auto flex shrink-0 flex-col items-end gap-1 sm:ml-0">
             {date ? (
               <time
                 dateTime={date}
@@ -105,7 +119,15 @@ export function ArtistTrackRow({ track, context }) {
               </time>
             ) : null}
             {mainTag ? (
-              <Badge variant="outline" title="Main tag">
+              /*
+               * A long genre would otherwise run past the row: the tag caps
+               * itself at the corner it lives in and cuts with an ellipsis.
+               */
+              <Badge
+                variant="outline"
+                title="Main tag"
+                className="max-w-[8rem] truncate border-white text-white sm:max-w-none light:border-foreground light:text-foreground"
+              >
                 {mainTag}
               </Badge>
             ) : null}
@@ -117,8 +139,13 @@ export function ArtistTrackRow({ track, context }) {
          * exactly the cover's height. Laying it in the gap between the rows
          * would put its middle below the cover's middle, because the title
          * block is taller than the footer.
+         *
+         * A phone cannot afford that: the footer wraps onto a second line, so
+         * the column is taller than the cover and a bar pinned to its middle
+         * would run under the buttons. There the bar takes its own row between
+         * the two bands instead, and only from `sm` is it lifted out again.
          */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
+        <div className="w-full py-1 sm:absolute sm:inset-x-0 sm:top-1/2 sm:py-0 sm:-translate-y-1/2">
           <MiniWaveform
             samples={samples}
             markers={markers}
@@ -144,8 +171,13 @@ export function ArtistTrackRow({ track, context }) {
          * above the cover's bottom edge as the top row starts below its top
          * edge, so the two bracket the cover evenly and the bar between them
          * lands on the cover's middle.
+         *
+         * On a phone the four buttons and the counts no longer fit on one line,
+         * so the footer wraps and the two quietest counts step aside. Plays and
+         * likes stay: they are the two people actually read in a list. From
+         * `sm` the footer is the single row it always was.
          */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex items-center gap-0.5">
             <LikeButton track={track} size={16} />
             <RepostButton track={track} size={16} iconOnly />
@@ -153,17 +185,17 @@ export function ArtistTrackRow({ track, context }) {
             <AddToQueueButton track={track} size={16} />
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground sm:gap-3">
             <span className="inline-flex items-center gap-1" title="Plays">
               <Play size={14} fill="currentColor" /> {formatCount(track.playback_count)}
             </span>
             <span className="inline-flex items-center gap-1" title="Likes">
               <Heart size={14} /> {formatCount(track.likes_count)}
             </span>
-            <span className="inline-flex items-center gap-1" title="Comments">
+            <span className="hidden items-center gap-1 sm:inline-flex" title="Comments">
               <MessageSquare size={14} /> {formatCount(track.comment_count)}
             </span>
-            <span className="inline-flex items-center gap-1" title="Reposts">
+            <span className="hidden items-center gap-1 sm:inline-flex" title="Reposts">
               <Repeat2 size={14} /> {formatCount(track.reposts_count)}
             </span>
           </div>
@@ -171,7 +203,7 @@ export function ArtistTrackRow({ track, context }) {
       </div>
     </div>
   );
-}
+});
 
 /*
  * The same entry with its content still to come, so the list does not jump when
@@ -180,7 +212,8 @@ export function ArtistTrackRow({ track, context }) {
 export function ArtistTrackRowSkeleton() {
   return (
     <div className="flex gap-3 rounded-lg px-2 py-2">
-      <Skeleton className="size-40 shrink-0 rounded-lg" />
+      {/* Matches the real row's cover, which is a fifth of the width on a phone. */}
+      <Skeleton className="size-20 shrink-0 rounded-lg sm:size-40" />
       <div className="relative flex min-w-0 flex-1 flex-col justify-between">
         <div className="flex min-h-11 items-center gap-2.5">
           <Skeleton className="size-8 shrink-0 rounded-full" />

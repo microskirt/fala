@@ -523,13 +523,14 @@ export function ProfilePage() {
         <div className="px-5 pb-6 pt-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
-                {profile.username}
-                {profile.verified ? <BadgeCheck size={18} className="text-primary" /> : null}
+              <h1 className="flex min-w-0 items-center gap-1.5 text-2xl font-semibold tracking-tight break-words sm:text-3xl">
+                <span className="min-w-0 break-words">{profile.username}</span>
+                {profile.verified ? <BadgeCheck size={18} className="shrink-0 text-primary" /> : null}
               </h1>
-              <div className="text-sm text-muted-foreground">@{profile.permalink}</div>
+              <div className="break-words text-sm text-muted-foreground">@{profile.permalink}</div>
             </div>
-            <div className="flex items-center gap-2">
+            {/* The actions wrap under the name instead of pushing past the card. */}
+            <div className="flex flex-wrap items-center gap-2">
               {isOwn ? (
                 <Button variant="ghost" asChild>
                   <Link to="/settings">

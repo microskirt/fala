@@ -26,6 +26,11 @@ function Toaster(props) {
         '--normal-text': 'var(--popover-foreground)',
       }}
       position="top-right"
+      /*
+       * The toast is a fixed 340px wide, which is wider than a phone once the
+       * 12px gutters are taken off. It keeps that width on a desktop and shrinks
+       * to the viewport on anything narrower, so it never runs off the edge.
+       */
       offset={{ top: 'calc(var(--topbar-height) + 12px)', right: '12px' }}
       gap={8}
       visibleToasts={4}
@@ -35,7 +40,7 @@ function Toaster(props) {
         unstyled: true,
         classNames: {
           toast:
-            'group relative flex w-[340px] items-start gap-2.5 rounded-lg border border-border bg-popover py-3 pl-3.5 pr-9 text-popover-foreground shadow-lg',
+            'group relative flex w-[min(340px,calc(100vw-1.5rem))] items-start gap-2.5 rounded-lg border border-border bg-popover py-3 pl-3.5 pr-9 text-popover-foreground shadow-lg',
           title: 'text-sm font-medium leading-snug',
           description: 'mt-0.5 text-xs text-muted-foreground',
           icon: 'mt-0.5 shrink-0 text-muted-foreground',
