@@ -289,18 +289,9 @@ export function ActivityPage() {
   }, [isAuthed, days]);
 
   /*
-   * A song counts as heard when it plays, not only when this page's own button
-   * starts it. Skipping with the player bar changes the loaded song without
-   * going through `choose`, so the row that was skipped to used to stay in the
-   * list as if it had never played.
-   *
-   * The row is found by the track object the player holds. The queue keeps the
-   * exact objects this page handed it, and two authors can post the same song,
-   * so matching the object names the one row that was skipped to instead of
-   * taking every posting of that song away. The ref remembers the last song
-   * this page already accounted for, so opening Activity while something plays
-   * from elsewhere does not mark it: only a change of song while the page is up
-   * counts.
+   * The track object is the row's identity. The queue keeps the exact objects
+   * this page handed it, so the map below names the one row a track came from
+   * even when two authors posted the same song.
    */
   const authorByTrack = useMemo(() => {
     const map = new Map();
@@ -312,28 +303,58 @@ export function ActivityPage() {
     return map;
   }, [authors]);
 
-  const handledIdRef = useRef(currentId);
+  /*
+   * The row the player is on stays on screen while it plays; the row it moved
+   * away from is the one that leaves. A skip in the player bar changes the song
+   * without going through `choose`, and marking the song that was skipped to at
+   * the moment it started made it vanish under the finger that had just pressed
+   * skip. So the mark lands on the song being left behind, and the song that
+   * took its place is pinned, exactly as a row's own play button pins it.
+   *
+   * The row is found by the track object the player holds. The queue keeps the
+   * exact objects this page handed it, and two authors can post the same song,
+   * so matching the object names the one row instead of taking every posting of
+   * that song away. The refs remember the last song this page accounted for, so
+   * opening Activity while something plays from elsewhere does not mark it: only
+   * a change of song while the page is up counts.
+   */
+  const handledIdRef = useRef(null);
+  const handledTrackRef = useRef(null);
   useEffect(() => {
     if (!current?.id || !authors.length) return;
     const id = String(current.id);
     if (handledIdRef.current === id) return;
+
+    const previous = handledTrackRef.current;
     handledIdRef.current = id;
-    if (pinned && pinned.trackId === id) return;
+    handledTrackRef.current = current;
+
+    // The song being left behind is the one that has now been heard.
+    if (previous && String(previous.id) !== id) {
+      const prevAuthor = authorByTrack.get(previous);
+      if (prevAuthor) {
+        markPlayed(prevAuthor.id, previous.id);
+      } else {
+        /*
+         * A queue started elsewhere holds its own copy of the track, so it
+         * cannot name the row by object. One author posting it is still
+         * unambiguous; two or more are left alone rather than clearing all of
+         * them on a guess.
+         */
+        const posters = authors.filter((a) =>
+          (a.entries || []).some((e) => String(e.track?.id) === String(previous.id))
+        );
+        if (posters.length === 1) markPlayed(posters[0].user?.id, previous.id);
+      }
+    }
+
+    // The song now playing keeps its row until something else starts.
     const author = authorByTrack.get(current);
     if (author) {
-      markPlayed(author.id, current.id);
-      return;
+      const key = playedKey(author.user?.id, current.id);
+      if (key) setPinned({ key, trackId: id });
     }
-    /*
-     * A queue started elsewhere holds its own copy of the track, so it cannot
-     * name the row by object. One author posting it is still unambiguous; two
-     * or more are left alone rather than clearing all of them on a guess.
-     */
-    const posters = authors.filter((a) =>
-      (a.entries || []).some((e) => String(e.track?.id) === id)
-    );
-    if (posters.length === 1) markPlayed(posters[0].user?.id, current.id);
-  }, [current, pinned, authors, authorByTrack]);
+  }, [current, authors, authorByTrack]);
 
   /*
    * A song leaves the view once this browser has played it, so the list only
