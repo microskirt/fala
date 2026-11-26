@@ -264,7 +264,17 @@
    * key at all counts, so pressing Space to play after clicking a nav item drew
    * a box around a link that had only been clicked. `inputModality.js` records
    * the device, and the ring follows that instead.
+   *
+   * The browser's own outline has to be cleared first, not merely overridden in
+   * keyboard mode. It is what the stray box really was: the rule below only
+   * ever added a ring for the keyboard and left the native one on for every
+   * other key, so the click-then-Space case still drew it. Clearing it here and
+   * drawing it back for the keyboard keeps the ring meaning what it says.
    */
+  :focus-visible {
+    outline: none;
+  }
+
   [data-input='keyboard'] :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
