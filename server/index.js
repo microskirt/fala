@@ -852,6 +852,7 @@ const MIME = {
   '.woff': 'font/woff',
   '.map': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
 };
 
 async function serveStatic(req, res, urlPath) {
@@ -885,11 +886,18 @@ async function serveStatic(req, res, urlPath) {
   const ext = path.extname(file).toLowerCase();
   const cache = rel.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
   const stat = fs.statSync(file);
-  res.writeHead(200, {
+  const headers = {
     'Content-Type': MIME[ext] || 'application/octet-stream',
     'Content-Length': stat.size,
     'Cache-Control': cache,
-  });
+  };
+  /*
+   * The worker file must never be pinned by a long cache or a new deploy could
+   * keep serving the old one indefinitely. The Allowed header lets a worker at
+   * the root control every route.
+   */
+  if (rel === '/sw.js') headers['Service-Worker-Allowed'] = '/';
+  res.writeHead(200, headers);
   fs.createReadStream(file).pipe(res);
 }
 

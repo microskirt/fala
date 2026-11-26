@@ -16,6 +16,42 @@ import './styles/globals.css';
 migrateLegacyKeys();
 installInputModality();
 
+/*
+ * PWA plumbing lives here rather than in a component so it runs once, before
+ * the router mounts, and never re-runs on navigation or re-render.
+ */
+function installPwa() {
+  if (typeof window === 'undefined') return;
+
+  /*
+   * The install prompt is a one-shot event the browser fires before
+   * `beforeinstallprompt` is usable. Stashing it lets UI call prompt() later
+   * instead of the browser showing its own mini-infobar.
+   */
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    window.__falaInstallPrompt = event;
+    window.dispatchEvent(new CustomEvent('fala:installprompt', { detail: event }));
+  });
+
+  window.addEventListener('appinstalled', () => {
+    window.__falaInstallPrompt = null;
+    window.dispatchEvent(new CustomEvent('fala:appinstalled'));
+  });
+
+  /*
+   * Only production registers a worker: the dev server rewrites modules and
+   * the SW would cache half-built bundles, which is painful to debug.
+   */
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+installPwa();
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>

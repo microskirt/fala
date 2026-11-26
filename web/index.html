@@ -7,6 +7,17 @@
     <title>Fala</title>
     <meta name="description" content="Fala is a working front-end for SoundCloud." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <!-- Installability: Android/Chrome read the manifest, iOS reads the touch icon. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Fala" />
+    <meta name="application-name" content="Fala" />
+    <!-- Track titles and usernames often contain digit runs; stop iOS linking them. -->
+    <meta name="format-detection" content="telephone=no" />
     <script>
       // Apply the saved theme before first paint to avoid a flash.
       try {
