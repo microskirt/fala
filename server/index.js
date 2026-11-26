@@ -313,7 +313,26 @@ route('GET', '/api/me/stream/sorted', async (ctx) => {
   const token = requireToken(ctx);
   const asked = Number(ctx.query.get('days'));
   const days = [5, 7, 10].includes(asked) ? asked : 7;
-  return sc.sortedActivity(token, { days });
+  /*
+   * The rows carry hearts and repost marks, and the player bar reads its like
+   * state from the very object the queue was handed. SoundCloud never puts
+   * those flags on a track, so the same decoration every other list does has to
+   * happen here too, on the songs nested under each author.
+   */
+  const [data, flags] = await Promise.all([
+    sc.sortedActivity(token, { days }),
+    flagsFor(token),
+  ]);
+  return {
+    ...data,
+    collection: data.collection.map((author) => ({
+      ...author,
+      entries: author.entries.map((entry) => ({
+        ...entry,
+        track: entry.track ? decorateTrack(entry.track, flags) : null,
+      })),
+    })),
+  };
 });
 
 route('GET', '/api/me/notifications', async (ctx) => {
