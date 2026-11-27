@@ -1364,8 +1364,22 @@ export async function alsoLiked(token, trackId, { pages = 6 } = {}) {
  */
 const WIDEVINE_LICENSE_URL = 'https://license.media-streaming.soundcloud.cloud/playback/widevine';
 
+/*
+ * How long a resolved stream is kept.
+ *
+ * A song can play for minutes without a single API call, which lets the
+ * process's pooled connection to SoundCloud fall idle. The next request then
+ * has to open a fresh socket, and that is where the ten-second start came
+ * from: the first upstream call after a quiet spell, not the track itself. The
+ * player now resolves the next song while the current one plays, and that only
+ * helps if the answer is still here when the next song actually begins. The
+ * signed URL itself lives for hours, so ten minutes is comfortably inside it
+ * and long enough for any song to finish first.
+ */
+const STREAM_RESOLVE_TTL = 10 * 60_000;
+
 export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
-  const data = await apiGet(`/tracks/${id}`, { ttl: 120_000, token });
+  const data = await apiGet(`/tracks/${id}`, { ttl: STREAM_RESOLVE_TTL, token });
   if (!data.streamable) throw new ScError(404, 'This track is not streamable');
   const policy = String(data.policy || '');
   if (policy === 'BLOCK' || policy === 'SNIP') {
@@ -1417,7 +1431,7 @@ export async function streamUrl(id, quality = 'hq', { token = null } = {}) {
   for (const chosen of ordered.slice(0, 6)) {
     let resolved = null;
     try {
-      resolved = await apiGet(chosen.url, { ttl: 60_000, token });
+      resolved = await apiGet(chosen.url, { ttl: STREAM_RESOLVE_TTL, token });
     } catch {
       continue;
     }

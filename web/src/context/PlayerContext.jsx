@@ -377,6 +377,35 @@ export function PlayerProvider({ children }) {
   }, [current?.id, quality, reloadKey]);
 
   /*
+   * The next song is resolved while this one is still playing.
+   *
+   * A song runs for minutes with no API traffic at all, and that quiet spell
+   * lets the server's pooled connection to SoundCloud fall idle. The next
+   * click then pays to open a fresh one, which is the ten-second start: it is
+   * the first upstream call after a pause, not the track. Asking for the next
+   * song's stream now moves that cost into the background, where the listener
+   * is already listening to something.
+   *
+   * Shuffle picks its next song at random, so there is nothing to predict and
+   * this stays quiet rather than warming a song that will not play.
+   */
+  const upcomingId =
+    !shuffle && index >= 0 && index + 1 < queue.length ? queue[index + 1]?.id : null;
+  useEffect(() => {
+    if (!current || upcomingId == null) return;
+    /*
+     * A short delay keeps this off the critical path of the current song's own
+     * load: the song that is playing matters more than the one after it.
+     */
+    const timer = setTimeout(() => {
+      api
+        .get(`/api/tracks/${upcomingId}/stream?quality=${encodeURIComponent(quality)}`)
+        .catch(() => {});
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [current?.id, upcomingId, quality]);
+
+  /*
    * A failed load is retried once with a fresh stream URL, because the usual
    * cause is a signed URL that expired while the track sat in the queue. Only
    * when the retry fails too does the listener hear about it, and then as a
