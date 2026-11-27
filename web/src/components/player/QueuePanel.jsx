@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Trash2, ListMusic, GripVertical, Play } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext.jsx';
-import { AddToPlaylistButton } from '@/components/Controls.jsx';
 import { Artwork } from '@/components/Media.jsx';
 import { trackArtistName } from '@/api.js';
 import { Button } from '@/components/ui/button.jsx';
@@ -223,12 +222,7 @@ export function QueuePanel() {
                     </span>
                   </span>
                 </button>
-                {/* Hidden controls stay out of the hit test until the row is hovered. */}
-                <AddToPlaylistButton
-                  track={t}
-                  size={14}
-                  className="pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
-                />
+                {/* Hidden control stays out of the hit test until the row is hovered. */}
                 <Button
                   variant="ghost"
                   size="icon-sm"
