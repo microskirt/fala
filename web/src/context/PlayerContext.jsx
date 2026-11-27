@@ -662,36 +662,70 @@ export function PlayerProvider({ children }) {
    * Queued songs land directly after the one that is playing, which is where a
    * listener expects the next thing they added to come up. Appending instead
    * pushed them behind everything already waiting, so a song added to a long
-   * queue was not heard for an hour. Nothing is inserted twice, and an empty
-   * queue still starts playing.
+   * queue was not heard for an hour. An empty queue still starts playing.
+   *
+   * A song that is already waiting is moved, not dropped. Playing from a list
+   * makes that whole list the queue, so the song a listener adds from the same
+   * list is almost always already in it, sitting far from the current one. The
+   * old dedupe threw it away and still said it had been added, which is why the
+   * button looked like it did nothing. Moving it behind the current song is
+   * what the listener asked for, and the toast now reports what happened.
    */
   const addToQueue = useCallback(
     (input) => {
-      const incoming = (Array.isArray(input) ? input : [input]).filter(Boolean);
+      const incoming = (Array.isArray(input) ? input : [input]).filter(
+        (t) => t && t.id != null
+      );
       if (incoming.length === 0) return;
-      setQueue((prev) => {
-        const seen = new Set(prev.map((t) => String(t.id)));
-        const added = [];
-        for (const t of incoming) {
-          const key = String(t.id);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          added.push(t);
-        }
-        if (added.length === 0) return prev;
-        if (prev.length === 0) {
-          setIndex(0);
-          setPlaying(true);
-          playingRef.current = true;
-          return added;
-        }
-        // A queue with nothing loaded yet has no "now playing" to follow.
-        const at = index < 0 ? prev.length : Math.min(prev.length, index + 1);
-        return [...prev.slice(0, at), ...added, ...prev.slice(at)];
-      });
-      toast.success(incoming.length === 1 ? 'Added to queue' : `Added ${incoming.length} tracks to queue`);
+
+      const currentId =
+        index >= 0 && index < queue.length ? String(queue[index].id) : null;
+
+      // What is actually new, in order, with the song that is already playing
+      // and any repeat inside the request itself left out.
+      const want = [];
+      const wanted = new Set();
+      for (const t of incoming) {
+        const key = String(t.id);
+        if (key === currentId || wanted.has(key)) continue;
+        wanted.add(key);
+        want.push(t);
+      }
+
+      if (queue.length === 0) {
+        setQueue(incoming);
+        setIndex(0);
+        setPlaying(true);
+        playingRef.current = true;
+        toast.success('Added to queue');
+        return;
+      }
+
+      // Nothing to place: every song in the request is the one already playing.
+      if (want.length === 0) {
+        toast.info('Already playing');
+        return;
+      }
+
+      // Drop any copy that is already waiting so it can be placed behind the
+      // current song instead of being left where it happened to sit. Taking
+      // one out from above the playing song shifts it down, so the index is
+      // found again in the trimmed list rather than kept as it was.
+      const rest = queue.filter((t) => !wanted.has(String(t.id)));
+      let at = rest.length;
+      let nextIndex = index;
+      if (currentId != null) {
+        const cur = rest.findIndex((t) => String(t.id) === currentId);
+        at = cur + 1;
+        nextIndex = cur;
+      }
+      setQueue([...rest.slice(0, at), ...want, ...rest.slice(at)]);
+      if (nextIndex !== index) setIndex(nextIndex);
+      toast.success(
+        want.length === 1 ? 'Added to queue' : `Added ${want.length} tracks to queue`
+      );
     },
-    [index, toast]
+    [queue, index, toast]
   );
 
   const playNextInQueue = useCallback(
