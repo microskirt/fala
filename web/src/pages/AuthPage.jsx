@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
-  Radio,
   KeyRound,
   ArrowRight,
   AlertCircle,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { useToast } from '@/context/ToastContext.jsx';
+import { BrandMark } from '@/components/Brand.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
@@ -61,9 +61,7 @@ export function AuthPage() {
           }}
         />
         <Link to="/" className="relative flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Radio size={18} strokeWidth={2.4} />
-          </span>
+          <BrandMark size={36} className="shrink-0 rounded-lg" />
           <span className="leading-tight">
             <span className="block text-base font-semibold tracking-tight">Fala</span>
             <span className="block text-xs text-muted-foreground">A working SoundCloud</span>
